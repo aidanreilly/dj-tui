@@ -1,5 +1,7 @@
 //! Signed waveform rasterising for the deck overview.
 
+use crate::pixel::{band_half_steps, Palette};
+use ratatui::style::Color;
 use wave::WavePoint;
 
 // Compatibility rasteriser for magnitude-only envelopes.
@@ -139,4 +141,49 @@ pub fn downsample_peaks(src: &[f32], n: usize) -> Vec<f32> {
             src[start..end].iter().copied().fold(0.0, f32::max)
         })
         .collect()
+}
+
+/// One colour per cell, matching the geometry `amplitude_rows` draws.
+///
+/// A cell holds one foreground colour and two half-block pixels, so the band is chosen
+/// from the cell's outer pixel: the topmost band reaching that far out wins, which puts
+/// bass at the edges and highs near the centre line.
+pub fn band_colors(points: &[WavePoint], rows: usize, palette: &Palette) -> Vec<Vec<Color>> {
+    if rows == 0 {
+        return Vec::new();
+    }
+    let height = rows * 2;
+    let centre = (height - 1) as f32 * 0.5;
+    let low = rgba_to_color(palette.bands[0]);
+
+    (0..rows)
+        .map(|row| {
+            // The outer of the cell's two pixels: upward above the centre line,
+            // downward below it.
+            let pixel = if row < rows / 2 { row * 2 } else { row * 2 + 1 };
+            points
+                .iter()
+                .map(|p| {
+                    let mut colour = low;
+                    for band in 0..3 {
+                        let frac = band_half_steps(p.bands[band], band);
+                        if frac <= 0.0 {
+                            continue;
+                        }
+                        let half = frac * centre;
+                        let top = (centre - half).round() as usize;
+                        let bottom = (centre + half).round() as usize;
+                        if pixel >= top && pixel <= bottom {
+                            colour = rgba_to_color(palette.bands[band]);
+                        }
+                    }
+                    colour
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn rgba_to_color(c: image::Rgba<u8>) -> Color {
+    Color::Rgb(c[0], c[1], c[2])
 }

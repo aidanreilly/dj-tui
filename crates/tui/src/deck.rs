@@ -1,4 +1,5 @@
-use crate::waveform::{amplitude_rows, downsample_points, ranges};
+use crate::pixel::Palette;
+use crate::waveform::{amplitude_rows, band_colors, downsample_points, ranges};
 use engine::DeckId;
 use ratatui::{
     buffer::Buffer,
@@ -40,11 +41,19 @@ pub struct DeckView {
 
 pub struct DeckPanel<'a> {
     view: &'a DeckView,
+    palette: &'a Palette,
 }
 
+static DEFAULT_PALETTE: std::sync::OnceLock<Palette> = std::sync::OnceLock::new();
+
 impl<'a> DeckPanel<'a> {
+    /// Draws in the default palette. Kept for callers that have no mode to hand.
     pub fn new(view: &'a DeckView) -> Self {
-        Self { view }
+        Self::with_palette(view, DEFAULT_PALETTE.get_or_init(Palette::default))
+    }
+
+    pub fn with_palette(view: &'a DeckView, palette: &'a Palette) -> Self {
+        Self { view, palette }
     }
 }
 
@@ -109,6 +118,7 @@ impl Widget for DeckPanel<'_> {
         let wave_y = inner.y + 1;
         let columns = downsample_points(&v.waveform, inner.width as usize);
         let rows = amplitude_rows(&ranges(&columns), WAVEFORM_ROWS as usize);
+        let colours = band_colors(&columns, WAVEFORM_ROWS as usize, self.palette);
         let center_y = wave_y + WAVEFORM_ROWS / 2;
         buf.set_string(
             inner.x,
@@ -122,12 +132,12 @@ impl Widget for DeckPanel<'_> {
                 break;
             }
             for (col, glyph) in row.chars().enumerate().filter(|(_, glyph)| *glyph != ' ') {
-                buf.set_string(
-                    inner.x + col as u16,
-                    y,
-                    glyph.to_string(),
-                    Style::new().fg(ratatui::style::Color::Rgb(126, 113, 190)),
-                );
+                let colour = colours
+                    .get(i)
+                    .and_then(|r| r.get(col))
+                    .copied()
+                    .unwrap_or(ratatui::style::Color::Rgb(126, 113, 190));
+                buf.set_string(inner.x + col as u16, y, glyph.to_string(), Style::new().fg(colour));
             }
         }
         if v.duration_secs > 0.0 {

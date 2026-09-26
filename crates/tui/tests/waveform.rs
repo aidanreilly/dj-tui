@@ -186,3 +186,59 @@ fn ranges_extracts_the_signed_pairs() {
     let src = vec![pt(0.25, [1.0; 3]), pt(0.75, [0.0; 3])];
     assert_eq!(ranges(&src), vec![[-0.25, 0.25], [-0.75, 0.75]]);
 }
+
+// --- Band colouring for the glyph fallback ---
+
+use ratatui::style::Color;
+use tui::pixel::Palette;
+use tui::waveform::band_colors;
+
+fn as_color(c: image::Rgba<u8>) -> Color {
+    Color::Rgb(c[0], c[1], c[2])
+}
+
+fn pt_row(bands: [f32; 3]) -> Vec<WavePoint> {
+    vec![pt(1.0, bands)]
+}
+
+#[test]
+fn band_colours_have_the_same_shape_as_the_glyph_rows() {
+    let p = Palette::default();
+    let src = vec![pt(1.0, [1.0, 0.5, 0.2]); 7];
+    let colours = band_colors(&src, 8, &p);
+    assert_eq!(colours.len(), 8);
+    assert!(colours.iter().all(|row| row.len() == 7));
+}
+
+#[test]
+fn the_topmost_band_wins_a_cell_where_two_overlap() {
+    let p = Palette::default();
+    // Bass at full scale over a quieter mid and high: the centre cells belong to the
+    // high band, the outermost cell to the low band. Values chosen so the 1.8x and 3x
+    // display gains do not push the upper bands to full scale.
+    let colours = band_colors(&pt_row([1.0, 0.3, 0.15]), 8, &p);
+    assert_eq!(colours[3][0], as_color(p.bands[2]), "cell above the line");
+    assert_eq!(colours[4][0], as_color(p.bands[2]), "cell below the line");
+    assert_eq!(colours[0][0], as_color(p.bands[0]), "outermost cell");
+}
+
+#[test]
+fn a_quiet_high_band_does_not_reach_the_outer_cells() {
+    let p = Palette::default();
+    let colours = band_colors(&pt_row([1.0, 0.0, 0.05]), 8, &p);
+    assert_eq!(colours[0][0], as_color(p.bands[0]));
+}
+
+#[test]
+fn a_column_with_no_bands_falls_back_to_the_low_colour() {
+    let p = Palette::default();
+    let colours = band_colors(&pt_row([0.0, 0.0, 0.0]), 8, &p);
+    assert_eq!(colours[3][0], as_color(p.bands[0]));
+}
+
+#[test]
+fn zero_rows_or_no_points_give_nothing_to_draw() {
+    let p = Palette::default();
+    assert!(band_colors(&[], 8, &p).iter().all(|r| r.is_empty()));
+    assert!(band_colors(&pt_row([1.0; 3]), 0, &p).is_empty());
+}
