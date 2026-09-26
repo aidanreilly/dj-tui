@@ -3,7 +3,7 @@
 
 use image::{Rgba, RgbaImage};
 use tui::pixel::{playhead_x, Palette, PixelWaveform, WaveformBitmaps, PLAYHEAD_WIDTH};
-use wave::{WaveformMode, WavePoint};
+use wave::{WavePoint, WaveformMode};
 
 const W: u32 = 200;
 const H: u32 = 80;
@@ -355,7 +355,12 @@ fn blue_tints_toward_white_as_highs_rise() {
     let bright = WaveformBitmaps::rasterize(&one([1.0, 0.2, 1.0], 1.0), 1, 64, &p);
     let a = *dull.normal().get_pixel(0, 32);
     let b = *bright.normal().get_pixel(0, 32);
-    assert!(luma(&b) > luma(&a), "{} should exceed {}", luma(&b), luma(&a));
+    assert!(
+        luma(&b) > luma(&a),
+        "{} should exceed {}",
+        luma(&b),
+        luma(&a)
+    );
 }
 
 #[test]
@@ -369,9 +374,26 @@ fn blue_height_comes_from_the_bands_combined() {
 
 #[test]
 fn every_mode_leaves_silence_as_the_centre_line_alone() {
-    for mode in [WaveformMode::ThreeBand, WaveformMode::Rgb, WaveformMode::Blue] {
+    for mode in [
+        WaveformMode::ThreeBand,
+        WaveformMode::Rgb,
+        WaveformMode::Blue,
+    ] {
         let p = Palette::for_mode(mode);
         let b = WaveformBitmaps::rasterize(&one([0.0; 3], 0.0), 1, 64, &p);
         assert_eq!(opaque_rows(b.normal(), 0), 2, "{mode:?}");
     }
+}
+
+#[test]
+fn changing_only_the_mode_produces_a_fresh_image() {
+    let mut pw = PixelWaveform::default();
+    let r = flat(0.6, 64);
+    assert!(pw.update(&r, (W, H), Some(10), &three_band()).is_some());
+    assert!(pw.update(&r, (W, H), Some(10), &three_band()).is_none());
+    let rgb = Palette::for_mode(WaveformMode::Rgb);
+    assert!(
+        pw.update(&r, (W, H), Some(10), &rgb).is_some(),
+        "a new mode must redraw"
+    );
 }

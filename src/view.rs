@@ -10,7 +10,7 @@ pub struct DeckMeta {
     pub bpm: Option<f64>,
     pub key: Option<String>,
     pub loading: bool,
-    pub waveform: Vec<[f32; 2]>,
+    pub waveform: Vec<wave::WavePoint>,
 }
 
 fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &DeckMeta) -> DeckView {
@@ -46,6 +46,7 @@ pub fn screen_view(
     focused: DeckId,
     metas: &[DeckMeta; 2],
     status: String,
+    waveform_mode: wave::WaveformMode,
 ) -> ScreenView {
     let rate = sample_rate as f64;
     ScreenView {
@@ -60,5 +61,6 @@ pub fn screen_view(
         },
         status,
         message: String::new(),
+        waveform_mode,
     }
 }

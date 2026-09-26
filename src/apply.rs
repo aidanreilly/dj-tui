@@ -6,6 +6,7 @@
 
 use engine::{Command, Snapshot};
 use input::{Action, Dir};
+use wave::WaveformMode;
 
 /// Step sizes and limits for keyboard controls.
 #[derive(Debug, Clone)]
@@ -37,6 +38,7 @@ pub struct ControlState {
     pub faders: [f32; 2],
     pub headphone_cue: [bool; 2],
     pub rates: [f64; 2],
+    pub waveform_mode: WaveformMode,
 }
 
 impl Default for ControlState {
@@ -46,6 +48,7 @@ impl Default for ControlState {
             faders: [1.0; 2],
             headphone_cue: [false; 2],
             rates: [1.0; 2],
+            waveform_mode: WaveformMode::default(),
         }
     }
 }
@@ -108,6 +111,10 @@ pub fn apply(
             };
             st.crossfader = x.clamp(-1.0, 1.0);
             Command::SetCrossfader(st.crossfader)
+        }
+        CycleWaveformMode => {
+            st.waveform_mode = st.waveform_mode.next();
+            return None;
         }
         _ => return None,
     })

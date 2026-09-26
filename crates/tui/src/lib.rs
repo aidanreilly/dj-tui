@@ -13,3 +13,4 @@ pub use graphics::{detect_graphics, multiplexer_detected, Graphics};
 pub use keys::convert_key;
 pub use layout::{screen_layout, ScreenLayout, DECK_HEIGHT};
 pub use screen::{render_screen, MixerView, ScreenView};
+pub use wave::WaveformMode;

@@ -6,11 +6,10 @@ use dj_tui::{
     cli::{parse_args, USAGE},
     clock::NullClock,
     config::{config_path, Backend, Config},
-    demo::{click_track, waveform_envelope},
+    demo::{click_track, planar},
     view::DeckMeta,
 };
 use engine::{channel, DeckId, Engine, EngineProcessor};
-use loader::ENVELOPE_POINTS;
 use ratatui::crossterm::{
     event::{
         self, Event, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
@@ -134,7 +133,8 @@ fn main() -> ExitCode {
     if args.demo && args.files.is_empty() {
         for (id, bpm) in [(DeckId::A, 124.0), (DeckId::B, 126.0)] {
             let track = click_track(bpm, 180.0, app.sample_rate());
-            let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
+            let [l, r] = planar(&track);
+            let waveform = wave::analyse(&l, &r, app.sample_rate());
             let meta = DeckMeta {
                 title: Some(format!("Demo click {bpm:.0}")),
                 bpm: Some(bpm),

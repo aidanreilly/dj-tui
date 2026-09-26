@@ -137,7 +137,12 @@ impl Widget for DeckPanel<'_> {
                     .and_then(|r| r.get(col))
                     .copied()
                     .unwrap_or(ratatui::style::Color::Rgb(126, 113, 190));
-                buf.set_string(inner.x + col as u16, y, glyph.to_string(), Style::new().fg(colour));
+                buf.set_string(
+                    inner.x + col as u16,
+                    y,
+                    glyph.to_string(),
+                    Style::new().fg(colour),
+                );
             }
         }
         if v.duration_secs > 0.0 {

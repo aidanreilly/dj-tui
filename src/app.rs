@@ -25,13 +25,20 @@ pub struct App {
 impl App {
     /// `sample_rate` is the session rate reported by the audio backend.
     pub fn new(handle: EngineHandle, config: &Config, sample_rate: u32) -> Self {
+        let cache_dir = wave::cache::dir(
+            std::env::var("XDG_CACHE_HOME").ok().as_deref(),
+            std::env::var("HOME").ok().as_deref(),
+        );
         let mut app = Self {
             handle,
             controls: Controls::new(config.deck.tempo_range),
-            state: ControlState::default(),
+            state: ControlState {
+                waveform_mode: config.ui.waveform_mode,
+                ..ControlState::default()
+            },
             keymap: Keymap::new(),
             metas: Default::default(),
-            loader: Loader::spawn(sample_rate),
+            loader: Loader::spawn(sample_rate, cache_dir),
             sample_rate,
             message: String::new(),
         };
@@ -132,6 +139,7 @@ impl App {
             self.keymap.focused(),
             &self.metas,
             status,
+            self.state.waveform_mode,
         );
         v.message = self.message.clone();
         v

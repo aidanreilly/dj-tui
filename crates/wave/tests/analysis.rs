@@ -33,7 +33,11 @@ fn a_sixty_hertz_sine_lands_in_the_low_band() {
     let (l, r) = sine(60.0, 2.0);
     let points = analyse(&l, &r, SR);
     assert_eq!(loudest(&points[points.len() / 2]), 0);
-    assert!(mean(&points, 2) < 0.05, "high band was {}", mean(&points, 2));
+    assert!(
+        mean(&points, 2) < 0.05,
+        "high band was {}",
+        mean(&points, 2)
+    );
 }
 
 #[test]

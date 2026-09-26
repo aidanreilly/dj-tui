@@ -53,6 +53,7 @@ fn view(pos_a: f64, b_loaded: bool) -> ScreenView {
         },
         status: String::new(),
         message: String::new(),
+        waveform_mode: wave::WaveformMode::default(),
     }
 }
 

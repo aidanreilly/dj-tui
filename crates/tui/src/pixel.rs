@@ -8,9 +8,9 @@
 //! (<https://github.com/biomassa/tui-wave>, MIT, Copyright (c) 2026 biomassa).
 
 use crate::waveform::downsample_points;
-use wave::{WaveformMode, WavePoint};
 use image::{Rgba, RgbaImage};
 use std::hash::{Hash, Hasher};
+use wave::{WavePoint, WaveformMode};
 
 /// Width of the playhead line in pixels.
 pub const PLAYHEAD_WIDTH: u32 = 2;
@@ -117,10 +117,10 @@ fn draw_column(img: &mut RgbaImage, x: u32, mid: f32, p: &WavePoint, palette: &P
                 return;
             }
             let mut channels = [0.0f32; 3];
-            for band in 0..3 {
-                let v = (p.bands[band] * BAND_GAIN[band]).min(1.0);
+            for ((value, gain), colour) in p.bands.iter().zip(BAND_GAIN).zip(palette.bands) {
+                let v = (value * gain).min(1.0);
                 for (c, acc) in channels.iter_mut().enumerate() {
-                    *acc += v * (palette.bands[band][c] as f32 / 255.0);
+                    *acc += v * (colour[c] as f32 / 255.0);
                 }
             }
             let colour = Rgba([
@@ -270,7 +270,7 @@ fn fingerprint(points: &[WavePoint]) -> u64 {
 /// crosses into a new pixel column, and otherwise reports that nothing changed.
 #[derive(Default)]
 pub struct PixelWaveform {
-    source: Option<(u64, (u32, u32))>,
+    source: Option<(u64, (u32, u32), WaveformMode)>,
     bitmaps: Option<WaveformBitmaps>,
     shown_playhead: Option<Option<u32>>,
     rasterizations: u64,
@@ -292,7 +292,7 @@ impl PixelWaveform {
             };
             return None;
         }
-        let source = (fingerprint(points), size);
+        let source = (fingerprint(points), size, palette.mode);
         if self.source != Some(source) || self.bitmaps.is_none() {
             self.bitmaps = Some(WaveformBitmaps::rasterize(points, size.0, size.1, palette));
             self.source = Some(source);

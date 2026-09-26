@@ -2,8 +2,8 @@
 
 use engine::CrossfaderCurve;
 use serde::{Deserialize, Deserializer};
-pub use wave::WaveformMode;
 use std::path::PathBuf;
+pub use wave::WaveformMode;
 
 const TEMPO_RANGES: [u8; 3] = [8, 16, 50];
 

@@ -4,8 +4,8 @@
 //! depend on it.
 
 mod analysis;
-pub mod cache;
 mod biquad;
+pub mod cache;
 mod mode;
 
 pub use analysis::{analyse, WavePoint, HIGH_HZ, LOW_HZ, POINTS_PER_SECOND};

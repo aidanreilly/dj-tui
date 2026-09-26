@@ -142,3 +142,17 @@ fn actions_flow_end_to_end_through_the_realtime_channel() {
     assert!(s.decks[0].playing);
     assert!((s.decks[0].position - (1000.0 + 10.0 * 1.005)).abs() < 1e-6);
 }
+
+#[test]
+fn w_cycles_the_waveform_mode_and_sends_no_command() {
+    use dj_tui::config::WaveformMode;
+    let mut st = ControlState::default();
+    let snap = Snapshot::default();
+    assert_eq!(st.waveform_mode, WaveformMode::ThreeBand);
+    assert!(run(&mut st, &snap, Action::CycleWaveformMode).is_none());
+    assert_eq!(st.waveform_mode, WaveformMode::Rgb);
+    run(&mut st, &snap, Action::CycleWaveformMode);
+    assert_eq!(st.waveform_mode, WaveformMode::Blue);
+    run(&mut st, &snap, Action::CycleWaveformMode);
+    assert_eq!(st.waveform_mode, WaveformMode::ThreeBand);
+}

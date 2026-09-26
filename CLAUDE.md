@@ -23,6 +23,13 @@ deck keeps a fixed kitty image id and only resends when the playhead reaches a n
 column. The glyph renderer in `tui::waveform` stays as the fallback and always draws first.
 `[ui] graphics = "off"` forces glyphs.
 
+`crates/wave` owns the `WavePoint` type, the biquad filter bank that produces low, mid and
+high RMS per bucket at 20 points a second, and the per-track analysis cache under
+`$XDG_CACHE_HOME/dj-tui/analysis`. Bump `cache::ANALYSIS_VERSION` whenever filter corners,
+normalisation or `POINTS_PER_SECOND` change. Analysis runs before resampling, so one cache
+file serves every session rate. Band display gains live in `tui::pixel::BAND_GAIN`, so
+retuning the look never invalidates a cache file. `W` cycles `3band`, `rgb` and `blue`.
+
 ## Commands
 
 ```sh

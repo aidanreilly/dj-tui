@@ -158,9 +158,11 @@ pub fn band_colors(points: &[WavePoint], rows: usize, palette: &Palette) -> Vec<
 
     (0..rows)
         .map(|row| {
-            // The outer of the cell's two pixels: upward above the centre line,
-            // downward below it.
-            let pixel = if row < rows / 2 { row * 2 } else { row * 2 + 1 };
+            // The cell's two half-block pixels. A band counts for this cell when it
+            // reaches into either of them, which is what docs/spec.md:75 asks for: a
+            // quiet band spanning only the pixels beside the centre line still colours
+            // the two centre cells.
+            let (first, last_pixel) = (row * 2, row * 2 + 1);
             points
                 .iter()
                 .map(|p| {
@@ -173,7 +175,7 @@ pub fn band_colors(points: &[WavePoint], rows: usize, palette: &Palette) -> Vec<
                         let half = frac * centre;
                         let top = (centre - half).round() as usize;
                         let bottom = (centre + half).round() as usize;
-                        if pixel >= top && pixel <= bottom {
+                        if first <= bottom && last_pixel >= top {
                             colour = rgba_to_color(palette.bands[band]);
                         }
                     }

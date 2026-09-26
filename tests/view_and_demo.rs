@@ -41,10 +41,20 @@ fn view_reports_times_in_seconds_and_focus() {
             bpm: Some(124.0),
             key: None,
             loading: false,
-            waveform: vec![[0.0, 0.5]],
+            waveform: vec![wave::WavePoint {
+                range: [0.0, 0.5],
+                bands: [0.5, 0.2, 0.1],
+            }],
         },
     ];
-    let v = screen_view(&snap, 1000, DeckId::B, &metas, "ok".into());
+    let v = screen_view(
+        &snap,
+        1000,
+        DeckId::B,
+        &metas,
+        "ok".into(),
+        wave::WaveformMode::default(),
+    );
     let b = &v.decks[1];
     assert!(b.focused && !v.decks[0].focused);
     assert_eq!(b.position_secs, 2.5);

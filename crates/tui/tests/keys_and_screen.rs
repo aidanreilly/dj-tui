@@ -104,6 +104,7 @@ fn whole_screen_shows_every_section() {
         },
         status: "keyboard: kitty protocol".into(),
         message: "Loaded Some Track on deck A".into(),
+        waveform_mode: wave::WaveformMode::default(),
     };
     let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -142,6 +143,7 @@ fn long_status_does_not_hide_the_message() {
         },
         status: "x".repeat(300),
         message: "Could not load a.flac".into(),
+        waveform_mode: wave::WaveformMode::default(),
     };
     let mut term = Terminal::new(TestBackend::new(100, 40)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -155,4 +157,72 @@ fn long_status_does_not_hide_the_message() {
         })
         .collect();
     assert!(text.contains("Could not load a.flac"), "{text}");
+}
+
+#[test]
+fn the_waveform_mode_reaches_the_glyph_renderer() {
+    use ratatui::style::Color;
+    use wave::{WavePoint, WaveformMode};
+
+    // A loaded deck whose bass dominates: 3band paints it blue, rgb paints it red.
+    fn view(mode: WaveformMode) -> ScreenView {
+        let mut d = deck(DeckId::A, true);
+        d.title = Some("Track".into());
+        d.duration_secs = 100.0;
+        d.waveform = vec![
+            WavePoint {
+                range: [-1.0, 1.0],
+                bands: [1.0, 0.0, 0.0],
+            };
+            200
+        ];
+        ScreenView {
+            decks: [d, deck(DeckId::B, false)],
+            mixer: MixerView {
+                crossfader: 0.0,
+                faders: [1.0, 1.0],
+                headphone_cue: [false, false],
+            },
+            status: String::new(),
+            message: String::new(),
+            waveform_mode: mode,
+        }
+    }
+
+    fn waveform_colours(mode: WaveformMode) -> Vec<Color> {
+        let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
+        let v = view(mode);
+        term.draw(|f| render_screen(f, &v)).unwrap();
+        let buf = term.backend().buffer();
+        (0..44)
+            .flat_map(|y| (0..120).map(move |x| (x, y)))
+            .filter(|&(x, y)| buf[(x, y)].symbol() == "▌")
+            .map(|(x, y)| buf[(x, y)].fg)
+            .collect()
+    }
+
+    /// The distinct colours drawn, so a failure prints a census rather than every cell.
+    fn distinct(colours: &[Color]) -> Vec<Color> {
+        let mut v: Vec<Color> = Vec::new();
+        for c in colours {
+            if !v.contains(c) {
+                v.push(*c);
+            }
+        }
+        v
+    }
+
+    let three = waveform_colours(WaveformMode::ThreeBand);
+    let rgb = waveform_colours(WaveformMode::Rgb);
+    assert!(!three.is_empty(), "no waveform bars were drawn");
+    assert!(
+        three.contains(&Color::Rgb(36, 82, 200)),
+        "3band should paint bass-heavy columns blue, saw {:?}",
+        distinct(&three)
+    );
+    assert!(
+        rgb.contains(&Color::Rgb(255, 0, 0)),
+        "rgb should paint bass-heavy columns red, saw {:?}",
+        distinct(&rgb)
+    );
 }

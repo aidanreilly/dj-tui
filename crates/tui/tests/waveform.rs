@@ -174,9 +174,14 @@ fn a_zero_sized_area_rasterises_without_panicking() {
     use tui::pixel::{Palette, WaveformBitmaps};
     let p = Palette::default();
     let src = vec![pt(1.0, [1.0; 3]); 8];
-    assert_eq!(WaveformBitmaps::rasterize(&src, 0, 10, &p).normal().width(), 0);
     assert_eq!(
-        WaveformBitmaps::rasterize(&src, 10, 0, &p).normal().height(),
+        WaveformBitmaps::rasterize(&src, 0, 10, &p).normal().width(),
+        0
+    );
+    assert_eq!(
+        WaveformBitmaps::rasterize(&src, 10, 0, &p)
+            .normal()
+            .height(),
         0
     );
 }
@@ -241,4 +246,18 @@ fn zero_rows_or_no_points_give_nothing_to_draw() {
     let p = Palette::default();
     assert!(band_colors(&[], 8, &p).iter().all(|r| r.is_empty()));
     assert!(band_colors(&pt_row([1.0; 3]), 0, &p).is_empty());
+}
+
+#[test]
+fn a_band_reaching_only_a_cells_inner_pixel_still_colours_that_cell() {
+    // docs/spec.md:75 asks for the topmost band that "reaches into that cell's vertical
+    // range". A quiet mid band spans only the pixels either side of the centre line, and
+    // those are the inner pixels of the two centre cells. Ignoring them leaves every
+    // column flat in the low colour, which is what the demo click track showed.
+    let p = Palette::default();
+    // The mid band lands on pixels 7 and 8 alone: the inner pixels of cells 3 and 4.
+    // The low band spans 6 to 9, so an outer-pixel-only rule reports low for both cells.
+    let colours = band_colors(&pt_row([0.4, 0.10, 0.0]), 8, &p);
+    assert_eq!(colours[3][0], as_color(p.bands[1]), "cell above the line");
+    assert_eq!(colours[4][0], as_color(p.bands[1]), "cell below the line");
 }

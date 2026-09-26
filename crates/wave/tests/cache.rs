@@ -114,7 +114,11 @@ fn a_file_written_for_another_path_is_a_miss() {
     // Move the cache file to where a different source would look for it.
     let other = source.parent().unwrap().join("other.flac");
     fs::copy(&source, &other).unwrap();
-    fs::rename(cache::path_for(&dir, &source), cache::path_for(&dir, &other)).unwrap();
+    fs::rename(
+        cache::path_for(&dir, &source),
+        cache::path_for(&dir, &other),
+    )
+    .unwrap();
     assert!(cache::read(&dir, &other).is_none());
 }
 

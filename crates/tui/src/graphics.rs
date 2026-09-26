@@ -40,6 +40,9 @@ impl Graphics {
 
     /// Call right after `render_screen` with the same view.
     pub fn render(&mut self, frame: &mut Frame, view: &ScreenView) {
+        if self.palette.mode != view.waveform_mode {
+            self.palette = Palette::for_mode(view.waveform_mode);
+        }
         let layout = screen_layout(frame.area());
         let font = self.picker.font_size();
         for (i, panel) in [layout.deck_a, layout.deck_b].into_iter().enumerate() {

@@ -1,3 +1,4 @@
+use crate::pixel::Palette;
 use crate::{screen_layout, DeckPanel, DeckView};
 use ratatui::{
     layout::Rect,
@@ -6,6 +7,7 @@ use ratatui::{
     widgets::{Block, Paragraph},
     Frame,
 };
+use wave::WaveformMode;
 
 #[derive(Debug, Clone)]
 pub struct MixerView {
@@ -22,6 +24,7 @@ pub struct ScreenView {
     pub status: String,
     /// Latest event for the user (load results, errors). Shown above the status line.
     pub message: String,
+    pub waveform_mode: WaveformMode,
 }
 
 const XFADE_WIDTH: usize = 13;
@@ -68,12 +71,13 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
 
 pub fn render_screen(f: &mut Frame, v: &ScreenView) {
     let l = screen_layout(f.area());
-    f.render_widget(DeckPanel::new(&v.decks[0]), l.deck_a);
+    let palette = Palette::for_mode(v.waveform_mode);
+    f.render_widget(DeckPanel::with_palette(&v.decks[0], &palette), l.deck_a);
     f.render_widget(
         Paragraph::new(" PHASE ").style(Style::new().add_modifier(Modifier::DIM)),
         l.phase,
     );
-    f.render_widget(DeckPanel::new(&v.decks[1]), l.deck_b);
+    f.render_widget(DeckPanel::with_palette(&v.decks[1], &palette), l.deck_b);
     render_mixer(f, l.mixer, &v.mixer);
 
     let browser = Block::bordered().title(" BROWSER ");

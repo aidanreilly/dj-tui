@@ -162,9 +162,13 @@ fn the_envelope_does_not_depend_on_the_session_rate() {
 fn the_second_load_comes_from_the_cache() {
     let cache = tempfile::tempdir().unwrap();
     let (_dir, path) = tone_fixture(1.0);
-    let first = load_file(&path, 48_000, Some(cache.path())).unwrap().waveform;
+    let first = load_file(&path, 48_000, Some(cache.path()))
+        .unwrap()
+        .waveform;
     assert!(wave::cache::path_for(cache.path(), &path).exists());
-    let second = load_file(&path, 48_000, Some(cache.path())).unwrap().waveform;
+    let second = load_file(&path, 48_000, Some(cache.path()))
+        .unwrap()
+        .waveform;
     assert_eq!(first, second);
 }
 
