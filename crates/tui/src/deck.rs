@@ -10,6 +10,8 @@ use ratatui::{
 
 pub const WAVEFORM_ROWS: u16 = 8;
 
+pub fn waveform_area(_panel: Rect) -> Rect { todo!() }
+
 /// Everything the deck panel needs to draw, copied out of engine state each frame.
 #[derive(Debug, Clone)]
 pub struct DeckView {

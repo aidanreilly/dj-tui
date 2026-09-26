@@ -6,6 +6,8 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-ratatui = "0.29"
+ratatui = "0.30"
 input = { path = "../input" }
 engine = { path = "../engine" }
+ratatui-image = { version = "11", default-features = false, features = ["crossterm"] }
+image = { version = "0.25", default-features = false }
