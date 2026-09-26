@@ -1,0 +1,24 @@
+[workspace]
+members = ["crates/engine", "crates/input", "crates/tui"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+rust-version = "1.82"
+
+[package]
+name = "dj-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+engine = { path = "crates/engine" }
+input = { path = "crates/input" }
+tui = { path = "crates/tui" }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+ratatui = "0.29"
