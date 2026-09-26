@@ -8,7 +8,7 @@
 //! (<https://github.com/biomassa/tui-wave>, MIT, Copyright (c) 2026 biomassa).
 
 use crate::waveform::downsample_points;
-use wave::WavePoint;
+use wave::{WaveformMode, WavePoint};
 use image::{Rgba, RgbaImage};
 use std::hash::{Hash, Hasher};
 
@@ -23,24 +23,94 @@ fn shape(peak: f32) -> f32 {
     peak.clamp(0.0, 1.0).powf(1.5)
 }
 
+/// Per-band display gain, applied at draw time and never stored in a cache.
+///
+/// The three bands share one divisor, and music puts far more absolute energy into bass
+/// than into cymbals, so an ungained high band would sit near 0.1 and all but vanish
+/// once `shape` raises it to the power of 1.5.
+pub const BAND_GAIN: [f32; 3] = [1.0, 1.8, 3.0];
+
+/// Colour at the top of the `blue` mode's tint.
+const WHITE: Rgba<u8> = Rgba([240, 244, 255, 255]);
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Palette {
-    /// Colour at the centre line.
-    pub low: Rgba<u8>,
-    /// Colour at full scale.
-    pub high: Rgba<u8>,
+    /// Low, mid and high colours. In `rgb` these are the pure channels.
+    pub bands: [Rgba<u8>; 3],
     pub centre_line: Rgba<u8>,
     pub playhead: Rgba<u8>,
+    pub mode: WaveformMode,
+}
+
+impl Palette {
+    pub fn for_mode(mode: WaveformMode) -> Self {
+        let bands = match mode {
+            WaveformMode::ThreeBand | WaveformMode::Blue => [
+                Rgba([36, 82, 200, 255]),
+                Rgba([235, 150, 40, 255]),
+                Rgba([238, 240, 248, 255]),
+            ],
+            WaveformMode::Rgb => [
+                Rgba([255, 0, 0, 255]),
+                Rgba([0, 255, 0, 255]),
+                Rgba([0, 0, 255, 255]),
+            ],
+        };
+        Self {
+            bands,
+            centre_line: Rgba([58, 50, 84, 255]),
+            playhead: Rgba([236, 232, 210, 255]),
+            mode,
+        }
+    }
 }
 
 impl Default for Palette {
     fn default() -> Self {
-        Self {
-            low: Rgba([96, 84, 170, 255]),
-            high: Rgba([214, 208, 255, 255]),
-            centre_line: Rgba([58, 50, 84, 255]),
-            playhead: Rgba([236, 232, 210, 255]),
+        Self::for_mode(WaveformMode::default())
+    }
+}
+
+/// A band's height as a fraction of the half panel, with its gain and the contrast
+/// curve applied. Shared with the glyph renderer so both modes read alike.
+pub fn band_half_steps(value: f32, band: usize) -> f32 {
+    shape((value * BAND_GAIN[band]).min(1.0))
+}
+
+fn band_half(value: f32, band: usize, mid: f32) -> f32 {
+    band_half_steps(value, band) * mid
+}
+
+/// Paint one column, in whichever scheme the palette names.
+fn draw_column(img: &mut RgbaImage, x: u32, mid: f32, p: &WavePoint, palette: &Palette) {
+    match palette.mode {
+        WaveformMode::ThreeBand => {
+            let mut drew = false;
+            // Low first, then mid, then high, so the highest band present wins where
+            // they overlap. Bass reaches furthest, which leaves a white core at the
+            // centre line.
+            for band in 0..3 {
+                let half = band_half(p.bands[band], band, mid);
+                if half <= 0.0 {
+                    continue;
+                }
+                drew = true;
+                let colour = palette.bands[band];
+                let half = half.max(0.5);
+                span(img, x, mid - half, mid + half, |_| colour);
+            }
+            if !drew {
+                // Every band at zero with a real range: draw the shape in the low colour
+                // rather than dropping the column.
+                let half = shape(p.range[0].abs().max(p.range[1].abs())) * mid;
+                if half > 0.0 {
+                    let colour = palette.bands[0];
+                    span(img, x, mid - half.max(0.5), mid + half.max(0.5), |_| colour);
+                }
+            }
         }
+        // Filled in by the next commit.
+        WaveformMode::Rgb | WaveformMode::Blue => {}
     }
 }
 
@@ -97,18 +167,7 @@ impl WaveformBitmaps {
         let mid = height as f32 / 2.0;
         let columns = downsample_points(points, width as usize);
         for (x, p) in columns.iter().enumerate() {
-            let [min, max] = p.range;
-            let x = x as u32;
-            let half = shape(min.abs().max(max.abs())) * mid;
-            if half <= 0.0 {
-                continue;
-            }
-            // Keep very quiet passages visible: at least one pixel, centred.
-            let half = half.max(0.5);
-            span(&mut normal, x, mid - half, mid + half, |y| {
-                let t = ((y as f32 + 0.5) - mid).abs() / mid;
-                lerp(palette.low, palette.high, t)
-            });
+            draw_column(&mut normal, x as u32, mid, p, palette);
         }
         // The centre line fills whatever the bars left empty, straddling the middle.
         for x in 0..width {

@@ -3,7 +3,7 @@
 
 use image::{Rgba, RgbaImage};
 use tui::pixel::{playhead_x, Palette, PixelWaveform, WaveformBitmaps, PLAYHEAD_WIDTH};
-use wave::WavePoint;
+use wave::{WaveformMode, WavePoint};
 
 const W: u32 = 200;
 const H: u32 = 80;
@@ -131,17 +131,79 @@ fn bar_edges_are_anti_aliased() {
     assert!(partial, "every edge pixel is fully on or off");
 }
 
+fn three_band() -> Palette {
+    Palette::for_mode(WaveformMode::ThreeBand)
+}
+
+/// A single-column source, so a named x is unambiguous.
+fn one(bands: [f32; 3], peak: f32) -> Vec<WavePoint> {
+    vec![WavePoint {
+        range: [-peak, peak],
+        bands,
+    }]
+}
+
 #[test]
-fn colour_runs_from_low_at_the_centre_to_high_at_the_peaks() {
-    let p = pal();
-    let b = WaveformBitmaps::rasterize(&flat(1.0, 10), 10, H, &p);
-    let centre = b.normal().get_pixel(5, H / 2 - 1);
-    let edge = b.normal().get_pixel(5, 0);
+fn bass_reaches_furthest_and_highs_form_a_core_at_the_centre() {
+    let p = three_band();
+    // Bass loud, highs quiet: exactly the case docs/spec.md:75 describes.
+    let b = WaveformBitmaps::rasterize(&one([1.0, 0.5, 0.15], 1.0), 1, 64, &p);
+    let img = b.normal();
+    let centre = img.get_pixel(0, 32);
+    let outer = img.get_pixel(0, 2);
     assert!(
-        dist(centre, &p.low) < dist(centre, &p.high),
-        "centre {centre:?}"
+        dist(centre, &p.bands[2]) < dist(centre, &p.bands[0]),
+        "centre {centre:?} should be the high colour"
     );
-    assert!(dist(edge, &p.high) < dist(edge, &p.low), "edge {edge:?}");
+    assert!(
+        dist(outer, &p.bands[0]) < dist(outer, &p.bands[2]),
+        "outer {outer:?} should be the low colour"
+    );
+}
+
+#[test]
+fn each_band_reaches_its_own_height() {
+    let p = three_band();
+    let only_low = WaveformBitmaps::rasterize(&one([1.0, 0.0, 0.0], 1.0), 1, 64, &p);
+    let only_high = WaveformBitmaps::rasterize(&one([0.0, 0.0, 1.0], 1.0), 1, 64, &p);
+    // Both bands are at full scale, so both fill the column.
+    assert_eq!(opaque_rows(only_low.normal(), 0), 64);
+    assert_eq!(opaque_rows(only_high.normal(), 0), 64);
+    // A quiet band covers less than a loud one.
+    let quiet = WaveformBitmaps::rasterize(&one([0.3, 0.0, 0.0], 1.0), 1, 64, &p);
+    assert!(opaque_rows(quiet.normal(), 0) < 64);
+}
+
+#[test]
+fn the_high_band_is_gained_up_so_it_stays_visible() {
+    let p = three_band();
+    // 0.15 of high content is typical of real music and must still draw.
+    let b = WaveformBitmaps::rasterize(&one([1.0, 0.0, 0.15], 1.0), 1, 64, &p);
+    let centre = b.normal().get_pixel(0, 32);
+    assert!(
+        dist(centre, &p.bands[2]) < dist(centre, &p.bands[0]),
+        "centre {centre:?} lost the high band"
+    );
+}
+
+#[test]
+fn a_column_with_range_but_no_bands_still_draws() {
+    // A DC offset or a filter transient can leave every band at zero.
+    let p = three_band();
+    let b = WaveformBitmaps::rasterize(&one([0.0, 0.0, 0.0], 1.0), 1, 64, &p);
+    assert_eq!(opaque_rows(b.normal(), 0), 64);
+    let pixel = b.normal().get_pixel(0, 10);
+    assert!(
+        dist(pixel, &p.bands[0]) < 16,
+        "expected the low colour, got {pixel:?}"
+    );
+}
+
+#[test]
+fn silence_still_draws_only_the_centre_line() {
+    let p = three_band();
+    let b = WaveformBitmaps::rasterize(&one([0.0; 3], 0.0), 1, 64, &p);
+    assert_eq!(opaque_rows(b.normal(), 0), 2);
 }
 
 #[test]
