@@ -10,7 +10,11 @@ use ratatui::{
 
 pub const WAVEFORM_ROWS: u16 = 8;
 
-pub fn waveform_area(_panel: Rect) -> Rect { todo!() }
+/// Where a deck panel draws its waveform: the rows under the title, inside the border.
+pub fn waveform_area(panel: Rect) -> Rect {
+    let inner = Block::bordered().inner(panel);
+    Rect::new(inner.x, inner.y + 1, inner.width, WAVEFORM_ROWS.min(inner.height.saturating_sub(1)))
+}
 
 /// Everything the deck panel needs to draw, copied out of engine state each frame.
 #[derive(Debug, Clone)]

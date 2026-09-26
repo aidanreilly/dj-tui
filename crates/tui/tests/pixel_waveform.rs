@@ -47,7 +47,8 @@ fn silence_draws_only_the_centre_line_on_a_transparent_background() {
     for x in 0..W {
         for y in 0..H {
             let a = img.get_pixel(x, y)[3];
-            if y == H / 2 {
+            // The line straddles the exact centre so the image stays mirror-symmetric.
+            if y == H / 2 - 1 || y == H / 2 {
                 assert!(a > 0, "centre line missing at x={x}");
             } else {
                 assert_eq!(a, 0, "stray pixel at ({x},{y})");
@@ -119,7 +120,7 @@ fn dimmed_copy_has_the_same_shape_and_is_darker() {
 #[test]
 fn empty_waveform_is_silence() {
     let b = WaveformBitmaps::rasterize(&[], 20, 10, &pal());
-    assert_eq!(touched_rows(b.normal(), 3), 1);
+    assert_eq!(touched_rows(b.normal(), 3), 2, "just the centre line");
 }
 
 // --- Composing with the playhead ---
