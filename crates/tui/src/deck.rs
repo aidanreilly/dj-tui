@@ -1,4 +1,4 @@
-use crate::waveform::{braille_rows, downsample_peaks};
+use crate::waveform::{bar_rows, downsample_peaks};
 use engine::DeckId;
 use ratatui::{
     buffer::Buffer,
@@ -83,7 +83,7 @@ impl Widget for DeckPanel<'_> {
 
         // Waveform rows.
         let wave_y = inner.y + 1;
-        let rows = braille_rows(&downsample_peaks(&v.envelope, inner.width as usize * 2), WAVEFORM_ROWS as usize);
+        let rows = bar_rows(&downsample_peaks(&v.envelope, inner.width as usize), WAVEFORM_ROWS as usize);
         for (i, row) in rows.iter().enumerate() {
             let y = wave_y + i as u16;
             if y >= inner.bottom() {

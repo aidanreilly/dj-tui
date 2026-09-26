@@ -1,38 +1,40 @@
-//! Braille rasterising for the overview waveform.
+//! Bar rasterising for the overview waveform.
 //!
-//! Each terminal cell is a 2 × 4 braille dot grid. The waveform is mirrored around a
-//! horizontal centre line: half the rows grow upward, half grow downward.
+//! One thin vertical line per terminal cell column, mirrored around a horizontal centre
+//! line: half the rows grow upward, half grow downward. Each cell resolves two steps, a
+//! full-height line and a half-height stub on the side facing the centre.
 
-const BRAILLE_BASE: u32 = 0x2800;
-/// Dot bits indexed by [dot column][dot row] inside one cell.
-const DOT_BITS: [[u8; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
+/// Full-height line.
+const FULL: char = '│';
+/// Half-height stub in the lower part of a cell, for a bar growing upward.
+const DOWN: char = '╷';
+/// Half-height stub in the upper part of a cell, for a bar growing downward.
+const UP: char = '╵';
 
-/// Rasterise `envelope` (one value in 0..=1 per dot column) into `rows` lines of braille.
+/// Rasterise `envelope` (one value in 0..=1 per cell column) into `rows` lines of bars.
 /// `rows` must be even and at least 2.
-pub fn braille_rows(envelope: &[f32], rows: usize) -> Vec<String> {
+pub fn bar_rows(envelope: &[f32], rows: usize) -> Vec<String> {
     assert!(rows >= 2 && rows % 2 == 0, "waveform rows must be even, got {rows}");
-    let cells = envelope.len().div_ceil(2);
-    let half_dots = rows / 2 * 4;
-    let mut grid = vec![vec![0u8; cells]; rows];
+    let half_cells = rows / 2;
+    let half_steps = half_cells * 2;
+    let mut grid = vec![vec![' '; envelope.len()]; rows];
 
-    let mut set = |dot_row: usize, col: usize| {
-        grid[dot_row / 4][col / 2] |= DOT_BITS[col % 2][dot_row % 4];
-    };
     for (col, &v) in envelope.iter().enumerate() {
-        let h = (v.clamp(0.0, 1.0) * half_dots as f32).round() as usize;
-        for k in 0..h {
-            set(half_dots - 1 - k, col);
-            set(half_dots + k, col);
+        let v = v.clamp(0.0, 1.0);
+        let mut steps = (v * half_steps as f32).round() as usize;
+        // Anything audible keeps its place on the centre line rather than dropping out.
+        if steps == 0 && v > 0.0 {
+            steps = 1;
+        }
+        for k in 0..steps {
+            let cell = k / 2;
+            let tops_out_here = k % 2 == 0 && k + 1 == steps;
+            grid[half_cells - 1 - cell][col] = if tops_out_here { DOWN } else { FULL };
+            grid[half_cells + cell][col] = if tops_out_here { UP } else { FULL };
         }
     }
 
-    grid.into_iter()
-        .map(|row| {
-            row.into_iter()
-                .map(|bits| char::from_u32(BRAILLE_BASE + bits as u32).unwrap_or(' '))
-                .collect()
-        })
-        .collect()
+    grid.into_iter().map(|row| row.into_iter().collect()).collect()
 }
 
 /// Reduce (or stretch) `src` to exactly `n` values, keeping the peak of each bucket.
