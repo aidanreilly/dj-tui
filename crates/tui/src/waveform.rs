@@ -5,23 +5,26 @@ const FULL: char = '▌';
 const DOWN: char = '▖';
 const UP: char = '▘';
 
-/// Rasterise signed `[minimum, maximum]` ranges as thin bars around the center line.
+/// Rasterise signed `[minimum, maximum]` ranges as symmetrical peak bars around the center.
+/// A nonlinear curve gives quieter sections more height contrast against loud peaks.
 /// The left half of each terminal cell is the bar; its right half remains a one-pixel gap.
-/// Upper and lower quadrant glyphs add vertical detail at each bar's ends.
 pub fn amplitude_rows(ranges: &[[f32; 2]], rows: usize) -> Vec<String> {
     assert!(rows > 0, "waveform must have at least one row");
     let height = rows * 2;
     let mut pixels = vec![vec![false; ranges.len()]; height];
 
     for (col, &[a, b]) in ranges.iter().enumerate() {
-        let min = a.clamp(-1.0, 1.0).min(b.clamp(-1.0, 1.0));
-        let max = a.clamp(-1.0, 1.0).max(b.clamp(-1.0, 1.0));
+        let peak = a.abs().max(b.abs()).clamp(0.0, 1.0);
+        // Emphasize the difference between lower-energy sections and strong peaks.
+        let peak = peak.powf(1.5);
         // Silence should remain visually quiet rather than drawing a center pixel.
-        if min == 0.0 && max == 0.0 {
+        if peak == 0.0 {
             continue;
         }
 
         let last = (height - 1) as f32;
+        let min = -peak;
+        let max = peak;
         let top = (((1.0 - max) * 0.5) * last).round() as usize;
         let bottom = (((1.0 - min) * 0.5) * last).round() as usize;
         for row in top.min(height - 1)..=bottom.min(height - 1) {
@@ -43,7 +46,9 @@ pub fn amplitude_rows(ranges: &[[f32; 2]], rows: usize) -> Vec<String> {
         .collect()
 }
 
-/// Resample signed ranges to exactly `n` columns, retaining each bucket's extrema.
+/// Resample signed ranges to exactly `n` columns as a centered average-peak envelope.
+/// Averaging the source peaks in each screen column keeps long tracks from turning into
+/// solid full-height bars when a column spans several seconds of audio.
 pub fn downsample_ranges(src: &[[f32; 2]], n: usize) -> Vec<[f32; 2]> {
     if n == 0 {
         return Vec::new();
@@ -56,11 +61,12 @@ pub fn downsample_ranges(src: &[[f32; 2]], n: usize) -> Vec<[f32; 2]> {
         .map(|j| {
             let start = (j * len / n).min(len - 1);
             let end = ((j + 1) * len / n).clamp(start + 1, len);
-            src[start..end]
+            let peak = src[start..end]
                 .iter()
-                .fold([f32::INFINITY, f32::NEG_INFINITY], |acc, range| {
-                    [acc[0].min(range[0]), acc[1].max(range[1])]
-                })
+                .map(|[min, max]| min.abs().max(max.abs()))
+                .sum::<f32>()
+                / (end - start) as f32;
+            [-peak, peak]
         })
         .collect()
 }
