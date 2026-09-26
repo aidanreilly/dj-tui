@@ -20,6 +20,7 @@ engine = { path = "crates/engine" }
 input = { path = "crates/input" }
 tui = { path = "crates/tui" }
 loader = { path = "crates/loader" }
+backend = { path = "crates/backend" }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 ratatui = "0.29"

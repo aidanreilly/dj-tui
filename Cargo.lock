@@ -151,6 +151,7 @@ dependencies = [
 name = "dj-tui"
 version = "0.1.0"
 dependencies = [
+ "backend",
  "engine",
  "input",
  "loader",

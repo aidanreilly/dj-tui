@@ -75,3 +75,44 @@ fn waveform_mode_cycles_through_all_three() {
     assert_eq!(m.next().next(), WaveformMode::Blue);
     assert_eq!(m.next().next().next(), WaveformMode::ThreeBand);
 }
+
+#[test]
+fn routing_defaults_to_auto() {
+    assert_eq!(Config::default().routing().unwrap(), backend::Routing::Auto);
+}
+
+#[test]
+fn routing_can_be_turned_off() {
+    let c = Config::from_toml("[audio]\nrouting = \"off\"").unwrap();
+    assert_eq!(c.routing().unwrap(), backend::Routing::Off);
+}
+
+#[test]
+fn explicit_routing_reads_port_lists() {
+    let c = Config::from_toml(
+        "[audio]\nrouting = \"explicit\"\nmaster_ports = [\"a:1\", \"a:2\"]\ncue_ports = [\"b:1\", \"b:2\"]",
+    )
+    .unwrap();
+    assert_eq!(
+        c.routing().unwrap(),
+        backend::Routing::Explicit {
+            master: ["a:1".into(), "a:2".into()],
+            cue: Some(["b:1".into(), "b:2".into()]),
+        }
+    );
+}
+
+#[test]
+fn explicit_routing_needs_exactly_two_master_ports() {
+    assert!(Config::from_toml("[audio]\nrouting = \"explicit\"").is_err());
+    assert!(Config::from_toml("[audio]\nrouting = \"explicit\"\nmaster_ports = [\"a:1\"]").is_err());
+    assert!(Config::from_toml(
+        "[audio]\nrouting = \"explicit\"\nmaster_ports = [\"a:1\",\"a:2\"]\ncue_ports = [\"x\"]"
+    )
+    .is_err());
+}
+
+#[test]
+fn client_name_defaults_to_dj_tui() {
+    assert_eq!(Config::default().audio.client_name, "dj-tui");
+}

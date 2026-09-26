@@ -48,13 +48,35 @@ pub struct Config {
 #[serde(default, deny_unknown_fields)]
 pub struct Audio {
     pub backend: Backend,
+    /// Used only by backends that choose their own rate; JACK's server rate always wins.
     pub sample_rate: u32,
     pub buffer_frames: u32,
+    pub client_name: String,
+    pub routing: RoutingMode,
+    pub master_ports: Vec<String>,
+    pub cue_ports: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RoutingMode {
+    #[default]
+    Auto,
+    Off,
+    Explicit,
 }
 
 impl Default for Audio {
     fn default() -> Self {
-        Self { backend: Backend::Jack, sample_rate: 48_000, buffer_frames: 256 }
+        Self {
+            backend: Backend::Jack,
+            sample_rate: 48_000,
+            buffer_frames: 256,
+            client_name: "dj-tui".into(),
+            routing: RoutingMode::Auto,
+            master_ports: Vec::new(),
+            cue_ports: Vec::new(),
+        }
     }
 }
 
@@ -108,7 +130,30 @@ impl Config {
         Ok(c)
     }
 
+    /// Output routing for the audio backend.
+    pub fn routing(&self) -> Result<backend::Routing, String> {
+        let pair = |v: &[String], key: &str| -> Result<[String; 2], String> {
+            match v {
+                [a, b] => Ok([a.clone(), b.clone()]),
+                _ => Err(format!("audio.{key} must list exactly two ports, got {}", v.len())),
+            }
+        };
+        Ok(match self.audio.routing {
+            RoutingMode::Auto => backend::Routing::Auto,
+            RoutingMode::Off => backend::Routing::Off,
+            RoutingMode::Explicit => backend::Routing::Explicit {
+                master: pair(&self.audio.master_ports, "master_ports")?,
+                cue: if self.audio.cue_ports.is_empty() {
+                    None
+                } else {
+                    Some(pair(&self.audio.cue_ports, "cue_ports")?)
+                },
+            },
+        })
+    }
+
     fn validate(&self) -> Result<(), String> {
+        self.routing()?;
         if !TEMPO_RANGES.contains(&self.deck.tempo_range) {
             return Err(format!(
                 "deck.tempo_range must be one of {TEMPO_RANGES:?}, got {}",
