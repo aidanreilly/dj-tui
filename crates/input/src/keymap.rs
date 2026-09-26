@@ -188,7 +188,7 @@ impl Keymap {
             'v' | 'V' => Fader(d, dir(c == 'V')),
             '/' => Search,
             'b' => BrowserFullscreen,
-            'W' => CycleWaveformMode,
+            'w' => CycleWaveformMode,
             '?' => Help,
             _ => return None,
         })

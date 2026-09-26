@@ -124,6 +124,18 @@ impl App {
         false
     }
 
+    /// Seek a loaded deck to a normalized position from 0.0 (start) to 1.0 (end).
+    pub fn seek_to_fraction(&mut self, deck: DeckId, fraction: f64) {
+        let frames = self.handle.snapshot().decks[deck.index()].track_frames;
+        if frames == 0 {
+            return;
+        }
+        self.send(Command::Seek(
+            deck,
+            frames as f64 * fraction.clamp(0.0, 1.0),
+        ));
+    }
+
     pub fn snapshot(&self) -> Snapshot {
         self.handle.snapshot()
     }
