@@ -109,8 +109,42 @@ fn draw_column(img: &mut RgbaImage, x: u32, mid: f32, p: &WavePoint, palette: &P
                 }
             }
         }
-        // Filled in by the next commit.
-        WaveformMode::Rgb | WaveformMode::Blue => {}
+        WaveformMode::Rgb => {
+            // One colour per column: the three bands summed onto their own channels,
+            // so a full-spectrum column trends toward white.
+            let half = shape(p.range[0].abs().max(p.range[1].abs())) * mid;
+            if half <= 0.0 {
+                return;
+            }
+            let mut channels = [0.0f32; 3];
+            for band in 0..3 {
+                let v = (p.bands[band] * BAND_GAIN[band]).min(1.0);
+                for (c, acc) in channels.iter_mut().enumerate() {
+                    *acc += v * (palette.bands[band][c] as f32 / 255.0);
+                }
+            }
+            let colour = Rgba([
+                (channels[0].min(1.0) * 255.0) as u8,
+                (channels[1].min(1.0) * 255.0) as u8,
+                (channels[2].min(1.0) * 255.0) as u8,
+                255,
+            ]);
+            let half = half.max(0.5);
+            span(img, x, mid - half, mid + half, |_| colour);
+        }
+        WaveformMode::Blue => {
+            // Height from the three bands combined, tinting toward white as the high
+            // band's share rises.
+            let power: f32 = p.bands.iter().map(|b| b * b).sum();
+            let half = shape(power.sqrt().min(1.0)) * mid;
+            if half <= 0.0 {
+                return;
+            }
+            let tint = (p.bands[2] * BAND_GAIN[2]).min(1.0);
+            let colour = lerp(palette.bands[0], WHITE, tint);
+            let half = half.max(0.5);
+            span(img, x, mid - half, mid + half, |_| colour);
+        }
     }
 }
 

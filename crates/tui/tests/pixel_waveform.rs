@@ -312,3 +312,66 @@ fn no_waveform_means_no_image() {
     pw.update(&[], (W, H), None, &pal());
     assert!(!pw.has_image(), "unloading clears the image");
 }
+
+#[test]
+fn rgb_gives_one_colour_across_a_column() {
+    let p = Palette::for_mode(WaveformMode::Rgb);
+    let b = WaveformBitmaps::rasterize(&one([1.0, 0.0, 0.0], 1.0), 1, 64, &p);
+    let img = b.normal();
+    let top = img.get_pixel(0, 2);
+    let centre = img.get_pixel(0, 32);
+    assert_eq!(top, centre, "rgb columns are a single colour");
+}
+
+#[test]
+fn rgb_maps_each_band_to_its_own_channel() {
+    let p = Palette::for_mode(WaveformMode::Rgb);
+    let bass = WaveformBitmaps::rasterize(&one([1.0, 0.0, 0.0], 1.0), 1, 64, &p);
+    let pixel = *bass.normal().get_pixel(0, 32);
+    assert!(pixel[0] > 200, "red channel was {}", pixel[0]);
+    assert!(pixel[2] < 40, "blue channel was {}", pixel[2]);
+}
+
+#[test]
+fn rgb_full_spectrum_columns_trend_toward_white() {
+    let p = Palette::for_mode(WaveformMode::Rgb);
+    let b = WaveformBitmaps::rasterize(&one([1.0, 1.0, 1.0], 1.0), 1, 64, &p);
+    let pixel = *b.normal().get_pixel(0, 32);
+    assert!(luma(&pixel) > 600, "luma was {}", luma(&pixel));
+}
+
+#[test]
+fn rgb_height_comes_from_the_range_not_the_bands() {
+    let p = Palette::for_mode(WaveformMode::Rgb);
+    let quiet = WaveformBitmaps::rasterize(&one([1.0, 1.0, 1.0], 0.3), 1, 64, &p);
+    let loud = WaveformBitmaps::rasterize(&one([1.0, 1.0, 1.0], 1.0), 1, 64, &p);
+    assert!(opaque_rows(quiet.normal(), 0) < opaque_rows(loud.normal(), 0));
+}
+
+#[test]
+fn blue_tints_toward_white_as_highs_rise() {
+    let p = Palette::for_mode(WaveformMode::Blue);
+    let dull = WaveformBitmaps::rasterize(&one([1.0, 0.2, 0.0], 1.0), 1, 64, &p);
+    let bright = WaveformBitmaps::rasterize(&one([1.0, 0.2, 1.0], 1.0), 1, 64, &p);
+    let a = *dull.normal().get_pixel(0, 32);
+    let b = *bright.normal().get_pixel(0, 32);
+    assert!(luma(&b) > luma(&a), "{} should exceed {}", luma(&b), luma(&a));
+}
+
+#[test]
+fn blue_height_comes_from_the_bands_combined() {
+    let p = Palette::for_mode(WaveformMode::Blue);
+    let thin = WaveformBitmaps::rasterize(&one([0.2, 0.0, 0.0], 1.0), 1, 64, &p);
+    let full = WaveformBitmaps::rasterize(&one([1.0, 1.0, 1.0], 1.0), 1, 64, &p);
+    assert!(opaque_rows(thin.normal(), 0) < opaque_rows(full.normal(), 0));
+    assert_eq!(opaque_rows(full.normal(), 0), 64);
+}
+
+#[test]
+fn every_mode_leaves_silence_as_the_centre_line_alone() {
+    for mode in [WaveformMode::ThreeBand, WaveformMode::Rgb, WaveformMode::Blue] {
+        let p = Palette::for_mode(mode);
+        let b = WaveformBitmaps::rasterize(&one([0.0; 3], 0.0), 1, 64, &p);
+        assert_eq!(opaque_rows(b.normal(), 0), 2, "{mode:?}");
+    }
+}
