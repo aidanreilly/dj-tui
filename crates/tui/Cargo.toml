@@ -11,3 +11,4 @@ input = { path = "../input" }
 engine = { path = "../engine" }
 ratatui-image = { version = "11", default-features = false, features = ["crossterm"] }
 image = { version = "0.25", default-features = false }
+wave = { path = "../wave" }

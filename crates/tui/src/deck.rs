@@ -1,4 +1,4 @@
-use crate::waveform::{amplitude_rows, downsample_ranges};
+use crate::waveform::{amplitude_rows, downsample_points, ranges};
 use engine::DeckId;
 use ratatui::{
     buffer::Buffer,
@@ -34,8 +34,8 @@ pub struct DeckView {
     pub loading: bool,
     pub playing: bool,
     pub hot_cues: [bool; 8],
-    /// Whole-track signed `[minimum, maximum]` sample ranges, resampled to panel width.
-    pub waveform: Vec<[f32; 2]>,
+    /// Whole-track analysis points, resampled to panel width when drawn.
+    pub waveform: Vec<wave::WavePoint>,
 }
 
 pub struct DeckPanel<'a> {
@@ -107,8 +107,8 @@ impl Widget for DeckPanel<'_> {
 
         // Waveform rows.
         let wave_y = inner.y + 1;
-        let columns = downsample_ranges(&v.waveform, inner.width as usize);
-        let rows = amplitude_rows(&columns, WAVEFORM_ROWS as usize);
+        let columns = downsample_points(&v.waveform, inner.width as usize);
+        let rows = amplitude_rows(&ranges(&columns), WAVEFORM_ROWS as usize);
         let center_y = wave_y + WAVEFORM_ROWS / 2;
         buf.set_string(
             inner.x,

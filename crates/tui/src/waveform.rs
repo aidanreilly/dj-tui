@@ -1,5 +1,7 @@
 //! Signed waveform rasterising for the deck overview.
 
+use wave::WavePoint;
+
 // Compatibility rasteriser for magnitude-only envelopes.
 const FULL: char = '▌';
 const DOWN: char = '▖';
@@ -48,29 +50,49 @@ pub fn amplitude_rows(ranges: &[[f32; 2]], rows: usize) -> Vec<String> {
         .collect()
 }
 
-/// Resample signed ranges to exactly `n` columns as a centered average-peak envelope.
-/// Averaging the source peaks in each screen column keeps long tracks from turning into
-/// solid full-height bars when a column spans several seconds of audio.
-pub fn downsample_ranges(src: &[[f32; 2]], n: usize) -> Vec<[f32; 2]> {
+/// Resample points to exactly `n` columns, averaging within each column.
+///
+/// Averaging rather than taking the peak keeps a long track from turning into solid
+/// full-height bars when one column spans several seconds of audio.
+pub fn downsample_points(src: &[WavePoint], n: usize) -> Vec<WavePoint> {
     if n == 0 {
         return Vec::new();
     }
     if src.is_empty() {
-        return vec![[0.0, 0.0]; n];
+        return vec![WavePoint::default(); n];
     }
     let len = src.len();
     (0..n)
         .map(|j| {
             let start = (j * len / n).min(len - 1);
             let end = ((j + 1) * len / n).clamp(start + 1, len);
-            let peak = src[start..end]
+            let bucket = &src[start..end];
+            let count = bucket.len() as f32;
+            let peak = bucket
                 .iter()
-                .map(|[min, max]| min.abs().max(max.abs()))
+                .map(|p| p.range[0].abs().max(p.range[1].abs()))
                 .sum::<f32>()
-                / (end - start) as f32;
-            [-peak, peak]
+                / count;
+            let mut bands = [0.0f32; 3];
+            for p in bucket {
+                for (acc, v) in bands.iter_mut().zip(p.bands) {
+                    *acc += v;
+                }
+            }
+            for b in &mut bands {
+                *b /= count;
+            }
+            WavePoint {
+                range: [-peak, peak],
+                bands,
+            }
         })
         .collect()
+}
+
+/// The signed pairs alone, for the glyph rasteriser.
+pub fn ranges(points: &[WavePoint]) -> Vec<[f32; 2]> {
+    points.iter().map(|p| p.range).collect()
 }
 
 /// Rasterise a magnitude-only `envelope` (one value in 0..=1 per column) into bars.

@@ -7,7 +7,8 @@
 //! The anti-aliased span drawing follows `draw_vspan_aa` in tui-wave
 //! (<https://github.com/biomassa/tui-wave>, MIT, Copyright (c) 2026 biomassa).
 
-use crate::waveform::downsample_ranges;
+use crate::waveform::downsample_points;
+use wave::WavePoint;
 use image::{Rgba, RgbaImage};
 use std::hash::{Hash, Hasher};
 
@@ -91,11 +92,12 @@ pub struct WaveformBitmaps {
 }
 
 impl WaveformBitmaps {
-    pub fn rasterize(ranges: &[[f32; 2]], width: u32, height: u32, palette: &Palette) -> Self {
+    pub fn rasterize(points: &[WavePoint], width: u32, height: u32, palette: &Palette) -> Self {
         let mut normal = RgbaImage::new(width, height);
         let mid = height as f32 / 2.0;
-        let columns = downsample_ranges(ranges, width as usize);
-        for (x, &[min, max]) in columns.iter().enumerate() {
+        let columns = downsample_points(points, width as usize);
+        for (x, p) in columns.iter().enumerate() {
+            let [min, max] = p.range;
             let x = x as u32;
             let half = shape(min.abs().max(max.abs())) * mid;
             if half <= 0.0 {
@@ -110,7 +112,8 @@ impl WaveformBitmaps {
         }
         // The centre line fills whatever the bars left empty, straddling the middle.
         for x in 0..width {
-            for y in [mid.ceil() as u32 - 1, mid as u32] {
+            // saturating: a zero-height area during a resize leaves `mid` at 0.
+            for y in [(mid.ceil() as u32).saturating_sub(1), mid as u32] {
                 if y < height && normal.get_pixel(x, y)[3] == 0 {
                     normal.put_pixel(x, y, palette.centre_line);
                 }
@@ -159,12 +162,13 @@ pub fn playhead_x(position_secs: f64, duration_secs: f64, width: u32) -> Option<
     Some(((frac * width as f64) as u32).min(width.saturating_sub(PLAYHEAD_WIDTH)))
 }
 
-fn fingerprint(ranges: &[[f32; 2]]) -> u64 {
+fn fingerprint(points: &[WavePoint]) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    ranges.len().hash(&mut h);
-    for [a, b] in ranges {
-        a.to_bits().hash(&mut h);
-        b.to_bits().hash(&mut h);
+    points.len().hash(&mut h);
+    for p in points {
+        for v in [p.range[0], p.range[1], p.bands[0], p.bands[1], p.bands[2]] {
+            v.to_bits().hash(&mut h);
+        }
     }
     h.finish()
 }
@@ -183,21 +187,21 @@ impl PixelWaveform {
     /// Returns an image when the terminal needs a new one.
     pub fn update(
         &mut self,
-        ranges: &[[f32; 2]],
+        points: &[WavePoint],
         size: (u32, u32),
         playhead: Option<u32>,
         palette: &Palette,
     ) -> Option<RgbaImage> {
-        if ranges.is_empty() || size.0 == 0 || size.1 == 0 {
+        if points.is_empty() || size.0 == 0 || size.1 == 0 {
             *self = Self {
                 rasterizations: self.rasterizations,
                 ..Default::default()
             };
             return None;
         }
-        let source = (fingerprint(ranges), size);
+        let source = (fingerprint(points), size);
         if self.source != Some(source) || self.bitmaps.is_none() {
-            self.bitmaps = Some(WaveformBitmaps::rasterize(ranges, size.0, size.1, palette));
+            self.bitmaps = Some(WaveformBitmaps::rasterize(points, size.0, size.1, palette));
             self.source = Some(source);
             self.shown_playhead = None;
             self.rasterizations += 1;

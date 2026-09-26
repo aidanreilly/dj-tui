@@ -49,14 +49,14 @@ impl Graphics {
                 area.width as u32 * font.width as u32,
                 area.height as u32 * font.height as u32,
             );
-            let ranges: &[[f32; 2]] = if dv.title.is_some() {
+            let points: &[wave::WavePoint] = if dv.title.is_some() {
                 &dv.waveform
             } else {
                 &[]
             };
             let playhead = playhead_x(dv.position_secs, dv.duration_secs, px.0);
             let deck = &mut self.decks[i];
-            match deck.pixel.update(ranges, px, playhead, &self.palette) {
+            match deck.pixel.update(points, px, playhead, &self.palette) {
                 Some(img) => {
                     let size = Size::new(area.width, area.height);
                     deck.protocol = make_protocol(

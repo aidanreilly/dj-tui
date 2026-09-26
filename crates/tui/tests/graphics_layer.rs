@@ -28,7 +28,10 @@ fn deck(id: DeckId, loaded: bool, position_secs: f64) -> DeckView {
             (0..512)
                 .map(|i| {
                     let p = 0.2 + 0.7 * ((i % 37) as f32 / 37.0);
-                    [-p, p]
+                    wave::WavePoint {
+                        range: [-p, p],
+                        bands: [p, p * 0.5, p * 0.2],
+                    }
                 })
                 .collect()
         } else {

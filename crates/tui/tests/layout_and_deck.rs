@@ -28,7 +28,13 @@ fn loaded_view(focused: bool) -> DeckView {
         loading: false,
         playing: true,
         hot_cues: [true, false, true, false, false, false, false, false],
-        waveform: vec![[-1.0, 1.0]; 200],
+        waveform: vec![
+            wave::WavePoint {
+                range: [-1.0, 1.0],
+                bands: [1.0, 0.5, 0.2],
+            };
+            200
+        ],
     }
 }
 

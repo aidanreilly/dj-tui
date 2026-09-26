@@ -3,6 +3,7 @@
 
 use image::{Rgba, RgbaImage};
 use tui::pixel::{playhead_x, Palette, PixelWaveform, WaveformBitmaps, PLAYHEAD_WIDTH};
+use wave::WavePoint;
 
 const W: u32 = 200;
 const H: u32 = 80;
@@ -11,8 +12,16 @@ fn pal() -> Palette {
     Palette::default()
 }
 
-fn flat(peak: f32, n: usize) -> Vec<[f32; 2]> {
-    vec![[-peak, peak]; n]
+fn flat(peak: f32, n: usize) -> Vec<WavePoint> {
+    vec![
+        WavePoint {
+            range: [-peak, peak],
+            // Full-band content, so the height tests read the same picture they did
+            // before bands existed.
+            bands: [peak, peak, peak],
+        };
+        n
+    ]
 }
 
 fn opaque_rows(img: &RgbaImage, x: u32) -> u32 {
@@ -79,10 +88,13 @@ fn louder_columns_are_taller() {
 
 #[test]
 fn bars_are_mirrored_around_the_centre() {
-    let ranges: Vec<[f32; 2]> = (0..100)
+    let ranges: Vec<WavePoint> = (0..100)
         .map(|i| {
             let p = (i as f32 / 100.0).sqrt();
-            [-p, p]
+            WavePoint {
+                range: [-p, p],
+                bands: [p, p, p],
+            }
         })
         .collect();
     let b = WaveformBitmaps::rasterize(&ranges, 100, H, &pal());
@@ -100,10 +112,13 @@ fn bars_are_mirrored_around_the_centre() {
 
 #[test]
 fn bar_edges_are_anti_aliased() {
-    let ranges: Vec<[f32; 2]> = (0..100)
+    let ranges: Vec<WavePoint> = (0..100)
         .map(|i| {
             let p = 0.1 + 0.8 * i as f32 / 100.0;
-            [-p, p]
+            WavePoint {
+                range: [-p, p],
+                bands: [p, p, p],
+            }
         })
         .collect();
     let b = WaveformBitmaps::rasterize(&ranges, 100, H, &pal());
