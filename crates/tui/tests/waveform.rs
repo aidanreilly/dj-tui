@@ -1,11 +1,11 @@
-//! Bar waveform rasterising (spec 3.2): thin vertical lines mirrored around the centre line.
+//! Bar waveform rasterising (spec 3.2): half-cell-wide bars mirrored around the centre line.
 
 use tui::waveform::{bar_rows, downsample_peaks};
 
-/// Full-height line, half-height stub below the cell centre, half-height stub above it.
-const FULL: char = '│';
-const DOWN: char = '╷';
-const UP: char = '╵';
+/// Full-height bar, half-height stub below the cell centre, half-height stub above it.
+const FULL: char = '▌';
+const DOWN: char = '▖';
+const UP: char = '▘';
 const BLANK: char = ' ';
 
 fn chars(rows: &[String]) -> Vec<Vec<char>> {

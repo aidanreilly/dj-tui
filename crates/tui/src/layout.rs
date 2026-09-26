@@ -1,7 +1,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 
-/// Rows for one deck panel: borders, title, four waveform rows, marker row, status row.
-pub const DECK_HEIGHT: u16 = 9;
+/// Rows for one deck panel: borders, title, eight waveform rows, marker row, status row.
+pub const DECK_HEIGHT: u16 = 13;
 pub const PHASE_HEIGHT: u16 = 1;
 pub const MIXER_WIDTH: u16 = 26;
 /// Height of the collapsed horizontal mixer used on narrow terminals.

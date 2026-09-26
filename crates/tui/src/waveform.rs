@@ -1,15 +1,16 @@
 //! Bar rasterising for the overview waveform.
 //!
-//! One thin vertical line per terminal cell column, mirrored around a horizontal centre
+//! One bar per terminal cell column, filling the left half of the cell so that bars sit
+//! close together with a narrow gap. The waveform is mirrored around a horizontal centre
 //! line: half the rows grow upward, half grow downward. Each cell resolves two steps, a
-//! full-height line and a half-height stub on the side facing the centre.
+//! full-height bar and a quadrant stub on the side facing the centre.
 
-/// Full-height line.
-const FULL: char = '│';
+/// Full-height bar, left half of the cell.
+const FULL: char = '▌';
 /// Half-height stub in the lower part of a cell, for a bar growing upward.
-const DOWN: char = '╷';
+const DOWN: char = '▖';
 /// Half-height stub in the upper part of a cell, for a bar growing downward.
-const UP: char = '╵';
+const UP: char = '▘';
 
 /// Rasterise `envelope` (one value in 0..=1 per cell column) into `rows` lines of bars.
 /// `rows` must be even and at least 2.

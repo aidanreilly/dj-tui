@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, BorderType, Widget},
 };
 
-pub const WAVEFORM_ROWS: u16 = 4;
+pub const WAVEFORM_ROWS: u16 = 8;
 
 /// Everything the deck panel needs to draw, copied out of engine state each frame.
 #[derive(Debug, Clone)]
