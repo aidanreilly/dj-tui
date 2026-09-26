@@ -1,7 +1,7 @@
 use dj_tui::demo::{click_track, peak_envelope};
 use dj_tui::view::{screen_view, DeckMeta};
 use dj_tui::clock::NullClock;
-use engine::{DeckId, Engine};
+use engine::{channel, Command, DeckId, Engine, Snapshot};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -28,45 +28,51 @@ fn peak_envelope_is_normalised_to_one() {
 
 #[test]
 fn view_reports_times_in_seconds_and_focus() {
-    let mut e = Engine::new();
-    let t = Arc::new(click_track(124.0, 10.0, 1000));
-    e.deck_mut(DeckId::B).load(t);
-    e.deck_mut(DeckId::B).seek(2500.0);
-    e.deck_mut(DeckId::B).hot_cue(1);
+    let mut snap = Snapshot::default();
+    snap.decks[1].track_frames = 10_000;
+    snap.decks[1].position = 2500.0;
+    snap.decks[1].hot_cues[1] = Some(100.0);
+    snap.decks[1].playing = true;
+    snap.faders = [0.5, 1.0];
     let metas = [
         DeckMeta::default(),
         DeckMeta { title: Some("Demo".into()), bpm: Some(124.0), key: None, envelope: vec![0.5] },
     ];
-    let v = screen_view(&e, DeckId::B, &metas, "ok".into());
+    let v = screen_view(&snap, 1000, DeckId::B, &metas, "ok".into());
     let b = &v.decks[1];
     assert!(b.focused && !v.decks[0].focused);
     assert_eq!(b.position_secs, 2.5);
     assert_eq!(b.duration_secs, 10.0);
     assert!(b.hot_cues[1] && !b.hot_cues[0]);
+    assert!(b.playing);
     assert_eq!(b.title.as_deref(), Some("Demo"));
-    assert!(v.decks[0].title.is_none());
+    assert!(v.decks[0].title.is_none(), "no track loaded on A");
+    assert_eq!(v.mixer.faders, [0.5, 1.0]);
+}
+
+fn playing_processor(rate: u32) -> (engine::EngineHandle, engine::EngineProcessor) {
+    let (mut h, p) = channel(Engine::new(), 8);
+    h.send(Command::Load(DeckId::A, Arc::new(click_track(120.0, 30.0, rate)))).unwrap();
+    h.send(Command::PlayPause(DeckId::A)).unwrap();
+    (h, p)
 }
 
 #[test]
 fn null_clock_advances_playing_decks_by_elapsed_time() {
-    let mut e = Engine::new();
-    e.deck_mut(DeckId::A).load(Arc::new(click_track(120.0, 30.0, 48_000)));
-    e.deck_mut(DeckId::A).play_pause();
+    let (h, mut p) = playing_processor(48_000);
     let mut clock = NullClock::new(48_000);
-    clock.advance(&mut e, Duration::from_millis(250));
-    assert_eq!(e.deck(DeckId::A).position(), 12_000.0);
-    clock.advance(&mut e, Duration::from_secs(1));
-    assert_eq!(e.deck(DeckId::A).position(), 60_000.0);
+    clock.advance(&mut p, Duration::from_millis(250));
+    assert_eq!(h.snapshot().decks[0].position, 12_000.0);
+    clock.advance(&mut p, Duration::from_secs(1));
+    assert_eq!(h.snapshot().decks[0].position, 60_000.0);
 }
 
 #[test]
 fn null_clock_carries_fractional_frames() {
-    let mut e = Engine::new();
-    e.deck_mut(DeckId::A).load(Arc::new(click_track(120.0, 30.0, 1000)));
-    e.deck_mut(DeckId::A).play_pause();
+    let (h, mut p) = playing_processor(1000);
     let mut clock = NullClock::new(1000);
     for _ in 0..4 {
-        clock.advance(&mut e, Duration::from_micros(2500));
+        clock.advance(&mut p, Duration::from_micros(2500));
     }
-    assert_eq!(e.deck(DeckId::A).position(), 10.0);
+    assert_eq!(h.snapshot().decks[0].position, 10.0);
 }

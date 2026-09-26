@@ -1,7 +1,7 @@
 //! Stand-in for an audio backend: advances the engine by wall-clock time and discards output.
 //! Replaced by the JACK backend in M1; kept afterwards for `--no-audio` runs.
 
-use engine::{Engine, MAX_BLOCK_FRAMES};
+use engine::{EngineProcessor, MAX_BLOCK_FRAMES};
 use std::time::Duration;
 
 pub struct NullClock {
@@ -21,7 +21,7 @@ impl NullClock {
         }
     }
 
-    pub fn advance(&mut self, engine: &mut Engine, elapsed: Duration) {
+    pub fn advance(&mut self, engine: &mut EngineProcessor, elapsed: Duration) {
         let exact = elapsed.as_secs_f64() * self.sample_rate + self.carry;
         let mut frames = exact.floor() as usize;
         self.carry = exact - frames as f64;

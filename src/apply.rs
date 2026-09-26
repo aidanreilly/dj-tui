@@ -1,9 +1,13 @@
-//! Maps input actions onto engine calls. Actions for features not built yet return `false`.
+//! Maps input actions onto engine commands.
+//!
+//! The UI owns the absolute value of every continuous control (faders, crossfader, tempo) in
+//! `ControlState`, so several key presses between two audio callbacks each count.
+//! Actions for features not built yet produce no command.
 
-use engine::Engine;
+use engine::{Command, Snapshot};
 use input::{Action, Dir};
 
-/// Step sizes for keyboard controls.
+/// Step sizes and limits for keyboard controls.
 #[derive(Debug, Clone)]
 pub struct Controls {
     pub tempo_range: f64,
@@ -26,6 +30,21 @@ impl Controls {
     }
 }
 
+/// The UI's authoritative copy of continuous control values.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ControlState {
+    pub crossfader: f32,
+    pub faders: [f32; 2],
+    pub headphone_cue: [bool; 2],
+    pub rates: [f64; 2],
+}
+
+impl Default for ControlState {
+    fn default() -> Self {
+        Self { crossfader: 0.0, faders: [1.0; 2], headphone_cue: [false; 2], rates: [1.0; 2] }
+    }
+}
+
 fn sign(d: Dir) -> f32 {
     match d {
         Dir::Up => 1.0,
@@ -33,41 +52,44 @@ fn sign(d: Dir) -> f32 {
     }
 }
 
-/// Apply one action. Returns whether it did anything.
-pub fn apply(e: &mut Engine, c: &Controls, action: Action) -> bool {
+pub fn apply(st: &mut ControlState, c: &Controls, snap: &Snapshot, action: Action) -> Option<Command> {
     use Action::*;
-    match action {
-        PlayPause(d) => e.deck_mut(d).play_pause(),
-        CuePress(d) => e.deck_mut(d).cue_press(),
-        CueRelease(d) => e.deck_mut(d).cue_release(),
-        HotCue(d, n) => e.deck_mut(d).hot_cue(n),
-        ClearHotCue(d, n) => e.deck_mut(d).clear_hot_cue(n),
+    Some(match action {
+        PlayPause(d) => Command::PlayPause(d),
+        CuePress(d) => Command::CuePress(d),
+        CueRelease(d) => Command::CueRelease(d),
+        HotCue(d, n) => Command::HotCue(d, n),
+        ClearHotCue(d, n) => Command::ClearHotCue(d, n),
         Tempo(d, dir, fine) => {
             let step = if fine { c.tempo_fine_step } else { c.tempo_step };
-            let deck = e.deck_mut(d);
-            let rate = (deck.rate() + step * sign(dir) as f64)
-                .clamp(1.0 - c.tempo_range, 1.0 + c.tempo_range);
+            let r = &mut st.rates[d.index()];
+            let next = (*r + step * sign(dir) as f64).clamp(1.0 - c.tempo_range, 1.0 + c.tempo_range);
             // Round away float drift so repeated steps land on exact values.
-            deck.set_rate((rate * 1e6).round() / 1e6);
+            *r = (next * 1e6).round() / 1e6;
+            Command::SetRate(d, *r)
         }
         SeekTenth(d, n) => {
-            let deck = e.deck_mut(d);
-            let frames = deck.track().map_or(0, |t| t.frames()) as f64;
-            deck.seek(frames * n as f64 / 10.0);
+            let frames = snap.decks[d.index()].track_frames;
+            if frames == 0 {
+                return None;
+            }
+            Command::Seek(d, frames as f64 * n as f64 / 10.0)
         }
         Fader(d, dir) => {
-            let v = e.channel_fader(d) + c.fader_step * sign(dir);
-            e.set_channel_fader(d, v);
+            let v = &mut st.faders[d.index()];
+            *v = (*v + c.fader_step * sign(dir)).clamp(0.0, 1.0);
+            Command::SetChannelFader(d, *v)
         }
         HeadphoneCue(d) => {
-            let on = !e.headphone_cue(d);
-            e.set_headphone_cue(d, on);
+            let on = &mut st.headphone_cue[d.index()];
+            *on = !*on;
+            Command::SetHeadphoneCue(d, *on)
         }
-        Crossfader(dir, snap) => {
-            let x = if snap { sign(dir) } else { e.crossfader() + c.crossfader_step * sign(dir) };
-            e.set_crossfader(x);
+        Crossfader(dir, snap_to_end) => {
+            let x = if snap_to_end { sign(dir) } else { st.crossfader + c.crossfader_step * sign(dir) };
+            st.crossfader = x.clamp(-1.0, 1.0);
+            Command::SetCrossfader(st.crossfader)
         }
-        _ => return false,
-    }
-    true
+        _ => return None,
+    })
 }

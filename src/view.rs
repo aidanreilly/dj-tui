@@ -1,6 +1,6 @@
-//! Copies engine state into the view structs the TUI renders.
+//! Builds the view structs the TUI renders from an engine snapshot plus per-deck metadata.
 
-use engine::{DeckId, Engine, HOT_CUES};
+use engine::{DeckId, Snapshot, HOT_CUES};
 use tui::{DeckView, MixerView, ScreenView};
 
 /// Per-deck information that lives outside the engine: metadata and analysis results.
@@ -12,44 +12,42 @@ pub struct DeckMeta {
     pub envelope: Vec<f32>,
 }
 
-fn deck_view(e: &Engine, id: DeckId, focused: DeckId, meta: &DeckMeta) -> DeckView {
-    let deck = e.deck(id);
-    let (position_secs, duration_secs) = match deck.track() {
-        Some(t) => {
-            let rate = t.sample_rate() as f64;
-            (deck.position() / rate, t.frames() as f64 / rate)
-        }
-        None => (0.0, 0.0),
-    };
+fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &DeckMeta) -> DeckView {
+    let d = &snap.decks[id.index()];
+    let loaded = d.track_frames > 0;
     let mut hot_cues = [false; HOT_CUES];
-    for (i, slot) in hot_cues.iter_mut().enumerate() {
-        *slot = deck.hot_cue_position(i).is_some();
+    for (slot, cue) in hot_cues.iter_mut().zip(&d.hot_cues) {
+        *slot = cue.is_some();
     }
     DeckView {
         id,
         focused: id == focused,
-        title: deck.track().and(meta.title.clone()),
+        title: if loaded { meta.title.clone() } else { None },
         bpm: meta.bpm,
         key: meta.key.clone(),
-        position_secs,
-        duration_secs,
-        playing: deck.is_playing(),
+        position_secs: d.position / rate,
+        duration_secs: d.track_frames as f64 / rate,
+        playing: d.playing,
         hot_cues,
-        envelope: meta.envelope.clone(),
+        envelope: if loaded { meta.envelope.clone() } else { Vec::new() },
     }
 }
 
-pub fn screen_view(e: &Engine, focused: DeckId, metas: &[DeckMeta; 2], status: String) -> ScreenView {
+/// `sample_rate` is the session rate; every loaded track has been resampled to it.
+pub fn screen_view(
+    snap: &Snapshot,
+    sample_rate: u32,
+    focused: DeckId,
+    metas: &[DeckMeta; 2],
+    status: String,
+) -> ScreenView {
+    let rate = sample_rate as f64;
     ScreenView {
         decks: [
-            deck_view(e, DeckId::A, focused, &metas[0]),
-            deck_view(e, DeckId::B, focused, &metas[1]),
+            deck_view(snap, rate, DeckId::A, focused, &metas[0]),
+            deck_view(snap, rate, DeckId::B, focused, &metas[1]),
         ],
-        mixer: MixerView {
-            crossfader: e.crossfader(),
-            faders: [e.channel_fader(DeckId::A), e.channel_fader(DeckId::B)],
-            headphone_cue: [e.headphone_cue(DeckId::A), e.headphone_cue(DeckId::B)],
-        },
+        mixer: MixerView { crossfader: snap.crossfader, faders: snap.faders, headphone_cue: snap.headphone_cue },
         status,
     }
 }
