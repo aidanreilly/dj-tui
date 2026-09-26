@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/engine", "crates/input", "crates/tui"]
+members = ["crates/engine", "crates/input", "crates/loader", "crates/tui"]
 resolver = "2"
 
 [workspace.package]
@@ -19,6 +19,7 @@ rust-version.workspace = true
 engine = { path = "crates/engine" }
 input = { path = "crates/input" }
 tui = { path = "crates/tui" }
+loader = { path = "crates/loader" }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 ratatui = "0.29"

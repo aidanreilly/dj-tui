@@ -28,27 +28,4 @@ pub fn click_track(bpm: f64, secs: f64, sample_rate: u32) -> Track {
     Track::from_interleaved(data, sample_rate)
 }
 
-/// Whole-track peak envelope with `points` values, normalised so the loudest is 1.
-pub fn peak_envelope(track: &Track, points: usize) -> Vec<f32> {
-    let frames = track.frames();
-    if frames == 0 || points == 0 {
-        return vec![0.0; points];
-    }
-    let mut env: Vec<f32> = (0..points)
-        .map(|j| {
-            let start = j * frames / points;
-            let end = ((j + 1) * frames / points).max(start + 1).min(frames);
-            (start..end)
-                .map(|i| {
-                    let (l, r) = track.frame_at(i as f64);
-                    l.abs().max(r.abs())
-                })
-                .fold(0.0, f32::max)
-        })
-        .collect();
-    let max = env.iter().copied().fold(0.0, f32::max);
-    if max > 0.0 {
-        env.iter_mut().for_each(|v| *v /= max);
-    }
-    env
-}
+pub use loader::peak_envelope;
