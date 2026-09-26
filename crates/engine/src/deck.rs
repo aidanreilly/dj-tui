@@ -21,8 +21,16 @@ impl Deck {
         Self { rate: 1.0, ..Default::default() }
     }
 
-    pub fn load(&mut self, track: Arc<Track>) {
-        *self = Self { track: Some(track), rate: self.rate, ..Default::default() };
+    /// Load `track`, resetting transport and cues. Returns the previous track so the caller
+    /// decides where it gets freed (never on the audio thread).
+    pub fn load(&mut self, track: Arc<Track>) -> Option<Arc<Track>> {
+        let old = std::mem::replace(self, Self { rate: self.rate, ..Default::default() });
+        self.track = Some(track);
+        old.track
+    }
+
+    pub fn cue_is_previewing(&self) -> bool {
+        self.previewing
     }
 
     pub fn track(&self) -> Option<&Arc<Track>> {

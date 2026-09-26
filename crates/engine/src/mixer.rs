@@ -1,4 +1,5 @@
-use crate::Deck;
+use crate::{Deck, Track};
+use std::sync::Arc;
 use std::f32::consts::FRAC_PI_2;
 
 /// Largest block rendered in one pass. Bigger callbacks are split, so no allocation happens in `process`.
@@ -21,7 +22,7 @@ impl DeckId {
         }
     }
 
-    fn index(self) -> usize {
+    pub fn index(self) -> usize {
         self as usize
     }
 }
@@ -130,6 +131,35 @@ impl Engine {
 
     pub fn set_cue_mix(&mut self, v: f32) {
         self.cue_mix = v.clamp(0.0, 1.0);
+    }
+
+    pub fn crossfader_curve(&self) -> CrossfaderCurve {
+        self.curve
+    }
+
+    pub fn cue_mix(&self) -> f32 {
+        self.cue_mix
+    }
+
+    /// Apply a command. A replaced track is returned so it can be freed off the audio thread.
+    pub fn apply(&mut self, cmd: crate::Command) -> Option<Arc<Track>> {
+        use crate::Command::*;
+        match cmd {
+            Load(d, t) => return self.deck_mut(d).load(t),
+            PlayPause(d) => self.deck_mut(d).play_pause(),
+            CuePress(d) => self.deck_mut(d).cue_press(),
+            CueRelease(d) => self.deck_mut(d).cue_release(),
+            HotCue(d, n) => self.deck_mut(d).hot_cue(n),
+            ClearHotCue(d, n) => self.deck_mut(d).clear_hot_cue(n),
+            Seek(d, f) => self.deck_mut(d).seek(f),
+            SetRate(d, r) => self.deck_mut(d).set_rate(r),
+            SetChannelFader(d, v) => self.set_channel_fader(d, v),
+            SetCrossfader(x) => self.set_crossfader(x),
+            SetCrossfaderCurve(c) => self.set_crossfader_curve(c),
+            SetHeadphoneCue(d, on) => self.set_headphone_cue(d, on),
+            SetCueMix(v) => self.set_cue_mix(v),
+        }
+        None
     }
 
     /// Fill interleaved stereo `master` and `cue` buffers of equal length.

@@ -6,3 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+rtrb = "0.3"
+
+[dev-dependencies]
+assert_no_alloc = "1.1"

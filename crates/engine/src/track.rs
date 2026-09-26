@@ -4,6 +4,12 @@ pub struct Track {
     sample_rate: u32,
 }
 
+impl std::fmt::Debug for Track {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Track").field("frames", &self.frames()).field("sample_rate", &self.sample_rate).finish()
+    }
+}
+
 impl Track {
     /// `data` must be interleaved stereo; a trailing odd sample is dropped.
     pub fn from_interleaved(mut data: Vec<f32>, sample_rate: u32) -> Self {
