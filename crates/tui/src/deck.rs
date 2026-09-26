@@ -122,11 +122,11 @@ impl Widget for DeckPanel<'_> {
                 for x in inner.x..head {
                     buf[(x, y)].modifier.insert(Modifier::DIM);
                 }
-                // Draw a one-eighth-cell playhead after the waveform so it overlays bars.
+                // Draw the playhead after the waveform using the same half-cell bar width.
                 buf.set_string(
                     head,
                     y,
-                    "▏",
+                    "▌",
                     Style::new().fg(ratatui::style::Color::Rgb(169, 165, 145)),
                 );
             }

@@ -102,13 +102,13 @@ fn empty_deck_says_so() {
 }
 
 #[test]
-fn played_portion_is_dimmed_and_playhead_is_a_thin_overlay() {
+fn played_portion_is_dimmed_and_playhead_matches_bar_width() {
     let buf = render(&loaded_view(true), 80, DECK_HEIGHT);
     // Waveform occupies inner width 78 starting at x=1, first waveform row y=2.
     // 5 of 30 seconds played: playhead at column 1 + 78*5/30 = 14.
     let y = 2;
     assert!(buf[(3, y)].modifier.contains(Modifier::DIM));
-    assert_eq!(buf[(14, y)].symbol(), "▏");
+    assert_eq!(buf[(14, y)].symbol(), "▌");
     assert!(!buf[(14, y)].modifier.contains(Modifier::DIM));
     assert!(!buf[(40, y)].modifier.contains(Modifier::DIM));
 }
