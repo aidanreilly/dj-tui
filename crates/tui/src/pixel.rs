@@ -28,7 +28,13 @@ fn shape(peak: f32) -> f32 {
 /// The three bands share one divisor, and music puts far more absolute energy into bass
 /// than into cymbals, so an ungained high band would sit near 0.1 and all but vanish
 /// once `shape` raises it to the power of 1.5.
-pub const BAND_GAIN: [f32; 3] = [1.0, 1.8, 3.0];
+pub const BAND_GAIN: [f32; 3] = [1.0, 1.3, 1.6];
+
+/// How far `rgb` measures each band against its own loudest column rather than against
+/// the track's overall peak. At 0 a bass-led track is red end to end; at 1 every band is
+/// stretched to its own full range and almost every column lands mid-ramp. In between
+/// keeps the spectral tilt while still reaching the blue end on treble-led passages.
+const RGB_LEVELLING: f32 = 0.5;
 
 /// Colour at the top of the `blue` mode's tint.
 const WHITE: Rgba<u8> = Rgba([240, 244, 255, 255]);
@@ -71,6 +77,28 @@ impl Default for Palette {
     }
 }
 
+/// Fully saturated colour for a spectral position: 0 is red, 0.5 green, 1 blue,
+/// passing through yellow and cyan. Used by `rgb`, whose hue carries the frequency
+/// balance while height carries the level.
+fn spectrum(position: f32) -> Rgba<u8> {
+    let h = position.clamp(0.0, 1.0) * 4.0;
+    let i = h.floor();
+    let f = h - i;
+    let (r, g, b) = match i as u32 {
+        0 => (1.0, f, 0.0),
+        1 => (1.0 - f, 1.0, 0.0),
+        2 => (0.0, 1.0, f),
+        3 => (0.0, 1.0 - f, 1.0),
+        _ => (0.0, 0.0, 1.0),
+    };
+    Rgba([
+        (r * 255.0).round() as u8,
+        (g * 255.0).round() as u8,
+        (b * 255.0).round() as u8,
+        255,
+    ])
+}
+
 /// A band's height as a fraction of the half panel, with its gain and the contrast
 /// curve applied. Shared with the glyph renderer so both modes read alike.
 pub fn band_half_steps(value: f32, band: usize) -> f32 {
@@ -82,7 +110,14 @@ fn band_half(value: f32, band: usize, mid: f32) -> f32 {
 }
 
 /// Paint one column, in whichever scheme the palette names.
-fn draw_column(img: &mut RgbaImage, x: u32, mid: f32, p: &WavePoint, palette: &Palette) {
+fn draw_column(
+    img: &mut RgbaImage,
+    x: u32,
+    mid: f32,
+    p: &WavePoint,
+    palette: &Palette,
+    reference: [f32; 3],
+) {
     match palette.mode {
         WaveformMode::ThreeBand => {
             let mut drew = false;
@@ -116,19 +151,25 @@ fn draw_column(img: &mut RgbaImage, x: u32, mid: f32, p: &WavePoint, palette: &P
             if half <= 0.0 {
                 return;
             }
-            let mut channels = [0.0f32; 3];
-            for ((value, gain), colour) in p.bands.iter().zip(BAND_GAIN).zip(palette.bands) {
-                let v = (value * gain).min(1.0);
-                for (c, acc) in channels.iter_mut().enumerate() {
-                    *acc += v * (colour[c] as f32 / 255.0);
-                }
+            // Hue follows where the energy sits, which is what makes a whole track
+            // readable: red for a bass-led column, green through the mids, blue for a
+            // treble-led one. Squaring turns amplitude into energy so the leading band
+            // pulls the hue decisively instead of every column averaging to grey.
+            let mut energy = [0.0f32; 3];
+            for (e, (v, r)) in energy.iter_mut().zip(p.bands.iter().zip(reference)) {
+                let scaled = if r > 0.0 {
+                    v / r.powf(RGB_LEVELLING)
+                } else {
+                    0.0
+                };
+                *e = scaled * scaled;
             }
-            let colour = Rgba([
-                (channels[0].min(1.0) * 255.0) as u8,
-                (channels[1].min(1.0) * 255.0) as u8,
-                (channels[2].min(1.0) * 255.0) as u8,
-                255,
-            ]);
+            let total: f32 = energy.iter().sum();
+            let colour = if total <= 0.0 {
+                palette.bands[0]
+            } else {
+                spectrum((0.5 * energy[1] + energy[2]) / total)
+            };
             let half = half.max(0.5);
             span(img, x, mid - half, mid + half, |_| colour);
         }
@@ -200,8 +241,17 @@ impl WaveformBitmaps {
         let mut normal = RgbaImage::new(width, height);
         let mid = height as f32 / 2.0;
         let columns = downsample_points(points, width as usize);
+        // Each band's own loudest column. `rgb` measures a band against this rather than
+        // against the track's overall peak, so a hi-hat section reads as treble-led even
+        // though hats never approach a kick in absolute level.
+        let mut reference = [0.0f32; 3];
+        for p in &columns {
+            for (r, v) in reference.iter_mut().zip(p.bands) {
+                *r = r.max(v);
+            }
+        }
         for (x, p) in columns.iter().enumerate() {
-            draw_column(&mut normal, x as u32, mid, p, palette);
+            draw_column(&mut normal, x as u32, mid, p, palette, reference);
         }
         // The centre line fills whatever the bars left empty, straddling the middle.
         for x in 0..width {

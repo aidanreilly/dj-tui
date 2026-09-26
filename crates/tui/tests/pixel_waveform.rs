@@ -333,11 +333,17 @@ fn rgb_maps_each_band_to_its_own_channel() {
 }
 
 #[test]
-fn rgb_full_spectrum_columns_trend_toward_white() {
+fn rgb_gives_an_evenly_balanced_column_the_middle_of_the_ramp() {
+    // Equal energy in all three bands sits in the middle of the spectrum, which the
+    // ramp paints green. docs/spec.md:72 puts the mids there.
     let p = Palette::for_mode(WaveformMode::Rgb);
     let b = WaveformBitmaps::rasterize(&one([1.0, 1.0, 1.0], 1.0), 1, 64, &p);
-    let pixel = *b.normal().get_pixel(0, 32);
-    assert!(luma(&pixel) > 600, "luma was {}", luma(&pixel));
+    let px = *b.normal().get_pixel(0, 32);
+    assert!(px[1] > 200, "green channel was {}", px[1]);
+    assert!(
+        px[0] < 90 && px[2] < 90,
+        "should not be washed out, got {px:?}"
+    );
 }
 
 #[test]
@@ -396,4 +402,55 @@ fn changing_only_the_mode_produces_a_fresh_image() {
         pw.update(&r, (W, H), Some(10), &rgb).is_some(),
         "a new mode must redraw"
     );
+}
+
+/// A two-column track: a bass-led column beside a treble-led one. `rgb` measures each
+/// band against its own loudest column, so both are needed to express the behaviour.
+fn two_columns() -> Vec<WavePoint> {
+    vec![
+        WavePoint {
+            range: [-1.0, 1.0],
+            bands: [1.0, 0.2, 0.1],
+        },
+        WavePoint {
+            range: [-1.0, 1.0],
+            bands: [0.2, 0.5, 0.6],
+        },
+    ]
+}
+
+#[test]
+fn rgb_paints_a_bass_led_column_at_the_red_end() {
+    let p = Palette::for_mode(WaveformMode::Rgb);
+    let b = WaveformBitmaps::rasterize(&two_columns(), 2, 64, &p);
+    let px = *b.normal().get_pixel(0, 32);
+    assert!(px[0] > 200, "bass-led column should be red, got {px:?}");
+    assert!(px[2] < 60, "and carry no blue, got {px:?}");
+}
+
+#[test]
+fn rgb_paints_a_treble_led_column_at_the_blue_end() {
+    let p = Palette::for_mode(WaveformMode::Rgb);
+    let b = WaveformBitmaps::rasterize(&two_columns(), 2, 64, &p);
+    let px = *b.normal().get_pixel(1, 32);
+    assert!(px[2] > 200, "treble-led column should be blue, got {px:?}");
+    assert!(px[0] < 60, "and carry no red, got {px:?}");
+}
+
+#[test]
+fn rgb_hue_follows_the_balance_rather_than_the_level() {
+    // Halving every band leaves the balance untouched, so the colour must not move.
+    let p = Palette::for_mode(WaveformMode::Rgb);
+    let loud = two_columns();
+    let quiet: Vec<WavePoint> = loud
+        .iter()
+        .map(|w| WavePoint {
+            range: w.range,
+            bands: [w.bands[0] * 0.5, w.bands[1] * 0.5, w.bands[2] * 0.5],
+        })
+        .collect();
+    let a = WaveformBitmaps::rasterize(&loud, 2, 64, &p);
+    let b = WaveformBitmaps::rasterize(&quiet, 2, 64, &p);
+    assert_eq!(a.normal().get_pixel(0, 32), b.normal().get_pixel(0, 32));
+    assert_eq!(a.normal().get_pixel(1, 32), b.normal().get_pixel(1, 32));
 }
