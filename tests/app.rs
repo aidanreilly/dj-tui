@@ -42,6 +42,7 @@ fn loading_a_file_puts_it_on_the_deck_with_its_title() {
     assert_eq!(view.decks[1].title.as_deref(), Some("Warehouse Tool"));
     assert!((view.decks[1].duration_secs - 0.1).abs() < 1e-9);
     assert!(app.message().contains("Warehouse Tool"), "{}", app.message());
+    assert_eq!(view.message, app.message());
 }
 
 #[test]

@@ -49,5 +49,6 @@ pub fn screen_view(
         ],
         mixer: MixerView { crossfader: snap.crossfader, faders: snap.faders, headphone_cue: snap.headphone_cue },
         status,
+        message: String::new(),
     }
 }

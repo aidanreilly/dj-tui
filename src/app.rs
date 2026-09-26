@@ -104,14 +104,10 @@ impl App {
         &self.message
     }
 
-    /// `status` is prepended to the current message on the status line.
     pub fn view(&self, status: String) -> ScreenView {
-        let line = match (status.is_empty(), self.message.is_empty()) {
-            (false, false) => format!("{status}  |  {}", self.message),
-            (false, true) => status,
-            _ => self.message.clone(),
-        };
-        screen_view(&self.handle.snapshot(), self.sample_rate, self.keymap.focused(), &self.metas, line)
+        let mut v = screen_view(&self.handle.snapshot(), self.sample_rate, self.keymap.focused(), &self.metas, status);
+        v.message = self.message.clone();
+        v
     }
 
     fn send(&mut self, cmd: Command) {

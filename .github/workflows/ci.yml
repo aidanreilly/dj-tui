@@ -14,6 +14,18 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
 
+  jack:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y jackd2 libjack-jackd2-dev libasound2-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - name: JACK integration tests against the dummy driver
+        run: |
+          jackd -n ci -d dummy -r 48000 -p 256 -P 4 -C 0 &
+          sleep 2
+          JACK_DEFAULT_SERVER=ci DJ_TUI_JACK_TESTS=1 cargo test -p backend --locked --test jack_dummy
+
   msrv:
     runs-on: ubuntu-24.04
     steps:

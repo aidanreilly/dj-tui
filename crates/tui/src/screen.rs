@@ -20,6 +20,8 @@ pub struct ScreenView {
     pub decks: [DeckView; 2],
     pub mixer: MixerView,
     pub status: String,
+    /// Latest event for the user (load results, errors). Shown above the status line.
+    pub message: String,
 }
 
 const XFADE_WIDTH: usize = 13;
@@ -68,6 +70,10 @@ pub fn render_screen(f: &mut Frame, v: &ScreenView) {
     );
     if inner.height > 0 {
         let status = Rect { y: inner.bottom() - 1, height: 1, ..inner };
-        f.render_widget(Paragraph::new(v.status.as_str()), status);
+        f.render_widget(Paragraph::new(v.status.as_str()).style(Style::new().add_modifier(Modifier::DIM)), status);
+    }
+    if inner.height > 1 && !v.message.is_empty() {
+        let message = Rect { y: inner.bottom() - 2, height: 1, ..inner };
+        f.render_widget(Paragraph::new(v.message.as_str()), message);
     }
 }

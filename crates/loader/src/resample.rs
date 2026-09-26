@@ -12,7 +12,7 @@ pub(crate) fn resample(input: [Vec<f32>; 2], from: u32, to: u32) -> Result<[Vec<
     let expected = (n as f64 * to as f64 / from as f64).round() as usize;
     let delay = r.output_delay();
     let mut out = [Vec::with_capacity(expected + delay + CHUNK * 2), Vec::with_capacity(expected + delay + CHUNK * 2)];
-    let mut push = |o: Vec<Vec<f32>>, out: &mut [Vec<f32>; 2]| {
+    let push = |o: Vec<Vec<f32>>, out: &mut [Vec<f32>; 2]| {
         out[0].extend_from_slice(&o[0]);
         out[1].extend_from_slice(&o[1]);
     };
