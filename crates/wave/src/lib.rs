@@ -4,6 +4,7 @@
 //! depend on it.
 
 mod analysis;
+pub mod cache;
 mod biquad;
 mod mode;
 
