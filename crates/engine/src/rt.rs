@@ -42,6 +42,7 @@ pub struct Snapshot {
     pub crossfader: f32,
     pub faders: [f32; 2],
     pub headphone_cue: [bool; 2],
+    pub crossfader_curve: CrossfaderCurve,
     pub frames_processed: u64,
 }
 
@@ -84,6 +85,7 @@ struct SharedDeck {
 struct Shared {
     decks: [SharedDeck; 2],
     crossfader: F32,
+    curve: std::sync::atomic::AtomicU8,
     frames_processed: AtomicU64,
 }
 
@@ -149,6 +151,11 @@ impl EngineHandle {
             crossfader: s.crossfader.get(),
             faders: [s.decks[0].fader.get(), s.decks[1].fader.get()],
             headphone_cue: [s.decks[0].headphone_cue.load(Relaxed), s.decks[1].headphone_cue.load(Relaxed)],
+            crossfader_curve: match s.curve.load(Relaxed) {
+                0 => CrossfaderCurve::Linear,
+                2 => CrossfaderCurve::Cut,
+                _ => CrossfaderCurve::ConstantPower,
+            },
             frames_processed: s.frames_processed.load(Relaxed),
         }
     }
@@ -200,6 +207,14 @@ impl EngineProcessor {
             out.headphone_cue.store(self.engine.headphone_cue(id), Relaxed);
         }
         s.crossfader.set(self.engine.crossfader());
+        s.curve.store(
+            match self.engine.crossfader_curve() {
+                CrossfaderCurve::Linear => 0,
+                CrossfaderCurve::ConstantPower => 1,
+                CrossfaderCurve::Cut => 2,
+            },
+            Relaxed,
+        );
         s.frames_processed.store(self.frames_processed, Relaxed);
     }
 }

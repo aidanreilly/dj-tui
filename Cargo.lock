@@ -157,6 +157,7 @@ dependencies = [
  "loader",
  "ratatui",
  "serde",
+ "tempfile",
  "toml",
  "tui",
 ]

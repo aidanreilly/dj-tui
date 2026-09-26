@@ -52,6 +52,7 @@ fn snapshot_reflects_cues_and_mixer_state() {
     assert_eq!(s.crossfader, 0.5);
     assert_eq!(s.faders, [0.25, 1.0]);
     assert_eq!(s.headphone_cue, [false, true]);
+    assert_eq!(s.crossfader_curve, CrossfaderCurve::Cut);
     assert_eq!(s.frames_processed, 1);
 }
 
