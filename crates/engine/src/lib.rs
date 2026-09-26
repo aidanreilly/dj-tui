@@ -5,5 +5,5 @@ mod mixer;
 mod track;
 
 pub use deck::{Deck, HOT_CUES};
-pub use mixer::{crossfader_gains, CrossfaderCurve, DeckId, Engine};
+pub use mixer::{crossfader_gains, CrossfaderCurve, DeckId, Engine, MAX_BLOCK_FRAMES};
 pub use track::Track;
