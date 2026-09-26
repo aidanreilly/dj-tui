@@ -69,8 +69,11 @@ master_ports = ["system:playback_1", "system:playback_2"]
 cue_ports    = ["system:playback_3", "system:playback_4"]
 ```
 
-Rust 1.82 or newer, and Fedora 44's `cargo` package is well past that at 1.98. `Cargo.lock` pins
-a few transitive crates to versions that still build on 1.82.
+Rust 1.88 or newer; Fedora 44's `cargo` package is well past that at 1.98.
+
+In Ghostty, kitty and WezTerm the deck overviews are drawn as real pixel images through the
+kitty graphics protocol. Inside tmux, screen or zellij, in terminals without it, or with
+`[ui] graphics = "off"`, dj-tui draws them with block characters instead.
 
 On terminals that support the kitty keyboard protocol (kitty, foot, WezTerm, recent Alacritty),
 holding `c` previews from the cue point. Elsewhere cue works as a press.

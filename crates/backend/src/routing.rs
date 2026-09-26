@@ -7,7 +7,10 @@ pub enum Routing {
     Auto,
     /// Leave connections to the user (qjackctl, Helvum, a session manager).
     Off,
-    Explicit { master: [String; 2], cue: Option<[String; 2]> },
+    Explicit {
+        master: [String; 2],
+        cue: Option<[String; 2]>,
+    },
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -25,7 +28,8 @@ pub fn plan_connections(client: &str, routing: &Routing, physical: &[String]) ->
         Routing::Off => {}
         Routing::Auto => {
             if physical.len() < 2 {
-                plan.warnings.push("no stereo playback outputs found; connect dj-tui ports by hand".into());
+                plan.warnings
+                    .push("no stereo playback outputs found; connect dj-tui ports by hand".into());
                 return plan;
             }
             for (i, port) in physical.iter().take(4).enumerate() {
@@ -40,14 +44,17 @@ pub fn plan_connections(client: &str, routing: &Routing, physical: &[String]) ->
         }
         Routing::Explicit { master, cue } => {
             let targets = master.iter().map(Some).chain(
-                cue.iter().flat_map(|c| c.iter().map(Some)).chain(std::iter::repeat(None)),
+                cue.iter()
+                    .flat_map(|c| c.iter().map(Some))
+                    .chain(std::iter::repeat(None)),
             );
             for (i, target) in targets.take(4).enumerate() {
                 let Some(target) = target else { continue };
                 if physical.iter().any(|p| p == target) {
                     plan.connections.push((ours(i), target.clone()));
                 } else {
-                    plan.warnings.push(format!("configured port {target} does not exist"));
+                    plan.warnings
+                        .push(format!("configured port {target} does not exist"));
                 }
             }
         }

@@ -13,7 +13,12 @@ pub const WAVEFORM_ROWS: u16 = 8;
 /// Where a deck panel draws its waveform: the rows under the title, inside the border.
 pub fn waveform_area(panel: Rect) -> Rect {
     let inner = Block::bordered().inner(panel);
-    Rect::new(inner.x, inner.y + 1, inner.width, WAVEFORM_ROWS.min(inner.height.saturating_sub(1)))
+    Rect::new(
+        inner.x,
+        inner.y + 1,
+        inner.width,
+        WAVEFORM_ROWS.min(inner.height.saturating_sub(1)),
+    )
 }
 
 /// Everything the deck panel needs to draw, copied out of engine state each frame.
@@ -91,7 +96,11 @@ impl Widget for DeckPanel<'_> {
             buf.set_string(inner.x, inner.y, text, style);
             return;
         };
-        let times = format!("{}  -{}", mmss(v.position_secs), mmss(v.duration_secs - v.position_secs));
+        let times = format!(
+            "{}  -{}",
+            mmss(v.position_secs),
+            mmss(v.duration_secs - v.position_secs)
+        );
         buf.set_stringn(inner.x, inner.y, title, inner.width as usize, Style::new());
         let tx = inner.right().saturating_sub(times.chars().count() as u16);
         buf.set_string(tx, inner.y, &times, Style::new());
@@ -145,7 +154,13 @@ impl Widget for DeckPanel<'_> {
                 .hot_cues
                 .iter()
                 .enumerate()
-                .map(|(i, &set)| if set { format!("[{}]", i + 1) } else { "[ ]".into() })
+                .map(|(i, &set)| {
+                    if set {
+                        format!("[{}]", i + 1)
+                    } else {
+                        "[ ]".into()
+                    }
+                })
                 .collect();
             let state = if v.playing { "PLAYING" } else { "PAUSED" };
             buf.set_string(inner.x, status_y, format!("{cues}   {state}"), Style::new());

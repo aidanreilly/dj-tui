@@ -12,7 +12,10 @@ use dj_tui::{
 use engine::{channel, DeckId, Engine, EngineProcessor};
 use loader::ENVELOPE_POINTS;
 use ratatui::crossterm::{
-    event::{self, Event, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
+    event::{
+        self, Event, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
+        PushKeyboardEnhancementFlags,
+    },
     execute,
     terminal::supports_keyboard_enhancement,
 };
@@ -88,7 +91,11 @@ fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<Strin
         }
         None => {
             let rate = config.audio.sample_rate;
-            (App::new(handle, config, rate), Audio::Silent(NullClock::new(rate), processor), notes)
+            (
+                App::new(handle, config, rate),
+                Audio::Silent(NullClock::new(rate), processor),
+                notes,
+            )
         }
     })
 }
@@ -147,11 +154,20 @@ fn main() -> ExitCode {
         && execute!(
             stdout(),
             PushKeyboardEnhancementFlags(
-                KeyboardEnhancementFlags::REPORT_EVENT_TYPES | KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                KeyboardEnhancementFlags::REPORT_EVENT_TYPES
+                    | KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
             )
         )
         .is_ok();
-    let keys = if key_release { "hold-cue on" } else { "cue is press only (no kitty keyboard)" };
+    let mut graphics = match config.ui.graphics {
+        dj_tui::config::Graphics::Auto => tui::detect_graphics().map(tui::Graphics::new),
+        dj_tui::config::Graphics::Off => None,
+    };
+    let keys = if key_release {
+        "hold-cue on"
+    } else {
+        "cue is press only (no kitty keyboard)"
+    };
     let mut notes = notes.into_iter();
     let mut note = notes.next();
     let mut note_shown = Instant::now();
@@ -179,10 +195,23 @@ fn main() -> ExitCode {
             }
             let status = match &note {
                 Some(n) => format!("{}  |  {n}", audio.status()),
-                None => format!("{}  |  {keys}  |  ? help  Ctrl+Q quit", audio.status()),
+                None => format!(
+                    "{}  |  {keys}  |  {}  |  ? help  Ctrl+Q quit",
+                    audio.status(),
+                    if graphics.is_some() {
+                        "pixel waveforms"
+                    } else {
+                        "glyph waveforms"
+                    }
+                ),
             };
             let view = app.view(status);
-            terminal.draw(|f| tui::render_screen(f, &view))?;
+            terminal.draw(|f| {
+                tui::render_screen(f, &view);
+                if let Some(g) = &mut graphics {
+                    g.render(f, &view);
+                }
+            })?;
         }
     })();
 

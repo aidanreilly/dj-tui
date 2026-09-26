@@ -31,7 +31,9 @@ pub fn write_wav(path: &Path, samples: &[f32], channels: u16, rate: u32, fmt: Fm
     f.write_all(&data_len.to_le_bytes()).unwrap();
     for &s in samples {
         match fmt {
-            Fmt::Pcm16 => f.write_all(&((s.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes()).unwrap(),
+            Fmt::Pcm16 => f
+                .write_all(&((s.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes())
+                .unwrap(),
             Fmt::Float32 => f.write_all(&s.to_le_bytes()).unwrap(),
         }
     }
@@ -39,7 +41,9 @@ pub fn write_wav(path: &Path, samples: &[f32], channels: u16, rate: u32, fmt: Fm
 
 pub fn sine(freq: f32, secs: f32, rate: u32, amp: f32) -> Vec<f32> {
     let n = (secs * rate as f32) as usize;
-    (0..n).map(|i| amp * (std::f32::consts::TAU * freq * i as f32 / rate as f32).sin()).collect()
+    (0..n)
+        .map(|i| amp * (std::f32::consts::TAU * freq * i as f32 / rate as f32).sin())
+        .collect()
 }
 
 pub fn stereo(mono: &[f32]) -> Vec<f32> {

@@ -52,7 +52,10 @@ impl App {
 
     /// Put an already decoded track on a deck (demo mode, tests).
     pub fn load_track(&mut self, deck: DeckId, track: engine::Track, meta: DeckMeta) {
-        self.metas[deck.index()] = DeckMeta { loading: false, ..meta };
+        self.metas[deck.index()] = DeckMeta {
+            loading: false,
+            ..meta
+        };
         self.send(Command::Load(deck, Arc::new(track)));
     }
 
@@ -60,7 +63,11 @@ impl App {
     pub fn tick(&mut self) {
         self.handle.collect_garbage();
         while let Some(done) = self.loader.try_recv() {
-            let name = done.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            let name = done
+                .path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
             match done.result {
                 Ok(loaded) => {
                     let title = match &loaded.artist {
@@ -90,11 +97,15 @@ impl App {
 
     /// Handle one key event. Returns true when the user asked to quit.
     pub fn on_key(&mut self, key: KeyEvent) -> bool {
-        let Some(action) = self.keymap.handle(key) else { return false };
+        let Some(action) = self.keymap.handle(key) else {
+            return false;
+        };
         match action {
             Action::Quit => return true,
             Action::Load(_) => {
-                self.message = "The library browser arrives in M8; pass files on the command line for now".into();
+                self.message =
+                    "The library browser arrives in M8; pass files on the command line for now"
+                        .into();
             }
             _ => {
                 let snap = self.handle.snapshot();
@@ -115,7 +126,13 @@ impl App {
     }
 
     pub fn view(&self, status: String) -> ScreenView {
-        let mut v = screen_view(&self.handle.snapshot(), self.sample_rate, self.keymap.focused(), &self.metas, status);
+        let mut v = screen_view(
+            &self.handle.snapshot(),
+            self.sample_rate,
+            self.keymap.focused(),
+            &self.metas,
+            status,
+        );
         v.message = self.message.clone();
         v
     }

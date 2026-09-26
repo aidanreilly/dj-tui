@@ -13,7 +13,10 @@ fn no_arguments_is_an_empty_session() {
 #[test]
 fn up_to_two_files_go_to_decks_a_and_b() {
     let a = parse(&["one.flac", "two.mp3"]).unwrap();
-    assert_eq!(a.files, vec![PathBuf::from("one.flac"), PathBuf::from("two.mp3")]);
+    assert_eq!(
+        a.files,
+        vec![PathBuf::from("one.flac"), PathBuf::from("two.mp3")]
+    );
     assert!(parse(&["1", "2", "3"]).unwrap_err().contains("two"));
 }
 

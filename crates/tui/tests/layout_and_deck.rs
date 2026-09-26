@@ -34,7 +34,8 @@ fn loaded_view(focused: bool) -> DeckView {
 
 fn render(view: &DeckView, w: u16, h: u16) -> Buffer {
     let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
-    term.draw(|f| f.render_widget(DeckPanel::new(view), f.area())).unwrap();
+    term.draw(|f| f.render_widget(DeckPanel::new(view), f.area()))
+        .unwrap();
     term.backend().buffer().clone()
 }
 

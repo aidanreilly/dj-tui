@@ -1,6 +1,6 @@
+use dj_tui::clock::NullClock;
 use dj_tui::demo::{click_track, peak_envelope};
 use dj_tui::view::{screen_view, DeckMeta};
-use dj_tui::clock::NullClock;
 use engine::{channel, Command, DeckId, Engine, Snapshot};
 use std::sync::Arc;
 use std::time::Duration;
@@ -58,7 +58,11 @@ fn view_reports_times_in_seconds_and_focus() {
 
 fn playing_processor(rate: u32) -> (engine::EngineHandle, engine::EngineProcessor) {
     let (mut h, p) = channel(Engine::new(), 8);
-    h.send(Command::Load(DeckId::A, Arc::new(click_track(120.0, 30.0, rate)))).unwrap();
+    h.send(Command::Load(
+        DeckId::A,
+        Arc::new(click_track(120.0, 30.0, rate)),
+    ))
+    .unwrap();
     h.send(Command::PlayPause(DeckId::A)).unwrap();
     (h, p)
 }

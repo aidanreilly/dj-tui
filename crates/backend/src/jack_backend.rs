@@ -1,6 +1,8 @@
 use crate::{plan_connections, PlanarRenderer, Routing, OUTPUT_PORTS};
 use engine::EngineProcessor;
-use jack::{AudioOut, Client, ClientOptions, Control, Frames, Port, PortFlags, PortSpec, ProcessScope};
+use jack::{
+    AudioOut, Client, ClientOptions, Control, Frames, Port, PortFlags, PortSpec, ProcessScope,
+};
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::sync::Arc;
 
@@ -24,7 +26,12 @@ impl jack::ProcessHandler for Process {
         let [a, b, c, d] = &mut self.ports;
         self.renderer.render(
             &mut self.processor,
-            [a.as_mut_slice(ps), b.as_mut_slice(ps), c.as_mut_slice(ps), d.as_mut_slice(ps)],
+            [
+                a.as_mut_slice(ps),
+                b.as_mut_slice(ps),
+                c.as_mut_slice(ps),
+                d.as_mut_slice(ps),
+            ],
         );
         Control::Continue
     }
@@ -68,19 +75,41 @@ impl JackBackend {
         self.client.sample_rate() as u32
     }
 
-    pub fn activate(self, processor: EngineProcessor, routing: &Routing) -> Result<Running, String> {
+    pub fn activate(
+        self,
+        processor: EngineProcessor,
+        routing: &Routing,
+    ) -> Result<Running, String> {
         let client = self.client;
-        let reg = |name: &str| client.register_port(name, AudioOut::default()).map_err(|e| format!("register {name}: {e}"));
-        let ports = [reg(OUTPUT_PORTS[0])?, reg(OUTPUT_PORTS[1])?, reg(OUTPUT_PORTS[2])?, reg(OUTPUT_PORTS[3])?];
+        let reg = |name: &str| {
+            client
+                .register_port(name, AudioOut::default())
+                .map_err(|e| format!("register {name}: {e}"))
+        };
+        let ports = [
+            reg(OUTPUT_PORTS[0])?,
+            reg(OUTPUT_PORTS[1])?,
+            reg(OUTPUT_PORTS[2])?,
+            reg(OUTPUT_PORTS[3])?,
+        ];
         let frames = (client.buffer_size() as usize).max(INITIAL_FRAMES);
         let sample_rate = client.sample_rate() as u32;
         let buffer_size = client.buffer_size();
         let name = client.name().to_string();
         let xruns = Arc::new(AtomicU64::new(0));
 
-        let process = Process { ports, renderer: PlanarRenderer::new(frames), processor };
+        let process = Process {
+            ports,
+            renderer: PlanarRenderer::new(frames),
+            processor,
+        };
         let active = client
-            .activate_async(Notifications { xruns: xruns.clone() }, process)
+            .activate_async(
+                Notifications {
+                    xruns: xruns.clone(),
+                },
+                process,
+            )
             .map_err(|e| format!("activate: {e}"))?;
 
         let physical = active.as_client().ports(
@@ -95,7 +124,14 @@ impl JackBackend {
                 warnings.push(format!("connect {ours} -> {theirs}: {e}"));
             }
         }
-        Ok(Running { client: active, name, warnings, xruns, sample_rate, buffer_size })
+        Ok(Running {
+            client: active,
+            name,
+            warnings,
+            xruns,
+            sample_rate,
+            buffer_size,
+        })
     }
 }
 
@@ -128,7 +164,9 @@ impl Running {
             .map(|p| format!("{}:{p}", self.name))
             .filter_map(|full| client.port_by_name(&full).map(|port| (full, port)))
             .flat_map(|(full, port)| {
-                port.get_connections().into_iter().map(move |other| (full.clone(), other))
+                port.get_connections()
+                    .into_iter()
+                    .map(move |other| (full.clone(), other))
             })
             .collect()
     }

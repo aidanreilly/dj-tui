@@ -41,7 +41,12 @@ pub struct ControlState {
 
 impl Default for ControlState {
     fn default() -> Self {
-        Self { crossfader: 0.0, faders: [1.0; 2], headphone_cue: [false; 2], rates: [1.0; 2] }
+        Self {
+            crossfader: 0.0,
+            faders: [1.0; 2],
+            headphone_cue: [false; 2],
+            rates: [1.0; 2],
+        }
     }
 }
 
@@ -52,7 +57,12 @@ fn sign(d: Dir) -> f32 {
     }
 }
 
-pub fn apply(st: &mut ControlState, c: &Controls, snap: &Snapshot, action: Action) -> Option<Command> {
+pub fn apply(
+    st: &mut ControlState,
+    c: &Controls,
+    snap: &Snapshot,
+    action: Action,
+) -> Option<Command> {
     use Action::*;
     Some(match action {
         PlayPause(d) => Command::PlayPause(d),
@@ -61,9 +71,14 @@ pub fn apply(st: &mut ControlState, c: &Controls, snap: &Snapshot, action: Actio
         HotCue(d, n) => Command::HotCue(d, n),
         ClearHotCue(d, n) => Command::ClearHotCue(d, n),
         Tempo(d, dir, fine) => {
-            let step = if fine { c.tempo_fine_step } else { c.tempo_step };
+            let step = if fine {
+                c.tempo_fine_step
+            } else {
+                c.tempo_step
+            };
             let r = &mut st.rates[d.index()];
-            let next = (*r + step * sign(dir) as f64).clamp(1.0 - c.tempo_range, 1.0 + c.tempo_range);
+            let next =
+                (*r + step * sign(dir) as f64).clamp(1.0 - c.tempo_range, 1.0 + c.tempo_range);
             // Round away float drift so repeated steps land on exact values.
             *r = (next * 1e6).round() / 1e6;
             Command::SetRate(d, *r)
@@ -86,7 +101,11 @@ pub fn apply(st: &mut ControlState, c: &Controls, snap: &Snapshot, action: Actio
             Command::SetHeadphoneCue(d, *on)
         }
         Crossfader(dir, snap_to_end) => {
-            let x = if snap_to_end { sign(dir) } else { st.crossfader + c.crossfader_step * sign(dir) };
+            let x = if snap_to_end {
+                sign(dir)
+            } else {
+                st.crossfader + c.crossfader_step * sign(dir)
+            };
             st.crossfader = x.clamp(-1.0, 1.0);
             Command::SetCrossfader(st.crossfader)
         }

@@ -120,13 +120,22 @@ pub fn channel(engine: Engine, capacity: usize) -> (EngineHandle, EngineProcesso
         frames_processed: 0,
     };
     processor.publish();
-    (EngineHandle { commands: ctx, garbage: grx, shared }, processor)
+    (
+        EngineHandle {
+            commands: ctx,
+            garbage: grx,
+            shared,
+        },
+        processor,
+    )
 }
 
 impl EngineHandle {
     /// Queue a command. Gives it back if the queue is full.
     pub fn send(&mut self, cmd: Command) -> Result<(), Command> {
-        self.commands.push(cmd).map_err(|rtrb::PushError::Full(c)| c)
+        self.commands
+            .push(cmd)
+            .map_err(|rtrb::PushError::Full(c)| c)
     }
 
     pub fn snapshot(&self) -> Snapshot {
@@ -150,7 +159,10 @@ impl EngineHandle {
             decks: [deck(&s.decks[0]), deck(&s.decks[1])],
             crossfader: s.crossfader.get(),
             faders: [s.decks[0].fader.get(), s.decks[1].fader.get()],
-            headphone_cue: [s.decks[0].headphone_cue.load(Relaxed), s.decks[1].headphone_cue.load(Relaxed)],
+            headphone_cue: [
+                s.decks[0].headphone_cue.load(Relaxed),
+                s.decks[1].headphone_cue.load(Relaxed),
+            ],
             crossfader_curve: match s.curve.load(Relaxed) {
                 0 => CrossfaderCurve::Linear,
                 2 => CrossfaderCurve::Cut,
@@ -202,9 +214,11 @@ impl EngineProcessor {
             for (i, slot) in out.hot_cues.iter().enumerate() {
                 slot.set(deck.hot_cue_position(i).unwrap_or(f64::NAN));
             }
-            out.track_frames.store(deck.track().map_or(0, |t| t.frames()), Relaxed);
+            out.track_frames
+                .store(deck.track().map_or(0, |t| t.frames()), Relaxed);
             out.fader.set(self.engine.channel_fader(id));
-            out.headphone_cue.store(self.engine.headphone_cue(id), Relaxed);
+            out.headphone_cue
+                .store(self.engine.headphone_cue(id), Relaxed);
         }
         s.crossfader.set(self.engine.crossfader());
         s.curve.store(

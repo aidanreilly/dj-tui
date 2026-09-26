@@ -30,7 +30,12 @@ pub struct Graphics {
 
 impl Graphics {
     pub fn new(picker: Picker) -> Self {
-        Self { picker, palette: Palette::default(), decks: Default::default(), transmissions: 0 }
+        Self {
+            picker,
+            palette: Palette::default(),
+            decks: Default::default(),
+            transmissions: 0,
+        }
     }
 
     /// Call right after `render_screen` with the same view.
@@ -40,14 +45,26 @@ impl Graphics {
         for (i, panel) in [layout.deck_a, layout.deck_b].into_iter().enumerate() {
             let area = waveform_area(panel);
             let dv = &view.decks[i];
-            let px = (area.width as u32 * font.width as u32, area.height as u32 * font.height as u32);
-            let ranges: &[[f32; 2]] = if dv.title.is_some() { &dv.waveform } else { &[] };
+            let px = (
+                area.width as u32 * font.width as u32,
+                area.height as u32 * font.height as u32,
+            );
+            let ranges: &[[f32; 2]] = if dv.title.is_some() {
+                &dv.waveform
+            } else {
+                &[]
+            };
             let playhead = playhead_x(dv.position_secs, dv.duration_secs, px.0);
             let deck = &mut self.decks[i];
             match deck.pixel.update(ranges, px, playhead, &self.palette) {
                 Some(img) => {
                     let size = Size::new(area.width, area.height);
-                    deck.protocol = make_protocol(&self.picker, DynamicImage::ImageRgba8(img), size, KITTY_IDS[i]);
+                    deck.protocol = make_protocol(
+                        &self.picker,
+                        DynamicImage::ImageRgba8(img),
+                        size,
+                        KITTY_IDS[i],
+                    );
                     self.transmissions += 1;
                 }
                 None if !deck.pixel.has_image() => deck.protocol = None,
@@ -68,9 +85,35 @@ impl Graphics {
 fn make_protocol(picker: &Picker, img: DynamicImage, size: Size, id: u32) -> Option<Protocol> {
     match picker.protocol_type() {
         ProtocolType::Kitty => {
-            let compress = picker.capabilities().contains(&Capability::KittyCompression);
-            Kitty::new(img, size, id, picker.tmux_detected(), compress).ok().map(Protocol::Kitty)
+            let compress = picker
+                .capabilities()
+                .contains(&Capability::KittyCompression);
+            Kitty::new(img, size, id, picker.tmux_detected(), compress)
+                .ok()
+                .map(Protocol::Kitty)
         }
         _ => picker.new_protocol(img, size, Resize::Fit(None)).ok(),
     }
+}
+
+/// True inside tmux, GNU screen or zellij, which don't pass kitty graphics through reliably.
+pub fn multiplexer_detected(env: impl Fn(&str) -> Option<String>) -> bool {
+    env("TMUX").is_some()
+        || env("STY").is_some()
+        || env("ZELLIJ").is_some()
+        || env("TERM").is_some_and(|t| t.starts_with("screen") || t.starts_with("tmux"))
+}
+
+/// Ask the terminal for kitty graphics support. Call once, after raw mode is on.
+/// Returns `None` when the terminal lacks it or a multiplexer sits in between.
+pub fn detect_graphics() -> Option<Picker> {
+    if multiplexer_detected(|k| std::env::var(k).ok()) {
+        return None;
+    }
+    let options = ratatui_image::picker::cap_parser::QueryStdioOptions {
+        kitty_compression: true,
+        ..Default::default()
+    };
+    let picker = Picker::from_query_stdio_with_options(options).ok()?;
+    (picker.protocol_type() == ProtocolType::Kitty).then_some(picker)
 }

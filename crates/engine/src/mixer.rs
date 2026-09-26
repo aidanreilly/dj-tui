@@ -1,6 +1,6 @@
 use crate::{Deck, Track};
-use std::sync::Arc;
 use std::f32::consts::FRAC_PI_2;
+use std::sync::Arc;
 
 /// Largest block rendered in one pass. Bigger callbacks are split, so no allocation happens in `process`.
 pub const MAX_BLOCK_FRAMES: usize = 4096;
@@ -60,7 +60,10 @@ struct Channel {
 
 impl Default for Channel {
     fn default() -> Self {
-        Self { fader: 1.0, headphone_cue: false }
+        Self {
+            fader: 1.0,
+            headphone_cue: false,
+        }
     }
 }
 
@@ -89,7 +92,10 @@ impl Engine {
             crossfader: 0.0,
             curve: CrossfaderCurve::default(),
             cue_mix: 0.5,
-            scratch: [vec![0.0; MAX_BLOCK_FRAMES * 2], vec![0.0; MAX_BLOCK_FRAMES * 2]],
+            scratch: [
+                vec![0.0; MAX_BLOCK_FRAMES * 2],
+                vec![0.0; MAX_BLOCK_FRAMES * 2],
+            ],
         }
     }
 
@@ -175,7 +181,10 @@ impl Engine {
             for (deck, buf) in self.decks.iter_mut().zip(self.scratch.iter_mut()) {
                 deck.render(&mut buf[..n]);
             }
-            let post = [self.channels[0].fader * xf[0], self.channels[1].fader * xf[1]];
+            let post = [
+                self.channels[0].fader * xf[0],
+                self.channels[1].fader * xf[1],
+            ];
             let pfl = [
                 self.channels[0].headphone_cue as u8 as f32,
                 self.channels[1].headphone_cue as u8 as f32,

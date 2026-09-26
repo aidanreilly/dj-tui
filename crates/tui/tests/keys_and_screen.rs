@@ -7,20 +7,37 @@ use ratatui::{backend::TestBackend, Terminal};
 use tui::{convert_key, render_screen, DeckView, MixerView, ScreenView};
 
 fn ct(code: KeyCode, mods: KeyModifiers, kind: KeyEventKind) -> CtKey {
-    CtKey { code, modifiers: mods, kind, state: KeyEventState::NONE }
+    CtKey {
+        code,
+        modifiers: mods,
+        kind,
+        state: KeyEventState::NONE,
+    }
 }
 
 #[test]
 fn converts_plain_characters() {
-    let e = convert_key(ct(KeyCode::Char('t'), KeyModifiers::NONE, KeyEventKind::Press));
+    let e = convert_key(ct(
+        KeyCode::Char('t'),
+        KeyModifiers::NONE,
+        KeyEventKind::Press,
+    ));
     assert_eq!(e, Some(KeyEvent::press(Key::Char('t'))));
 }
 
 #[test]
 fn converts_modifiers_and_release() {
-    let e = convert_key(ct(KeyCode::Char('3'), KeyModifiers::ALT, KeyEventKind::Press));
+    let e = convert_key(ct(
+        KeyCode::Char('3'),
+        KeyModifiers::ALT,
+        KeyEventKind::Press,
+    ));
     assert_eq!(e, Some(KeyEvent::press(Key::Char('3')).alt()));
-    let e = convert_key(ct(KeyCode::Char('c'), KeyModifiers::NONE, KeyEventKind::Release));
+    let e = convert_key(ct(
+        KeyCode::Char('c'),
+        KeyModifiers::NONE,
+        KeyEventKind::Release,
+    ));
     assert_eq!(e, Some(KeyEvent::release(Key::Char('c'))));
     let e = convert_key(ct(KeyCode::Left, KeyModifiers::SHIFT, KeyEventKind::Press));
     assert_eq!(e, Some(KeyEvent::press(Key::Left).shift()));
@@ -28,21 +45,36 @@ fn converts_modifiers_and_release() {
 
 #[test]
 fn space_is_its_own_key_and_backtab_is_tab() {
-    let e = convert_key(ct(KeyCode::Char(' '), KeyModifiers::NONE, KeyEventKind::Press));
+    let e = convert_key(ct(
+        KeyCode::Char(' '),
+        KeyModifiers::NONE,
+        KeyEventKind::Press,
+    ));
     assert_eq!(e, Some(KeyEvent::press(Key::Space)));
-    let e = convert_key(ct(KeyCode::BackTab, KeyModifiers::SHIFT, KeyEventKind::Press));
+    let e = convert_key(ct(
+        KeyCode::BackTab,
+        KeyModifiers::SHIFT,
+        KeyEventKind::Press,
+    ));
     assert_eq!(e.map(|e| e.key), Some(Key::Tab));
 }
 
 #[test]
 fn key_repeat_is_ignored_so_holds_do_not_retrigger() {
-    let e = convert_key(ct(KeyCode::Char('c'), KeyModifiers::NONE, KeyEventKind::Repeat));
+    let e = convert_key(ct(
+        KeyCode::Char('c'),
+        KeyModifiers::NONE,
+        KeyEventKind::Repeat,
+    ));
     assert_eq!(e, None);
 }
 
 #[test]
 fn unsupported_keys_are_dropped() {
-    assert_eq!(convert_key(ct(KeyCode::F(5), KeyModifiers::NONE, KeyEventKind::Press)), None);
+    assert_eq!(
+        convert_key(ct(KeyCode::F(5), KeyModifiers::NONE, KeyEventKind::Press)),
+        None
+    );
 }
 
 fn deck(id: DeckId, focused: bool) -> DeckView {
@@ -65,7 +97,11 @@ fn deck(id: DeckId, focused: bool) -> DeckView {
 fn whole_screen_shows_every_section() {
     let view = ScreenView {
         decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
-        mixer: MixerView { crossfader: -1.0, faders: [1.0, 0.5], headphone_cue: [false, true] },
+        mixer: MixerView {
+            crossfader: -1.0,
+            faders: [1.0, 0.5],
+            headphone_cue: [false, true],
+        },
         status: "keyboard: kitty protocol".into(),
         message: "Loaded Some Track on deck A".into(),
     };
@@ -73,9 +109,22 @@ fn whole_screen_shows_every_section() {
     term.draw(|f| render_screen(f, &view)).unwrap();
     let buf = term.backend().buffer();
     let text: String = (0..44)
-        .map(|y| (0..120).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>() + "\n")
+        .map(|y| {
+            (0..120)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+                + "\n"
+        })
         .collect();
-    for needle in ["▶ DECK A", "DECK B", "PHASE", "MIXER", "BROWSER", "keyboard: kitty protocol", "Loaded Some Track on deck A"] {
+    for needle in [
+        "▶ DECK A",
+        "DECK B",
+        "PHASE",
+        "MIXER",
+        "BROWSER",
+        "keyboard: kitty protocol",
+        "Loaded Some Track on deck A",
+    ] {
         assert!(text.contains(needle), "missing {needle}\n{text}");
     }
     // Headphone cue lit on B only.
@@ -86,7 +135,11 @@ fn whole_screen_shows_every_section() {
 fn long_status_does_not_hide_the_message() {
     let view = ScreenView {
         decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
-        mixer: MixerView { crossfader: 0.0, faders: [1.0, 1.0], headphone_cue: [false, false] },
+        mixer: MixerView {
+            crossfader: 0.0,
+            faders: [1.0, 1.0],
+            headphone_cue: [false, false],
+        },
         status: "x".repeat(300),
         message: "Could not load a.flac".into(),
     };
@@ -94,7 +147,12 @@ fn long_status_does_not_hide_the_message() {
     term.draw(|f| render_screen(f, &view)).unwrap();
     let buf = term.backend().buffer();
     let text: String = (0..40)
-        .map(|y| (0..100).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>() + "\n")
+        .map(|y| {
+            (0..100)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+                + "\n"
+        })
         .collect();
     assert!(text.contains("Could not load a.flac"), "{text}");
 }

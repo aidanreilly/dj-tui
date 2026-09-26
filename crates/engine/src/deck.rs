@@ -18,13 +18,22 @@ pub struct Deck {
 
 impl Deck {
     pub fn new() -> Self {
-        Self { rate: 1.0, ..Default::default() }
+        Self {
+            rate: 1.0,
+            ..Default::default()
+        }
     }
 
     /// Load `track`, resetting transport and cues. Returns the previous track so the caller
     /// decides where it gets freed (never on the audio thread).
     pub fn load(&mut self, track: Arc<Track>) -> Option<Arc<Track>> {
-        let old = std::mem::replace(self, Self { rate: self.rate, ..Default::default() });
+        let old = std::mem::replace(
+            self,
+            Self {
+                rate: self.rate,
+                ..Default::default()
+            },
+        );
         self.track = Some(track);
         old.track
     }

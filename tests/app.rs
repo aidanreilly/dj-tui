@@ -25,7 +25,11 @@ fn wait_for_load(app: &mut App, p: &mut EngineProcessor, deck: DeckId) {
     while app.snapshot().decks[deck.index()].track_frames == 0 {
         app.tick();
         process(p, 16);
-        assert!(start.elapsed() < Duration::from_secs(10), "load timed out: {}", app.message());
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "load timed out: {}",
+            app.message()
+        );
         std::thread::sleep(Duration::from_millis(5));
     }
 }
@@ -41,7 +45,11 @@ fn loading_a_file_puts_it_on_the_deck_with_its_title() {
     let view = app.view(String::new());
     assert_eq!(view.decks[1].title.as_deref(), Some("Warehouse Tool"));
     assert!((view.decks[1].duration_secs - 0.1).abs() < 1e-9);
-    assert!(app.message().contains("Warehouse Tool"), "{}", app.message());
+    assert!(
+        app.message().contains("Warehouse Tool"),
+        "{}",
+        app.message()
+    );
     assert_eq!(view.message, app.message());
 }
 
@@ -92,5 +100,8 @@ fn configured_crossfader_curve_is_sent_at_start() {
     let mut app = App::new(handle, &config, RATE);
     process(&mut p, 1);
     app.tick();
-    assert_eq!(app.snapshot().crossfader_curve, engine::CrossfaderCurve::Cut);
+    assert_eq!(
+        app.snapshot().crossfader_curve,
+        engine::CrossfaderCurve::Cut
+    );
 }

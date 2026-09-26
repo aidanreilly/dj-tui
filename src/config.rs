@@ -85,11 +85,25 @@ impl Default for Audio {
 pub struct Ui {
     pub waveform_mode: WaveformMode,
     pub end_warning_secs: u32,
+    /// Pixel waveforms through the kitty graphics protocol when the terminal supports it.
+    pub graphics: Graphics,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Graphics {
+    #[default]
+    Auto,
+    Off,
 }
 
 impl Default for Ui {
     fn default() -> Self {
-        Self { waveform_mode: WaveformMode::ThreeBand, end_warning_secs: 30 }
+        Self {
+            waveform_mode: WaveformMode::ThreeBand,
+            end_warning_secs: 30,
+            graphics: Graphics::Auto,
+        }
     }
 }
 
@@ -119,7 +133,10 @@ fn curve<'de, D: Deserializer<'de>>(d: D) -> Result<CrossfaderCurve, D::Error> {
         "linear" => Ok(CrossfaderCurve::Linear),
         "constant-power" => Ok(CrossfaderCurve::ConstantPower),
         "cut" => Ok(CrossfaderCurve::Cut),
-        other => Err(serde::de::Error::unknown_variant(other, &["linear", "constant-power", "cut"])),
+        other => Err(serde::de::Error::unknown_variant(
+            other,
+            &["linear", "constant-power", "cut"],
+        )),
     }
 }
 
@@ -135,7 +152,10 @@ impl Config {
         let pair = |v: &[String], key: &str| -> Result<[String; 2], String> {
             match v {
                 [a, b] => Ok([a.clone(), b.clone()]),
-                _ => Err(format!("audio.{key} must list exactly two ports, got {}", v.len())),
+                _ => Err(format!(
+                    "audio.{key} must list exactly two ports, got {}",
+                    v.len()
+                )),
             }
         };
         Ok(match self.audio.routing {
@@ -163,7 +183,9 @@ impl Config {
         let b = self.audio.buffer_frames;
         let max = engine::MAX_BLOCK_FRAMES as u32;
         if !b.is_power_of_two() || !(16..=max).contains(&b) {
-            return Err(format!("audio.buffer_frames must be a power of two from 16 to {max}, got {b}"));
+            return Err(format!(
+                "audio.buffer_frames must be a power of two from 16 to {max}, got {b}"
+            ));
         }
         Ok(())
     }

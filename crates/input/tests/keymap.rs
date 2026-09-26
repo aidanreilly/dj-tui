@@ -35,7 +35,10 @@ fn space_plays_the_focused_deck() {
 fn cue_reports_press_and_release() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, ch('c')), Some(Action::CuePress(A)));
-    assert_eq!(km.handle(KeyEvent::release(ch('c'))), Some(Action::CueRelease(A)));
+    assert_eq!(
+        km.handle(KeyEvent::release(ch('c'))),
+        Some(Action::CueRelease(A))
+    );
 }
 
 #[test]
@@ -50,7 +53,10 @@ fn cue_release_goes_to_the_deck_that_was_pressed_even_after_focus_change() {
     let mut km = Keymap::new();
     press(&mut km, ch('c'));
     press(&mut km, Key::Tab);
-    assert_eq!(km.handle(KeyEvent::release(ch('c'))), Some(Action::CueRelease(A)));
+    assert_eq!(
+        km.handle(KeyEvent::release(ch('c'))),
+        Some(Action::CueRelease(A))
+    );
 }
 
 #[test]
@@ -58,15 +64,27 @@ fn digits_trigger_hot_cues_and_alt_digits_clear_them() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, ch('1')), Some(Action::HotCue(A, 0)));
     assert_eq!(press(&mut km, ch('8')), Some(Action::HotCue(A, 7)));
-    assert_eq!(km.handle(KeyEvent::press(ch('3')).alt()), Some(Action::ClearHotCue(A, 2)));
+    assert_eq!(
+        km.handle(KeyEvent::press(ch('3')).alt()),
+        Some(Action::ClearHotCue(A, 2))
+    );
 }
 
 #[test]
 fn lowercase_turns_down_and_uppercase_turns_up() {
     let mut km = Keymap::new();
-    assert_eq!(press(&mut km, ch('t')), Some(Action::Eq(A, Band::High, Dir::Down)));
-    assert_eq!(press(&mut km, ch('T')), Some(Action::Eq(A, Band::High, Dir::Up)));
-    assert_eq!(press(&mut km, ch('u')), Some(Action::Eq(A, Band::Low, Dir::Down)));
+    assert_eq!(
+        press(&mut km, ch('t')),
+        Some(Action::Eq(A, Band::High, Dir::Down))
+    );
+    assert_eq!(
+        press(&mut km, ch('T')),
+        Some(Action::Eq(A, Band::High, Dir::Up))
+    );
+    assert_eq!(
+        press(&mut km, ch('u')),
+        Some(Action::Eq(A, Band::Low, Dir::Down))
+    );
     assert_eq!(press(&mut km, ch('v')), Some(Action::Fader(A, Dir::Down)));
     assert_eq!(press(&mut km, ch('V')), Some(Action::Fader(A, Dir::Up)));
     assert_eq!(press(&mut km, ch('r')), Some(Action::Trim(A, Dir::Down)));
@@ -76,31 +94,52 @@ fn lowercase_turns_down_and_uppercase_turns_up() {
 #[test]
 fn alt_on_eq_keys_toggles_kill() {
     let mut km = Keymap::new();
-    assert_eq!(km.handle(KeyEvent::press(ch('y')).alt()), Some(Action::EqKill(A, Band::Mid)));
+    assert_eq!(
+        km.handle(KeyEvent::press(ch('y')).alt()),
+        Some(Action::EqKill(A, Band::Mid))
+    );
 }
 
 #[test]
 fn tempo_has_normal_and_fine_steps() {
     let mut km = Keymap::new();
-    assert_eq!(press(&mut km, ch('+')), Some(Action::Tempo(A, Dir::Up, false)));
-    assert_eq!(press(&mut km, ch('-')), Some(Action::Tempo(A, Dir::Down, false)));
-    assert_eq!(km.handle(KeyEvent::press(ch('+')).alt()), Some(Action::Tempo(A, Dir::Up, true)));
+    assert_eq!(
+        press(&mut km, ch('+')),
+        Some(Action::Tempo(A, Dir::Up, false))
+    );
+    assert_eq!(
+        press(&mut km, ch('-')),
+        Some(Action::Tempo(A, Dir::Down, false))
+    );
+    assert_eq!(
+        km.handle(KeyEvent::press(ch('+')).alt()),
+        Some(Action::Tempo(A, Dir::Up, true))
+    );
 }
 
 #[test]
 fn backtick_sends_exactly_one_key_to_the_other_deck() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, ch('`')), None);
-    assert_eq!(press(&mut km, ch('u')), Some(Action::Eq(B, Band::Low, Dir::Down)));
+    assert_eq!(
+        press(&mut km, ch('u')),
+        Some(Action::Eq(B, Band::Low, Dir::Down))
+    );
     assert_eq!(km.focused(), A);
-    assert_eq!(press(&mut km, ch('u')), Some(Action::Eq(A, Band::Low, Dir::Down)));
+    assert_eq!(
+        press(&mut km, ch('u')),
+        Some(Action::Eq(A, Band::Low, Dir::Down))
+    );
 }
 
 #[test]
 fn backtick_before_a_global_key_is_consumed() {
     let mut km = Keymap::new();
     press(&mut km, ch('`'));
-    assert_eq!(press(&mut km, Key::Left), Some(Action::Crossfader(Dir::Down, false)));
+    assert_eq!(
+        press(&mut km, Key::Left),
+        Some(Action::Crossfader(Dir::Down, false))
+    );
     assert_eq!(press(&mut km, Key::Space), Some(Action::PlayPause(A)));
 }
 
@@ -123,14 +162,23 @@ fn enter_loads_into_focused_or_other_deck() {
 #[test]
 fn global_keys() {
     let mut km = Keymap::new();
-    assert_eq!(press(&mut km, Key::Right), Some(Action::Crossfader(Dir::Up, false)));
-    assert_eq!(km.handle(KeyEvent::press(Key::Left).shift()), Some(Action::Crossfader(Dir::Down, true)));
+    assert_eq!(
+        press(&mut km, Key::Right),
+        Some(Action::Crossfader(Dir::Up, false))
+    );
+    assert_eq!(
+        km.handle(KeyEvent::press(Key::Left).shift()),
+        Some(Action::Crossfader(Dir::Down, true))
+    );
     assert_eq!(press(&mut km, Key::Up), Some(Action::BrowserMove(Dir::Up)));
     assert_eq!(press(&mut km, ch('/')), Some(Action::Search));
     assert_eq!(press(&mut km, ch('b')), Some(Action::BrowserFullscreen));
     assert_eq!(press(&mut km, ch('W')), Some(Action::CycleWaveformMode));
     assert_eq!(press(&mut km, ch('?')), Some(Action::Help));
-    assert_eq!(km.handle(KeyEvent::press(ch('q')).ctrl()), Some(Action::Quit));
+    assert_eq!(
+        km.handle(KeyEvent::press(ch('q')).ctrl()),
+        Some(Action::Quit)
+    );
 }
 
 #[test]
@@ -143,7 +191,10 @@ fn deck_toggles_and_loops() {
     assert_eq!(press(&mut km, ch('l')), Some(Action::LoopToggle(d)));
     assert_eq!(press(&mut km, ch('[')), Some(Action::LoopHalve(d)));
     assert_eq!(press(&mut km, ch(']')), Some(Action::LoopDouble(d)));
-    assert_eq!(press(&mut km, ch('<')), Some(Action::BeatJump(d, Dir::Down)));
+    assert_eq!(
+        press(&mut km, ch('<')),
+        Some(Action::BeatJump(d, Dir::Down))
+    );
     assert_eq!(press(&mut km, ch('.')), Some(Action::Nudge(d, Dir::Up)));
     assert_eq!(press(&mut km, ch('f')), Some(Action::FxToggle(d)));
     assert_eq!(press(&mut km, ch('F')), Some(Action::FxNext(d)));

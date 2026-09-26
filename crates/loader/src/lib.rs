@@ -64,9 +64,16 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
     let track = Track::from_interleaved(data, session_rate);
     let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
     let title = decoded.title.unwrap_or_else(|| {
-        path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
+        path.file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default()
     });
-    Ok(LoadedTrack { track, title, artist: decoded.artist, waveform })
+    Ok(LoadedTrack {
+        track,
+        title,
+        artist: decoded.artist,
+        waveform,
+    })
 }
 
 /// Whole-track signed amplitude ranges, normalized so the loudest absolute sample is 1.
@@ -158,7 +165,10 @@ impl Loader {
                 }
             })
             .expect("spawn loader thread");
-        Self { requests: req_tx, results: res_rx }
+        Self {
+            requests: req_tx,
+            results: res_rx,
+        }
     }
 
     pub fn request(&self, deck: DeckId, path: PathBuf) {

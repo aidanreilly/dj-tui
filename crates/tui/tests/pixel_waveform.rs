@@ -16,11 +16,15 @@ fn flat(peak: f32, n: usize) -> Vec<[f32; 2]> {
 }
 
 fn opaque_rows(img: &RgbaImage, x: u32) -> u32 {
-    (0..img.height()).filter(|&y| img.get_pixel(x, y)[3] == 255).count() as u32
+    (0..img.height())
+        .filter(|&y| img.get_pixel(x, y)[3] == 255)
+        .count() as u32
 }
 
 fn touched_rows(img: &RgbaImage, x: u32) -> u32 {
-    (0..img.height()).filter(|&y| img.get_pixel(x, y)[3] > 0).count() as u32
+    (0..img.height())
+        .filter(|&y| img.get_pixel(x, y)[3] > 0)
+        .count() as u32
 }
 
 fn luma(p: &Rgba<u8>) -> u32 {
@@ -75,21 +79,40 @@ fn louder_columns_are_taller() {
 
 #[test]
 fn bars_are_mirrored_around_the_centre() {
-    let ranges: Vec<[f32; 2]> = (0..100).map(|i| { let p = (i as f32 / 100.0).sqrt(); [-p, p] }).collect();
+    let ranges: Vec<[f32; 2]> = (0..100)
+        .map(|i| {
+            let p = (i as f32 / 100.0).sqrt();
+            [-p, p]
+        })
+        .collect();
     let b = WaveformBitmaps::rasterize(&ranges, 100, H, &pal());
     let img = b.normal();
     for x in 0..100 {
         for y in 0..H / 2 {
-            assert_eq!(img.get_pixel(x, y)[3], img.get_pixel(x, H - 1 - y)[3], "({x},{y})");
+            assert_eq!(
+                img.get_pixel(x, y)[3],
+                img.get_pixel(x, H - 1 - y)[3],
+                "({x},{y})"
+            );
         }
     }
 }
 
 #[test]
 fn bar_edges_are_anti_aliased() {
-    let ranges: Vec<[f32; 2]> = (0..100).map(|i| { let p = 0.1 + 0.8 * i as f32 / 100.0; [-p, p] }).collect();
+    let ranges: Vec<[f32; 2]> = (0..100)
+        .map(|i| {
+            let p = 0.1 + 0.8 * i as f32 / 100.0;
+            [-p, p]
+        })
+        .collect();
     let b = WaveformBitmaps::rasterize(&ranges, 100, H, &pal());
-    let partial = (0..100).any(|x| (0..H).any(|y| { let a = b.normal().get_pixel(x, y)[3]; a > 0 && a < 255 }));
+    let partial = (0..100).any(|x| {
+        (0..H).any(|y| {
+            let a = b.normal().get_pixel(x, y)[3];
+            a > 0 && a < 255
+        })
+    });
     assert!(partial, "every edge pixel is fully on or off");
 }
 
@@ -99,7 +122,10 @@ fn colour_runs_from_low_at_the_centre_to_high_at_the_peaks() {
     let b = WaveformBitmaps::rasterize(&flat(1.0, 10), 10, H, &p);
     let centre = b.normal().get_pixel(5, H / 2 - 1);
     let edge = b.normal().get_pixel(5, 0);
-    assert!(dist(centre, &p.low) < dist(centre, &p.high), "centre {centre:?}");
+    assert!(
+        dist(centre, &p.low) < dist(centre, &p.high),
+        "centre {centre:?}"
+    );
     assert!(dist(edge, &p.high) < dist(edge, &p.low), "edge {edge:?}");
 }
 
@@ -137,7 +163,10 @@ fn compose_dims_the_played_part_and_draws_the_playhead() {
             assert_eq!(*img.get_pixel(x, y), p.playhead, "playhead at ({x},{y})");
         }
     }
-    assert_eq!(img.get_pixel(100 + PLAYHEAD_WIDTH, 5), b.normal().get_pixel(100 + PLAYHEAD_WIDTH, 5));
+    assert_eq!(
+        img.get_pixel(100 + PLAYHEAD_WIDTH, 5),
+        b.normal().get_pixel(100 + PLAYHEAD_WIDTH, 5)
+    );
 }
 
 #[test]
@@ -190,7 +219,9 @@ fn a_new_track_or_size_rasterises_again() {
     pw.update(&flat(0.5, 64), (W, H), Some(0), &pal());
     assert!(pw.update(&flat(0.6, 64), (W, H), Some(0), &pal()).is_some());
     assert_eq!(pw.rasterizations(), 2);
-    assert!(pw.update(&flat(0.6, 64), (W + 10, H), Some(0), &pal()).is_some());
+    assert!(pw
+        .update(&flat(0.6, 64), (W + 10, H), Some(0), &pal())
+        .is_some());
     assert_eq!(pw.rasterizations(), 3);
 }
 

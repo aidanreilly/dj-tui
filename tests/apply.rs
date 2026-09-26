@@ -25,11 +25,26 @@ fn run(state: &mut ControlState, snap: &Snapshot, action: Action) -> Option<Comm
 fn transport_actions_become_matching_commands() {
     let mut st = ControlState::default();
     let s = Snapshot::default();
-    assert!(matches!(run(&mut st, &s, Action::PlayPause(B)), Some(Command::PlayPause(B))));
-    assert!(matches!(run(&mut st, &s, Action::CuePress(A)), Some(Command::CuePress(A))));
-    assert!(matches!(run(&mut st, &s, Action::CueRelease(A)), Some(Command::CueRelease(A))));
-    assert!(matches!(run(&mut st, &s, Action::HotCue(A, 3)), Some(Command::HotCue(A, 3))));
-    assert!(matches!(run(&mut st, &s, Action::ClearHotCue(B, 1)), Some(Command::ClearHotCue(B, 1))));
+    assert!(matches!(
+        run(&mut st, &s, Action::PlayPause(B)),
+        Some(Command::PlayPause(B))
+    ));
+    assert!(matches!(
+        run(&mut st, &s, Action::CuePress(A)),
+        Some(Command::CuePress(A))
+    ));
+    assert!(matches!(
+        run(&mut st, &s, Action::CueRelease(A)),
+        Some(Command::CueRelease(A))
+    ));
+    assert!(matches!(
+        run(&mut st, &s, Action::HotCue(A, 3)),
+        Some(Command::HotCue(A, 3))
+    ));
+    assert!(matches!(
+        run(&mut st, &s, Action::ClearHotCue(B, 1)),
+        Some(Command::ClearHotCue(B, 1))
+    ));
 }
 
 #[test]
@@ -59,8 +74,14 @@ fn channel_fader_steps_within_range() {
 fn headphone_cue_toggles() {
     let mut st = ControlState::default();
     let s = Snapshot::default();
-    assert!(matches!(run(&mut st, &s, Action::HeadphoneCue(B)), Some(Command::SetHeadphoneCue(B, true))));
-    assert!(matches!(run(&mut st, &s, Action::HeadphoneCue(B)), Some(Command::SetHeadphoneCue(B, false))));
+    assert!(matches!(
+        run(&mut st, &s, Action::HeadphoneCue(B)),
+        Some(Command::SetHeadphoneCue(B, true))
+    ));
+    assert!(matches!(
+        run(&mut st, &s, Action::HeadphoneCue(B)),
+        Some(Command::SetHeadphoneCue(B, false))
+    ));
 }
 
 #[test]
@@ -82,7 +103,9 @@ fn tempo_steps_and_is_limited_to_the_configured_range() {
 fn seek_tenth_uses_the_loaded_track_length() {
     let mut st = ControlState::default();
     let s = snap_with_frames(1000, 0);
-    assert!(matches!(run(&mut st, &s, Action::SeekTenth(A, 5)), Some(Command::Seek(A, f)) if f == 500.0));
+    assert!(
+        matches!(run(&mut st, &s, Action::SeekTenth(A, 5)), Some(Command::Seek(A, f)) if f == 500.0)
+    );
     assert!(run(&mut st, &s, Action::SeekTenth(B, 5)).is_none());
 }
 
@@ -95,12 +118,20 @@ fn actions_the_engine_cannot_do_yet_give_no_command() {
 #[test]
 fn actions_flow_end_to_end_through_the_realtime_channel() {
     let (mut h, mut p) = channel(Engine::new(), 16);
-    h.send(Command::Load(A, Arc::new(Track::from_interleaved(vec![0.0; 4000], 1000)))).unwrap();
+    h.send(Command::Load(
+        A,
+        Arc::new(Track::from_interleaved(vec![0.0; 4000], 1000)),
+    ))
+    .unwrap();
     let mut buf = (vec![0.0; 20], vec![0.0; 20]);
     p.process(&mut buf.0, &mut buf.1);
 
     let mut st = ControlState::default();
-    for action in [Action::SeekTenth(A, 5), Action::PlayPause(A), Action::Tempo(A, Dir::Up, false)] {
+    for action in [
+        Action::SeekTenth(A, 5),
+        Action::PlayPause(A),
+        Action::Tempo(A, Dir::Up, false),
+    ] {
         let snap = h.snapshot();
         if let Some(cmd) = apply(&mut st, &ctl(), &snap, action) {
             h.send(cmd).unwrap();

@@ -7,7 +7,10 @@ fn physical(n: usize) -> Vec<String> {
 }
 
 fn pairs(plan: &backend::Plan) -> Vec<(&str, &str)> {
-    plan.connections.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect()
+    plan.connections
+        .iter()
+        .map(|(a, b)| (a.as_str(), b.as_str()))
+        .collect()
 }
 
 #[test]
@@ -35,7 +38,11 @@ fn auto_routing_on_a_stereo_card_connects_master_and_warns_about_cue() {
     let plan = plan_connections("dj-tui", &Routing::Auto, &physical(2));
     assert_eq!(plan.connections.len(), 2);
     assert_eq!(plan.warnings.len(), 1);
-    assert!(plan.warnings[0].contains("headphone"), "{:?}", plan.warnings);
+    assert!(
+        plan.warnings[0].contains("headphone"),
+        "{:?}",
+        plan.warnings
+    );
 }
 
 #[test]
@@ -54,7 +61,10 @@ fn explicit_routing_is_followed_and_missing_ports_are_reported() {
     let plan = plan_connections("dj-tui", &routing, &physical(4));
     assert_eq!(
         pairs(&plan),
-        vec![("dj-tui:master_L", "system:playback_3"), ("dj-tui:master_R", "system:playback_4")]
+        vec![
+            ("dj-tui:master_L", "system:playback_3"),
+            ("dj-tui:master_R", "system:playback_4")
+        ]
     );
     assert_eq!(plan.warnings.len(), 2);
     assert!(plan.warnings[0].contains("usb:out_1"));
@@ -62,7 +72,10 @@ fn explicit_routing_is_followed_and_missing_ports_are_reported() {
 
 #[test]
 fn explicit_routing_without_cue_leaves_cue_unconnected_silently() {
-    let routing = Routing::Explicit { master: ["system:playback_1".into(), "system:playback_2".into()], cue: None };
+    let routing = Routing::Explicit {
+        master: ["system:playback_1".into(), "system:playback_2".into()],
+        cue: None,
+    };
     let plan = plan_connections("x", &routing, &physical(4));
     assert_eq!(plan.connections.len(), 2);
     assert!(plan.warnings.is_empty());

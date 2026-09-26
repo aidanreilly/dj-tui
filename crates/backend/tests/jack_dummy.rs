@@ -24,9 +24,18 @@ fn plays_through_a_real_jack_server() {
     assert!(running.warnings().is_empty(), "{:?}", running.warnings());
 
     let ports = running.connected_ports();
-    assert!(ports.iter().any(|(ours, theirs)| ours == "dj-tui-test:master_L" && theirs == "system:playback_1"), "{ports:?}");
+    assert!(
+        ports
+            .iter()
+            .any(|(ours, theirs)| ours == "dj-tui-test:master_L" && theirs == "system:playback_1"),
+        "{ports:?}"
+    );
 
-    h.send(Command::Load(A, Arc::new(Track::from_interleaved(vec![0.1; rate as usize * 4], rate)))).unwrap();
+    h.send(Command::Load(
+        A,
+        Arc::new(Track::from_interleaved(vec![0.1; rate as usize * 4], rate)),
+    ))
+    .unwrap();
     h.send(Command::PlayPause(A)).unwrap();
     std::thread::sleep(Duration::from_millis(300));
     let pos = h.snapshot().decks[0].position;

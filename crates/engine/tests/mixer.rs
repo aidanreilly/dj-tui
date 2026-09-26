@@ -45,7 +45,11 @@ fn cut_curve_keeps_both_full_until_the_last_stretch() {
 
 #[test]
 fn crossfader_input_is_clamped() {
-    for c in [CrossfaderCurve::Linear, CrossfaderCurve::ConstantPower, CrossfaderCurve::Cut] {
+    for c in [
+        CrossfaderCurve::Linear,
+        CrossfaderCurve::ConstantPower,
+        CrossfaderCurve::Cut,
+    ] {
         assert_eq!(crossfader_gains(-5.0, c), crossfader_gains(-1.0, c));
         assert_eq!(crossfader_gains(5.0, c), crossfader_gains(1.0, c));
     }

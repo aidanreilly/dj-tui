@@ -15,6 +15,14 @@ meters, split-mono routing) is next.
   sends absolute `Set*` commands.
 - User-facing text follows the style of the existing messages: plain, specific, no jargon.
 
+## Waveform rendering
+
+`tui::pixel` rasterises the overview into RGBA images and `tui::Graphics` sends them through
+the kitty graphics protocol when `detect_graphics()` finds it (Ghostty, kitty, WezTerm). Each
+deck keeps a fixed kitty image id and only resends when the playhead reaches a new pixel
+column. The glyph renderer in `tui::waveform` stays as the fallback and always draws first.
+`[ui] graphics = "off"` forces glyphs.
+
 ## Commands
 
 ```sh
@@ -28,6 +36,6 @@ JACK_DEFAULT_SERVER=test DJ_TUI_JACK_TESTS=1 cargo test -p backend --test jack_d
 
 ## Toolchain
 
-MSRV is 1.82. `Cargo.lock` pins encoding_rs, indexmap, instability, unicode-segmentation
-and tempfile to releases that build on 1.82. On a newer toolchain `cargo update` is fine, but
-keep the MSRV CI job green or raise `rust-version` deliberately.
+MSRV is 1.88, the minimum for ratatui 0.30.2 and ratatui-image 11.1 (kitty compression).
+The workspace uses `resolver = "3"`, so `cargo update` only picks crates that build on 1.88.
+

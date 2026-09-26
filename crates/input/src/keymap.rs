@@ -26,16 +26,28 @@ pub struct KeyEvent {
 
 impl KeyEvent {
     pub fn press(key: Key) -> Self {
-        Self { key, alt: false, shift: false, ctrl: false, release: false }
+        Self {
+            key,
+            alt: false,
+            shift: false,
+            ctrl: false,
+            release: false,
+        }
     }
     pub fn release(key: Key) -> Self {
-        Self { release: true, ..Self::press(key) }
+        Self {
+            release: true,
+            ..Self::press(key)
+        }
     }
     pub fn alt(self) -> Self {
         Self { alt: true, ..self }
     }
     pub fn shift(self) -> Self {
-        Self { shift: true, ..self }
+        Self {
+            shift: true,
+            ..self
+        }
     }
     pub fn ctrl(self) -> Self {
         Self { ctrl: true, ..self }
@@ -63,7 +75,12 @@ impl Default for Keymap {
 
 impl Keymap {
     pub fn new() -> Self {
-        Self { focused: DeckId::A, next_to_other: false, pending_seek: None, cue_held: None }
+        Self {
+            focused: DeckId::A,
+            next_to_other: false,
+            pending_seek: None,
+            cue_held: None,
+        }
     }
 
     pub fn focused(&self) -> DeckId {
@@ -128,13 +145,21 @@ impl Keymap {
         };
 
         if let Some(band) = eq_band(c) {
-            return Some(if alt { EqKill(d, band) } else { Eq(d, band, dir(c.is_uppercase())) });
+            return Some(if alt {
+                EqKill(d, band)
+            } else {
+                Eq(d, band, dir(c.is_uppercase()))
+            });
         }
 
         Some(match c {
             '1'..='8' => {
                 let n = (c as u8 - b'1') as usize;
-                if alt { ClearHotCue(d, n) } else { HotCue(d, n) }
+                if alt {
+                    ClearHotCue(d, n)
+                } else {
+                    HotCue(d, n)
+                }
             }
             '9' | '0' => FxWet(d, dir(c == '0')),
             CUE_KEY => {

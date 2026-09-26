@@ -45,5 +45,11 @@ pub fn screen_layout(area: Rect) -> ScreenLayout {
     ])
     .areas(top);
 
-    ScreenLayout { deck_a, phase, deck_b, mixer, browser }
+    ScreenLayout {
+        deck_a,
+        phase,
+        deck_b,
+        mixer,
+        browser,
+    }
 }

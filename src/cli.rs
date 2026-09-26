@@ -40,7 +40,10 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Args, String> {
         }
     }
     if out.files.len() > 2 {
-        return Err(format!("at most two files (one per deck), got {}", out.files.len()));
+        return Err(format!(
+            "at most two files (one per deck), got {}",
+            out.files.len()
+        ));
     }
     Ok(out)
 }

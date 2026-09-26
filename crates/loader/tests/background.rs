@@ -10,7 +10,10 @@ fn wait(loader: &Loader) -> loader::LoadResult {
         if let Some(r) = loader.try_recv() {
             return r;
         }
-        assert!(start.elapsed() < Duration::from_secs(10), "loader timed out");
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "loader timed out"
+        );
         std::thread::sleep(Duration::from_millis(5));
     }
 }

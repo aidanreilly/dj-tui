@@ -6,7 +6,10 @@ pub struct Track {
 
 impl std::fmt::Debug for Track {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Track").field("frames", &self.frames()).field("sample_rate", &self.sample_rate).finish()
+        f.debug_struct("Track")
+            .field("frames", &self.frames())
+            .field("sample_rate", &self.sample_rate)
+            .finish()
     }
 }
 

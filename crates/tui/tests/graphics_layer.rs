@@ -4,7 +4,10 @@
 use engine::DeckId;
 use ratatui::{backend::TestBackend, buffer::Buffer, layout::Rect, Terminal};
 use ratatui_image::picker::{Picker, ProtocolType};
-use tui::{render_screen, screen_layout, waveform_area, DeckView, Graphics, MixerView, ScreenView, WAVEFORM_ROWS};
+use tui::{
+    render_screen, screen_layout, waveform_area, DeckView, Graphics, MixerView, ScreenView,
+    WAVEFORM_ROWS,
+};
 
 const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
 const KITTY_APC: &str = "\x1b_G";
@@ -21,14 +24,30 @@ fn deck(id: DeckId, loaded: bool, position_secs: f64) -> DeckView {
         loading: false,
         playing: loaded,
         hot_cues: [false; 8],
-        waveform: if loaded { (0..512).map(|i| { let p = 0.2 + 0.7 * ((i % 37) as f32 / 37.0); [-p, p] }).collect() } else { vec![] },
+        waveform: if loaded {
+            (0..512)
+                .map(|i| {
+                    let p = 0.2 + 0.7 * ((i % 37) as f32 / 37.0);
+                    [-p, p]
+                })
+                .collect()
+        } else {
+            vec![]
+        },
     }
 }
 
 fn view(pos_a: f64, b_loaded: bool) -> ScreenView {
     ScreenView {
-        decks: [deck(DeckId::A, true, pos_a), deck(DeckId::B, b_loaded, 10.0)],
-        mixer: MixerView { crossfader: 0.0, faders: [1.0, 1.0], headphone_cue: [false, false] },
+        decks: [
+            deck(DeckId::A, true, pos_a),
+            deck(DeckId::B, b_loaded, 10.0),
+        ],
+        mixer: MixerView {
+            crossfader: 0.0,
+            faders: [1.0, 1.0],
+            headphone_cue: [false, false],
+        },
         status: String::new(),
         message: String::new(),
     }
@@ -71,8 +90,14 @@ fn loaded_decks_get_a_kitty_image_and_empty_decks_do_not() {
     let buf = draw(&mut term, &mut g, &view(30.0, false));
     let l = screen_layout(Rect::new(0, 0, 120, 44));
     let placeholder = |s: &str| s.contains(KITTY_PLACEHOLDER);
-    assert!(area_has(&buf, waveform_area(l.deck_a), placeholder), "deck A has no image");
-    assert!(!area_has(&buf, waveform_area(l.deck_b), placeholder), "empty deck B got an image");
+    assert!(
+        area_has(&buf, waveform_area(l.deck_a), placeholder),
+        "deck A has no image"
+    );
+    assert!(
+        !area_has(&buf, waveform_area(l.deck_b), placeholder),
+        "empty deck B got an image"
+    );
     assert!(anywhere_has(&buf, KITTY_APC), "image data was never sent");
     assert_eq!(g.transmissions(), 1);
 }
@@ -83,7 +108,10 @@ fn unchanged_frames_send_no_image_data() {
     let mut g = Graphics::new(kitty());
     draw(&mut term, &mut g, &view(30.0, true));
     let buf = draw(&mut term, &mut g, &view(30.0, true));
-    assert!(!anywhere_has(&buf, KITTY_APC), "image data resent without a change");
+    assert!(
+        !anywhere_has(&buf, KITTY_APC),
+        "image data resent without a change"
+    );
     assert_eq!(g.transmissions(), 2, "one per deck");
 }
 
@@ -106,7 +134,13 @@ fn text_outside_the_waveform_is_untouched() {
     let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
     let mut g = Graphics::new(kitty());
     let buf = draw(&mut term, &mut g, &view(30.0, true));
-    let text: String = (0..44).map(|y| (0..120).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>()).collect();
+    let text: String = (0..44)
+        .map(|y| {
+            (0..120)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+        })
+        .collect();
     for needle in ["▶ DECK A", "DECK B", "MIXER", "BROWSER", "PLAYING"] {
         assert!(text.contains(needle), "{needle} missing");
     }

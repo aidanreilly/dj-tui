@@ -35,12 +35,14 @@ pub fn amplitude_rows(ranges: &[[f32; 2]], rows: usize) -> Vec<String> {
     (0..rows)
         .map(|row| {
             (0..ranges.len())
-                .map(|col| match (pixels[row * 2][col], pixels[row * 2 + 1][col]) {
-                    (true, true) => '▌',
-                    (true, false) => '▘',
-                    (false, true) => '▖',
-                    (false, false) => ' ',
-                })
+                .map(
+                    |col| match (pixels[row * 2][col], pixels[row * 2 + 1][col]) {
+                        (true, true) => '▌',
+                        (true, false) => '▘',
+                        (false, true) => '▖',
+                        (false, false) => ' ',
+                    },
+                )
                 .collect()
         })
         .collect()
@@ -74,7 +76,10 @@ pub fn downsample_ranges(src: &[[f32; 2]], n: usize) -> Vec<[f32; 2]> {
 /// Rasterise a magnitude-only `envelope` (one value in 0..=1 per column) into bars.
 /// `rows` must be even and at least 2.
 pub fn bar_rows(envelope: &[f32], rows: usize) -> Vec<String> {
-    assert!(rows >= 2 && rows % 2 == 0, "waveform rows must be even, got {rows}");
+    assert!(
+        rows >= 2 && rows % 2 == 0,
+        "waveform rows must be even, got {rows}"
+    );
     let half_cells = rows / 2;
     let half_steps = half_cells * 2;
     let mut grid = vec![vec![' '; envelope.len()]; rows];
@@ -94,7 +99,9 @@ pub fn bar_rows(envelope: &[f32], rows: usize) -> Vec<String> {
         }
     }
 
-    grid.into_iter().map(|row| row.into_iter().collect()).collect()
+    grid.into_iter()
+        .map(|row| row.into_iter().collect())
+        .collect()
 }
 
 /// Reduce (or stretch) `src` to exactly `n` values, keeping the peak of each bucket.

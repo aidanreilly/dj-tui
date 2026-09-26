@@ -33,13 +33,24 @@ pub(crate) fn decode(path: &Path) -> Result<Decoded, LoadError> {
         hint.with_extension(ext);
     }
     let mut probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|e| match e {
-            SymError::IoError(io) if io.kind() != std::io::ErrorKind::UnexpectedEof => LoadError::Io(io),
+            SymError::IoError(io) if io.kind() != std::io::ErrorKind::UnexpectedEof => {
+                LoadError::Io(io)
+            }
             other => LoadError::Unsupported(other.to_string()),
         })?;
 
-    let mut tags: Vec<Tag> = probed.metadata.get().and_then(|m| m.current().map(|r| r.tags().to_vec())).unwrap_or_default();
+    let mut tags: Vec<Tag> = probed
+        .metadata
+        .get()
+        .and_then(|m| m.current().map(|r| r.tags().to_vec()))
+        .unwrap_or_default();
     let mut format = probed.format;
     if let Some(rev) = format.metadata().current() {
         tags.extend_from_slice(rev.tags());

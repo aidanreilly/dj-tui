@@ -3,7 +3,9 @@ use common::{sine, stereo, write_wav, Fmt};
 use loader::{load_file, LoadError};
 
 fn left(track: &engine::Track) -> Vec<f32> {
-    (0..track.frames()).map(|i| track.frame_at(i as f64).0).collect()
+    (0..track.frames())
+        .map(|i| track.frame_at(i as f64).0)
+        .collect()
 }
 
 #[test]
@@ -46,15 +48,28 @@ fn mono_is_copied_to_both_channels() {
 fn resampling_keeps_duration_pitch_and_level() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("s.wav");
-    write_wav(&path, &stereo(&sine(1000.0, 2.0, 44_100, 0.5)), 2, 44_100, Fmt::Float32);
+    write_wav(
+        &path,
+        &stereo(&sine(1000.0, 2.0, 44_100, 0.5)),
+        2,
+        44_100,
+        Fmt::Float32,
+    );
     let loaded = load_file(&path, 48_000).unwrap();
-    assert!((loaded.track.frames() as i64 - 96_000).abs() <= 2, "{}", loaded.track.frames());
+    assert!(
+        (loaded.track.frames() as i64 - 96_000).abs() <= 2,
+        "{}",
+        loaded.track.frames()
+    );
 
     // Measure over the middle second, away from edge effects.
     let l = left(&loaded.track);
     let mid = &l[24_000..72_000];
     let crossings = mid.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count();
-    assert!((crossings as i32 - 1000).abs() <= 2, "crossings {crossings}");
+    assert!(
+        (crossings as i32 - 1000).abs() <= 2,
+        "crossings {crossings}"
+    );
     let rms = (mid.iter().map(|s| s * s).sum::<f32>() / mid.len() as f32).sqrt();
     assert!((rms - 0.5 / 2f32.sqrt()).abs() < 0.01, "rms {rms}");
 }

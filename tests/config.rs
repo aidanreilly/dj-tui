@@ -64,7 +64,10 @@ fn config_path_prefers_xdg_then_home() {
         config_path(None, Some("/home/u")),
         Some(PathBuf::from("/home/u/.config/dj-tui/config.toml"))
     );
-    assert_eq!(config_path(Some(""), Some("/home/u")), config_path(None, Some("/home/u")));
+    assert_eq!(
+        config_path(Some(""), Some("/home/u")),
+        config_path(None, Some("/home/u"))
+    );
     assert_eq!(config_path(None, None), None);
 }
 
@@ -105,7 +108,9 @@ fn explicit_routing_reads_port_lists() {
 #[test]
 fn explicit_routing_needs_exactly_two_master_ports() {
     assert!(Config::from_toml("[audio]\nrouting = \"explicit\"").is_err());
-    assert!(Config::from_toml("[audio]\nrouting = \"explicit\"\nmaster_ports = [\"a:1\"]").is_err());
+    assert!(
+        Config::from_toml("[audio]\nrouting = \"explicit\"\nmaster_ports = [\"a:1\"]").is_err()
+    );
     assert!(Config::from_toml(
         "[audio]\nrouting = \"explicit\"\nmaster_ports = [\"a:1\",\"a:2\"]\ncue_ports = [\"x\"]"
     )
@@ -115,4 +120,18 @@ fn explicit_routing_needs_exactly_two_master_ports() {
 #[test]
 fn client_name_defaults_to_dj_tui() {
     assert_eq!(Config::default().audio.client_name, "dj-tui");
+}
+
+#[test]
+fn graphics_defaults_to_auto_and_can_be_turned_off() {
+    use dj_tui::config::Graphics;
+    assert_eq!(Config::default().ui.graphics, Graphics::Auto);
+    assert_eq!(
+        Config::from_toml("[ui]\ngraphics = \"off\"")
+            .unwrap()
+            .ui
+            .graphics,
+        Graphics::Off
+    );
+    assert!(Config::from_toml("[ui]\ngraphics = \"sometimes\"").is_err());
 }

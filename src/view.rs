@@ -31,7 +31,11 @@ fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &Dec
         loading: meta.loading,
         playing: d.playing,
         hot_cues,
-        waveform: if loaded { meta.waveform.clone() } else { Vec::new() },
+        waveform: if loaded {
+            meta.waveform.clone()
+        } else {
+            Vec::new()
+        },
     }
 }
 
@@ -49,7 +53,11 @@ pub fn screen_view(
             deck_view(snap, rate, DeckId::A, focused, &metas[0]),
             deck_view(snap, rate, DeckId::B, focused, &metas[1]),
         ],
-        mixer: MixerView { crossfader: snap.crossfader, faders: snap.faders, headphone_cue: snap.headphone_cue },
+        mixer: MixerView {
+            crossfader: snap.crossfader,
+            faders: snap.faders,
+            headphone_cue: snap.headphone_cue,
+        },
         status,
         message: String::new(),
     }

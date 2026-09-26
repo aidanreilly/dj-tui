@@ -10,7 +10,11 @@ pub struct PlanarRenderer {
 
 impl PlanarRenderer {
     pub fn new(max_frames: usize) -> Self {
-        Self { master: vec![0.0; max_frames * 2], cue: vec![0.0; max_frames * 2], frames_rendered: 0 }
+        Self {
+            master: vec![0.0; max_frames * 2],
+            cue: vec![0.0; max_frames * 2],
+            frames_rendered: 0,
+        }
     }
 
     /// Grow scratch space. Call from a non-real-time context such as JACK's buffer size callback.

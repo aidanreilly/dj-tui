@@ -61,7 +61,11 @@ fn blend(img: &mut RgbaImage, x: u32, y: u32, color: Rgba<u8>, coverage: f32) {
     let ch = |i: usize| {
         ((color[i] as f32 * src_a + dst[i] as f32 * dst_a * (1.0 - src_a)) / out_a).round() as u8
     };
-    img.put_pixel(x, y, Rgba([ch(0), ch(1), ch(2), (out_a * 255.0).round() as u8]));
+    img.put_pixel(
+        x,
+        y,
+        Rgba([ch(0), ch(1), ch(2), (out_a * 255.0).round() as u8]),
+    );
 }
 
 /// Fill pixel column `x` over the continuous range `[lo, hi]`, blending partial rows.
@@ -185,7 +189,10 @@ impl PixelWaveform {
         palette: &Palette,
     ) -> Option<RgbaImage> {
         if ranges.is_empty() || size.0 == 0 || size.1 == 0 {
-            *self = Self { rasterizations: self.rasterizations, ..Default::default() };
+            *self = Self {
+                rasterizations: self.rasterizations,
+                ..Default::default()
+            };
             return None;
         }
         let source = (fingerprint(ranges), size);

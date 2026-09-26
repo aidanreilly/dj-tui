@@ -75,7 +75,10 @@ fn full_queue_returns_the_command() {
     let (mut h, _p) = channel(Engine::new(), 2);
     h.send(Command::PlayPause(A)).unwrap();
     h.send(Command::PlayPause(A)).unwrap();
-    assert!(matches!(h.send(Command::PlayPause(B)), Err(Command::PlayPause(B))));
+    assert!(matches!(
+        h.send(Command::PlayPause(B)),
+        Err(Command::PlayPause(B))
+    ));
 }
 
 #[test]
