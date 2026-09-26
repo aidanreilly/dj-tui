@@ -9,6 +9,8 @@ rust-version.workspace = true
 engine = { path = "../engine" }
 symphonia = { version = "0.5.4", features = ["all"] }
 rubato = "0.15"
+wave = { path = "../wave" }
 
 [dev-dependencies]
 tempfile = "3"
+wave = { path = "../wave" }

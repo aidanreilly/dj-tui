@@ -10,9 +10,6 @@ use engine::{DeckId, Track};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-/// Resolution of the stored overview waveform. The TUI downsamples to the panel width.
-pub const ENVELOPE_POINTS: usize = 2048;
-
 #[derive(Debug)]
 pub enum LoadError {
     Io(std::io::Error),
@@ -38,8 +35,8 @@ pub struct LoadedTrack {
     pub track: Track,
     pub title: String,
     pub artist: Option<String>,
-    /// Signed `[minimum, maximum]` sample range for each overview position.
-    pub waveform: Vec<[f32; 2]>,
+    /// Signed range and three-band RMS for each overview position.
+    pub waveform: Vec<wave::WavePoint>,
 }
 
 impl std::fmt::Debug for LoadedTrack {
@@ -53,8 +50,34 @@ impl std::fmt::Debug for LoadedTrack {
 }
 
 /// Decode `path` into a stereo track at `session_rate`.
-pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadError> {
+///
+/// Analysis happens before resampling, so its result does not depend on the session
+/// rate and one cache file serves every session. `cache_dir` of `None` skips the cache
+/// entirely, which is what tests and runs without a home directory get.
+pub fn load_file(
+    path: &Path,
+    session_rate: u32,
+    cache_dir: Option<&Path>,
+) -> Result<LoadedTrack, LoadError> {
     let decoded = decode::decode(path)?;
+
+    // Read before resampling: `decoded.channels` is moved into `resample` below, and a
+    // hit skips only the analysis pass. Decode still has to run to feed playback.
+    let waveform = match cache_dir.and_then(|d| wave::cache::read(d, path)) {
+        Some(points) => points,
+        None => {
+            let points = wave::analyse(
+                &decoded.channels[0],
+                &decoded.channels[1],
+                decoded.sample_rate,
+            );
+            if let Some(d) = cache_dir {
+                wave::cache::write(d, path, &points);
+            }
+            points
+        }
+    };
+
     let [l, r] = if decoded.sample_rate == session_rate {
         decoded.channels
     } else {
@@ -62,7 +85,6 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
     };
     let data: Vec<f32> = l.iter().zip(&r).flat_map(|(&a, &b)| [a, b]).collect();
     let track = Track::from_interleaved(data, session_rate);
-    let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
     let title = decoded.title.unwrap_or_else(|| {
         path.file_stem()
             .map(|s| s.to_string_lossy().into_owned())
@@ -74,42 +96,6 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
         artist: decoded.artist,
         waveform,
     })
-}
-
-/// Whole-track signed amplitude ranges, normalized so the loudest absolute sample is 1.
-/// Each point stores `[minimum, maximum]` across both channels for its time bucket.
-pub fn waveform_envelope(track: &Track, points: usize) -> Vec<[f32; 2]> {
-    let frames = track.frames();
-    if frames == 0 || points == 0 {
-        return vec![[0.0, 0.0]; points];
-    }
-
-    let mut waveform: Vec<[f32; 2]> = (0..points)
-        .map(|j| {
-            let start = (j * frames / points).min(frames - 1);
-            let end = ((j + 1) * frames / points).clamp(start + 1, frames);
-            let mut min = f32::INFINITY;
-            let mut max = f32::NEG_INFINITY;
-            for i in start..end {
-                let (l, r) = track.frame_at(i as f64);
-                min = min.min(l).min(r);
-                max = max.max(l).max(r);
-            }
-            [min, max]
-        })
-        .collect();
-
-    let peak = waveform
-        .iter()
-        .flat_map(|[min, max]| [min.abs(), max.abs()])
-        .fold(0.0, f32::max);
-    if peak > 0.0 {
-        waveform.iter_mut().for_each(|range| {
-            range[0] /= peak;
-            range[1] /= peak;
-        });
-    }
-    waveform
 }
 
 /// Whole-track peak envelope with `points` values, normalised so the loudest is 1.
@@ -151,14 +137,14 @@ pub struct Loader {
 }
 
 impl Loader {
-    pub fn spawn(session_rate: u32) -> Self {
+    pub fn spawn(session_rate: u32, cache_dir: Option<PathBuf>) -> Self {
         let (req_tx, req_rx) = channel::<(DeckId, PathBuf)>();
         let (res_tx, res_rx) = channel();
         std::thread::Builder::new()
             .name("dj-tui-loader".into())
             .spawn(move || {
                 for (deck, path) in req_rx {
-                    let result = load_file(&path, session_rate);
+                    let result = load_file(&path, session_rate, cache_dir.as_deref());
                     if res_tx.send(LoadResult { deck, path, result }).is_err() {
                         break;
                     }
