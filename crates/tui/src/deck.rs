@@ -1,4 +1,4 @@
-use crate::waveform::{bar_rows, downsample_peaks};
+use crate::waveform::{amplitude_rows, downsample_ranges};
 use engine::DeckId;
 use ratatui::{
     buffer::Buffer,
@@ -20,10 +20,11 @@ pub struct DeckView {
     pub key: Option<String>,
     pub position_secs: f64,
     pub duration_secs: f64,
+    pub loading: bool,
     pub playing: bool,
     pub hot_cues: [bool; 8],
-    /// Whole-track peak envelope, any resolution; resampled to the panel width.
-    pub envelope: Vec<f32>,
+    /// Whole-track signed `[minimum, maximum]` sample ranges, resampled to panel width.
+    pub waveform: Vec<[f32; 2]>,
 }
 
 pub struct DeckPanel<'a> {
@@ -73,7 +74,15 @@ impl Widget for DeckPanel<'_> {
 
         // Title row.
         let Some(title) = &v.title else {
-            buf.set_string(inner.x, inner.y, "No track loaded", Style::new().add_modifier(Modifier::DIM));
+            let (text, style) = if v.loading {
+                (
+                    "Loading track…",
+                    Style::new().fg(ratatui::style::Color::Rgb(126, 113, 190)),
+                )
+            } else {
+                ("No track loaded", Style::new().add_modifier(Modifier::DIM))
+            };
+            buf.set_string(inner.x, inner.y, text, style);
             return;
         };
         let times = format!("{}  -{}", mmss(v.position_secs), mmss(v.duration_secs - v.position_secs));
@@ -83,13 +92,28 @@ impl Widget for DeckPanel<'_> {
 
         // Waveform rows.
         let wave_y = inner.y + 1;
-        let rows = bar_rows(&downsample_peaks(&v.envelope, inner.width as usize), WAVEFORM_ROWS as usize);
+        let columns = downsample_ranges(&v.waveform, inner.width as usize);
+        let rows = amplitude_rows(&columns, WAVEFORM_ROWS as usize);
+        let center_y = wave_y + WAVEFORM_ROWS / 2;
+        buf.set_string(
+            inner.x,
+            center_y,
+            "┄".repeat(inner.width as usize),
+            Style::new().fg(ratatui::style::Color::Rgb(58, 50, 84)),
+        );
         for (i, row) in rows.iter().enumerate() {
             let y = wave_y + i as u16;
             if y >= inner.bottom() {
                 break;
             }
-            buf.set_string(inner.x, y, row, Style::new());
+            for (col, glyph) in row.chars().enumerate().filter(|(_, glyph)| *glyph != ' ') {
+                buf.set_string(
+                    inner.x + col as u16,
+                    y,
+                    glyph.to_string(),
+                    Style::new().fg(ratatui::style::Color::Rgb(126, 113, 190)),
+                );
+            }
         }
         if v.duration_secs > 0.0 {
             let frac = (v.position_secs / v.duration_secs).clamp(0.0, 1.0);

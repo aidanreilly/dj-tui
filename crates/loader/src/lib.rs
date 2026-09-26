@@ -1,7 +1,7 @@
 //! Decoding and resampling, off the audio thread.
 //!
 //! Tracks are decoded completely into memory with symphonia, converted to stereo, resampled
-//! to the session rate with rubato, and analysed for the overview waveform envelope.
+//! to the session rate with rubato, and analysed for the overview waveform.
 
 mod decode;
 mod resample;
@@ -10,7 +10,7 @@ use engine::{DeckId, Track};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-/// Resolution of the stored overview envelope. The TUI downsamples to the panel width.
+/// Resolution of the stored overview waveform. The TUI downsamples to the panel width.
 pub const ENVELOPE_POINTS: usize = 2048;
 
 #[derive(Debug)]
@@ -38,7 +38,8 @@ pub struct LoadedTrack {
     pub track: Track,
     pub title: String,
     pub artist: Option<String>,
-    pub envelope: Vec<f32>,
+    /// Signed `[minimum, maximum]` sample range for each overview position.
+    pub waveform: Vec<[f32; 2]>,
 }
 
 impl std::fmt::Debug for LoadedTrack {
@@ -61,14 +62,51 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
     };
     let data: Vec<f32> = l.iter().zip(&r).flat_map(|(&a, &b)| [a, b]).collect();
     let track = Track::from_interleaved(data, session_rate);
-    let envelope = peak_envelope(&track, ENVELOPE_POINTS);
+    let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
     let title = decoded.title.unwrap_or_else(|| {
         path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
     });
-    Ok(LoadedTrack { track, title, artist: decoded.artist, envelope })
+    Ok(LoadedTrack { track, title, artist: decoded.artist, waveform })
+}
+
+/// Whole-track signed amplitude ranges, normalized so the loudest absolute sample is 1.
+/// Each point stores `[minimum, maximum]` across both channels for its time bucket.
+pub fn waveform_envelope(track: &Track, points: usize) -> Vec<[f32; 2]> {
+    let frames = track.frames();
+    if frames == 0 || points == 0 {
+        return vec![[0.0, 0.0]; points];
+    }
+
+    let mut waveform: Vec<[f32; 2]> = (0..points)
+        .map(|j| {
+            let start = (j * frames / points).min(frames - 1);
+            let end = ((j + 1) * frames / points).clamp(start + 1, frames);
+            let mut min = f32::INFINITY;
+            let mut max = f32::NEG_INFINITY;
+            for i in start..end {
+                let (l, r) = track.frame_at(i as f64);
+                min = min.min(l).min(r);
+                max = max.max(l).max(r);
+            }
+            [min, max]
+        })
+        .collect();
+
+    let peak = waveform
+        .iter()
+        .flat_map(|[min, max]| [min.abs(), max.abs()])
+        .fold(0.0, f32::max);
+    if peak > 0.0 {
+        waveform.iter_mut().for_each(|range| {
+            range[0] /= peak;
+            range[1] /= peak;
+        });
+    }
+    waveform
 }
 
 /// Whole-track peak envelope with `points` values, normalised so the loudest is 1.
+/// Retained for callers that need a magnitude-only envelope.
 pub fn peak_envelope(track: &Track, points: usize) -> Vec<f32> {
     let frames = track.frames();
     if frames == 0 || points == 0 {

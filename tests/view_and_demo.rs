@@ -36,7 +36,13 @@ fn view_reports_times_in_seconds_and_focus() {
     snap.faders = [0.5, 1.0];
     let metas = [
         DeckMeta::default(),
-        DeckMeta { title: Some("Demo".into()), bpm: Some(124.0), key: None, envelope: vec![0.5] },
+        DeckMeta {
+            title: Some("Demo".into()),
+            bpm: Some(124.0),
+            key: None,
+            loading: false,
+            waveform: vec![[0.0, 0.5]],
+        },
     ];
     let v = screen_view(&snap, 1000, DeckId::B, &metas, "ok".into());
     let b = &v.decks[1];

@@ -28,4 +28,4 @@ pub fn click_track(bpm: f64, secs: f64, sample_rate: u32) -> Track {
     Track::from_interleaved(data, sample_rate)
 }
 
-pub use loader::peak_envelope;
+pub use loader::{peak_envelope, waveform_envelope};

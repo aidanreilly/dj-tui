@@ -45,13 +45,14 @@ impl App {
 
     /// Queue a file for background loading onto `deck`.
     pub fn load_path(&mut self, deck: DeckId, path: PathBuf) {
+        self.metas[deck.index()].loading = true;
         self.message = format!("Loading {} on deck {}…", path.display(), deck_letter(deck));
         self.loader.request(deck, path);
     }
 
     /// Put an already decoded track on a deck (demo mode, tests).
     pub fn load_track(&mut self, deck: DeckId, track: engine::Track, meta: DeckMeta) {
-        self.metas[deck.index()] = meta;
+        self.metas[deck.index()] = DeckMeta { loading: false, ..meta };
         self.send(Command::Load(deck, Arc::new(track)));
     }
 
@@ -70,10 +71,19 @@ impl App {
                     self.load_track(
                         done.deck,
                         loaded.track,
-                        DeckMeta { title: Some(title), bpm: None, key: None, envelope: loaded.envelope },
+                        DeckMeta {
+                            title: Some(title),
+                            bpm: None,
+                            key: None,
+                            loading: false,
+                            waveform: loaded.waveform,
+                        },
                     );
                 }
-                Err(e) => self.message = format!("Could not load {name}: {e}"),
+                Err(e) => {
+                    self.metas[done.deck.index()].loading = false;
+                    self.message = format!("Could not load {name}: {e}");
+                }
             }
         }
     }

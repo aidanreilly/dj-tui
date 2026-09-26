@@ -103,14 +103,14 @@ fn title_falls_back_to_the_file_name() {
 }
 
 #[test]
-fn envelope_is_computed_and_normalised() {
+fn waveform_ranges_are_computed_and_normalised() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("e.wav");
     let mut mono = vec![0.0; 48_000];
     mono[..24_000].iter_mut().for_each(|s| *s = 0.4);
     write_wav(&path, &stereo(&mono), 2, 48_000, Fmt::Float32);
     let loaded = load_file(&path, 48_000).unwrap();
-    assert_eq!(loaded.envelope.len(), loader::ENVELOPE_POINTS);
-    assert!((loaded.envelope[0] - 1.0).abs() < 1e-6);
-    assert_eq!(*loaded.envelope.last().unwrap(), 0.0);
+    assert_eq!(loaded.waveform.len(), loader::ENVELOPE_POINTS);
+    assert!((loaded.waveform[0][1] - 1.0).abs() < 1e-6);
+    assert_eq!(loaded.waveform.last().unwrap(), &[0.0, 0.0]);
 }

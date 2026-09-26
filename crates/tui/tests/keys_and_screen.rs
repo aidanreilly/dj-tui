@@ -54,9 +54,10 @@ fn deck(id: DeckId, focused: bool) -> DeckView {
         key: None,
         position_secs: 0.0,
         duration_secs: 0.0,
+        loading: false,
         playing: false,
         hot_cues: [false; 8],
-        envelope: vec![],
+        waveform: vec![],
     }
 }
 

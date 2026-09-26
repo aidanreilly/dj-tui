@@ -25,9 +25,10 @@ fn loaded_view(focused: bool) -> DeckView {
         key: Some("8A".into()),
         position_secs: 5.0,
         duration_secs: 30.0,
+        loading: false,
         playing: true,
         hot_cues: [true, false, true, false, false, false, false, false],
-        envelope: vec![1.0; 200],
+        waveform: vec![[-1.0, 1.0]; 200],
     }
 }
 
@@ -91,7 +92,11 @@ fn hot_cue_row_marks_set_cues() {
 
 #[test]
 fn empty_deck_says_so() {
-    let view = DeckView { title: None, envelope: vec![], ..loaded_view(false) };
+    let view = DeckView {
+        title: None,
+        waveform: vec![],
+        ..loaded_view(false)
+    };
     let text = buffer_text(&render(&view, 80, DECK_HEIGHT));
     assert!(text.contains("No track loaded"), "{text}");
 }

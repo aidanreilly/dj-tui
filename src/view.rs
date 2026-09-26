@@ -9,7 +9,8 @@ pub struct DeckMeta {
     pub title: Option<String>,
     pub bpm: Option<f64>,
     pub key: Option<String>,
-    pub envelope: Vec<f32>,
+    pub loading: bool,
+    pub waveform: Vec<[f32; 2]>,
 }
 
 fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &DeckMeta) -> DeckView {
@@ -27,9 +28,10 @@ fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &Dec
         key: meta.key.clone(),
         position_secs: d.position / rate,
         duration_secs: d.track_frames as f64 / rate,
+        loading: meta.loading,
         playing: d.playing,
         hot_cues,
-        envelope: if loaded { meta.envelope.clone() } else { Vec::new() },
+        waveform: if loaded { meta.waveform.clone() } else { Vec::new() },
     }
 }
 

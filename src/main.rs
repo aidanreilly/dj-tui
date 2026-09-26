@@ -6,7 +6,7 @@ use dj_tui::{
     cli::{parse_args, USAGE},
     clock::NullClock,
     config::{config_path, Backend, Config},
-    demo::{click_track, peak_envelope},
+    demo::{click_track, waveform_envelope},
     view::DeckMeta,
 };
 use engine::{channel, DeckId, Engine, EngineProcessor};
@@ -124,11 +124,17 @@ fn main() -> ExitCode {
         }
     };
 
-    if args.demo {
+    if args.demo && args.files.is_empty() {
         for (id, bpm) in [(DeckId::A, 124.0), (DeckId::B, 126.0)] {
             let track = click_track(bpm, 180.0, app.sample_rate());
-            let envelope = peak_envelope(&track, ENVELOPE_POINTS);
-            let meta = DeckMeta { title: Some(format!("Demo click {bpm:.0}")), bpm: Some(bpm), key: None, envelope };
+            let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
+            let meta = DeckMeta {
+                title: Some(format!("Demo click {bpm:.0}")),
+                bpm: Some(bpm),
+                key: None,
+                loading: false,
+                waveform,
+            };
             app.load_track(id, track, meta);
         }
     }

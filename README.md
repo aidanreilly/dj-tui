@@ -12,7 +12,7 @@ M0 and M1 are done: dj-tui plays real files through JACK.
   tracks are freed on the UI thread. A test with a disabled allocator proves `process` never
   allocates or frees.
 - `loader`: symphonia decoding (WAV, FLAC, MP3, AAC/M4A, OGG Vorbis, AIFF), stereo conversion,
-  rubato resampling to the session rate with delay compensation, overview envelope, and a
+  rubato resampling to the session rate with delay compensation, signed overview waveform, and a
   background loader thread.
 - `backend`: a JACK client with `master_L/R` and `cue_L/R` ports, auto or explicit routing
   to physical outputs, xrun counting. Works with PipeWire through pipewire-jack.
@@ -53,7 +53,7 @@ Either way:
 
 ```sh
 cargo run -- ~/Music/one.flac ~/Music/two.mp3
-cargo run -- --demo            # click tracks at 124 and 126 BPM
+cargo run -- --demo            # click tracks at 124 and 126 BPM; supplied files take precedence
 cargo run -- --no-audio x.wav  # no sound server needed
 ```
 
@@ -104,7 +104,7 @@ itself is a no-op unless `DJ_TUI_JACK_TESTS=1` is set.
 
 ```
 crates/engine   deck, mixer, track buffer, realtime command channel (no I/O)
-crates/loader   decoding, resampling, envelope, background loader thread
+crates/loader   decoding, resampling, waveform analysis, background loader thread
 crates/backend  JACK client, port routing, planar output
 crates/input    Action enum and keymap; MIDI mapping arrives in M9
 crates/tui      layout, widgets, waveform rasteriser

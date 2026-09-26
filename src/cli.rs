@@ -8,7 +8,7 @@ usage: dj-tui [OPTIONS] [FILE_A] [FILE_B]
 Loads FILE_A on deck A and FILE_B on deck B.
 
 options:
-  --demo       load click tracks at 124 and 126 BPM
+  --demo       use supplied files, or 124/126 BPM click tracks if no files are given
   --no-audio   run without a sound server (silent clock)
   -h, --help   show this help
   --version    show the version";
