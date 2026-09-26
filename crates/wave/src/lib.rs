@@ -5,6 +5,8 @@
 
 mod analysis;
 mod biquad;
+mod mode;
 
 pub use analysis::{analyse, WavePoint, HIGH_HZ, LOW_HZ, POINTS_PER_SECOND};
 pub use biquad::{Biquad, Q};
+pub use mode::WaveformMode;

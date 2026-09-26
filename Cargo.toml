@@ -20,6 +20,7 @@ engine = { path = "crates/engine" }
 input = { path = "crates/input" }
 tui = { path = "crates/tui" }
 loader = { path = "crates/loader" }
+wave = { path = "crates/wave", features = ["serde"] }
 backend = { path = "crates/backend" }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
