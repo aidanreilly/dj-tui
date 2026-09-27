@@ -40,6 +40,26 @@ fn isolator_at_unity_is_flat() {
 }
 
 #[test]
+fn isolator_at_unity_is_bit_exact() {
+    let mut eq = iso();
+    let input: Vec<f32> = (0..4096).map(|i| ((i * 7919) % 1000) as f32 / 1000.0 - 0.5).collect();
+    let mut buf = input.clone();
+    eq.process(&mut buf);
+    assert_eq!(buf, input);
+}
+
+#[test]
+fn equalising_path_sums_flat_when_engaged() {
+    // A negligible cut engages the band-split path without changing the level.
+    for f in [40.0, 250.0, 800.0, 2500.0, 8000.0, 15000.0] {
+        let mut eq = iso();
+        eq.set_gain_db(EqBand::Mid, -0.001);
+        let g = gain_db(f, |b| eq.process(b));
+        assert!(g.abs() < 0.2, "{f} Hz: {g:.2} dB");
+    }
+}
+
+#[test]
 fn low_kill_removes_bass_and_keeps_highs() {
     let mut eq = iso();
     eq.set_kill(EqBand::Low, true);
@@ -94,11 +114,12 @@ fn kills_are_smoothed_rather_than_instant() {
     let mut warm = sine(0, 24_000);
     eq.process(&mut warm);
     eq.set_kill(EqBand::Low, true);
-    let mut first_ms = sine(24_000, 48);
+    // 3 ms: long enough for the 50 Hz input itself to swing well past 0.3.
+    let mut first_ms = sine(24_000, 144);
     eq.process(&mut first_ms);
     let peak_first = first_ms.iter().fold(0f32, |m, s| m.max(s.abs()));
     assert!(peak_first > 0.3, "kill cut in instantly ({peak_first})");
-    let mut later = sine(24_048, 9600);
+    let mut later = sine(24_144, 9600);
     eq.process(&mut later);
     let peak_late = later[later.len() - 960..].iter().fold(0f32, |m, s| m.max(s.abs()));
     assert!(peak_late < 0.05, "kill never took effect ({peak_late})");

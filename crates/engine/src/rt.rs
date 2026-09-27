@@ -24,6 +24,10 @@ pub enum Command {
     SetCrossfaderCurve(CrossfaderCurve),
     SetHeadphoneCue(DeckId, bool),
     SetCueMix(f32),
+    SetTrim(DeckId, f32),
+    SetEq(DeckId, crate::dsp::EqBand, f32),
+    SetEqKill(DeckId, crate::dsp::EqBand, bool),
+    SetFilter(DeckId, f32),
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -83,6 +87,9 @@ struct SharedDeck {
 
 #[derive(Default)]
 struct Shared {
+    /// Peak levels as f32 bits. Non-negative floats order the same as their bits, so
+    /// `fetch_max` accumulates peaks between UI reads.
+    meters: [AtomicU32; 3],
     decks: [SharedDeck; 2],
     crossfader: F32,
     curve: std::sync::atomic::AtomicU8,
@@ -172,6 +179,13 @@ impl EngineHandle {
         }
     }
 
+    /// Peak levels since the previous call. Resets them.
+    pub fn take_meters(&self) -> crate::Meters {
+        let m = &self.shared.meters;
+        let take = |i: usize| f32::from_bits(m[i].swap(0, Relaxed));
+        crate::Meters { channels: [take(0), take(1)], master: take(2) }
+    }
+
     /// Free tracks the audio thread has let go of. Call regularly from the UI loop.
     pub fn collect_garbage(&mut self) -> usize {
         let mut n = 0;
@@ -193,6 +207,11 @@ impl EngineProcessor {
             }
         }
         self.engine.process(master, cue);
+        let peaks = self.engine.take_peaks();
+        let m = &self.shared.meters;
+        m[0].fetch_max(peaks.channels[0].to_bits(), Relaxed);
+        m[1].fetch_max(peaks.channels[1].to_bits(), Relaxed);
+        m[2].fetch_max(peaks.master.to_bits(), Relaxed);
         self.frames_processed += (master.len() / 2) as u64;
         self.publish();
     }

@@ -165,6 +165,9 @@ pub struct Isolator {
     target_db: [f32; 3],
     kill: [bool; 3],
     gain: [f32; 3],
+    /// 0 passes the input through untouched, 1 is fully equalised. Ramps between the two so
+    /// leaving and returning to flat never clicks.
+    wet: f32,
     smooth: f32,
 }
 
@@ -175,6 +178,7 @@ impl Isolator {
             target_db: [0.0; 3],
             kill: [false; 3],
             gain: [1.0; 3],
+            wet: 0.0,
             smooth: smoothing_coeff(fs, SMOOTH_SECS),
         }
     }
@@ -191,15 +195,26 @@ impl Isolator {
         std::array::from_fn(|i| if self.kill[i] { 0.0 } else { db_to_gain(self.target_db[i]) })
     }
 
+    /// Flat EQ is an exact pass-through: the crossovers keep running so their state is
+    /// warm, but their all-pass phase shift never reaches the output.
     pub fn process(&mut self, buf: &mut [f32]) {
         let target = self.targets();
+        let wet_target = if target == [1.0; 3] { 0.0 } else { 1.0 };
         for frame in buf.chunks_exact_mut(2) {
             for (g, t) in self.gain.iter_mut().zip(target) {
                 *g += (t - *g) * self.smooth;
             }
+            self.wet += (wet_target - self.wet) * self.smooth;
+            if (self.wet - wet_target).abs() < 1e-5 {
+                self.wet = wet_target;
+            }
             for (ch, s) in frame.iter_mut().enumerate() {
-                let [l, m, h] = self.split[ch].split(*s as f64);
-                *s = (l * self.gain[0] as f64 + m * self.gain[1] as f64 + h * self.gain[2] as f64) as f32;
+                let x = *s as f64;
+                let [l, m, h] = self.split[ch].split(x);
+                if self.wet > 0.0 {
+                    let eq = l * self.gain[0] as f64 + m * self.gain[1] as f64 + h * self.gain[2] as f64;
+                    *s = (x + self.wet as f64 * (eq - x)) as f32;
+                }
             }
         }
     }
