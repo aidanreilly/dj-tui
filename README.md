@@ -1,120 +1,253 @@
 # dj-tui
 
-A two-deck DJ console for the Linux terminal. Keyboard first, MIDI supported. GPL-3.0-or-later.
+A two-deck DJ console for the Linux terminal. Keyboard first, MIDI controllers supported.
+GPL-3.0-or-later.
 
-## Status
+Two decks with CDJ-style cueing, hot cues, loops and key lock, a three-band isolator mixer with
+filter and effects, colour waveforms drawn as real pixels where the terminal allows it, and
+tempo and key detection that runs as a track loads.
 
-M0 and M1 are done: dj-tui plays real files through JACK.
+## Install
 
-- `engine`: deck transport, CDJ-style main cue with hold-to-preview, eight hot cues, variable
-  rate, two-channel mixer with three crossfader curves and a pre-fader headphone cue bus.
-  The UI talks to it over a lock-free command ring; state comes back as atomics; replaced
-  tracks are freed on the UI thread. A test with a disabled allocator proves `process` never
-  allocates or frees.
-- `loader`: symphonia decoding (WAV, FLAC, MP3, AAC/M4A, OGG Vorbis, AIFF), stereo conversion,
-  rubato resampling to the session rate with delay compensation, signed overview waveform, and a
-  background loader thread.
-- `backend`: a JACK client with `master_L/R` and `cue_L/R` ports, auto or explicit routing
-  to physical outputs, xrun counting. Works with PipeWire through pipewire-jack.
-- `input`, `tui`: the focus-based keymap and the stacked deck layout from the spec.
-- root crate: config, CLI, and the app loop. Without a JACK server it falls back to a silent
-  clock and says so on the status line.
-
-Next up is M2: the second half of the mixer (isolator EQ, filter, trim, meters) and split-mono
-routing for stereo-only cards.
-
-Opus isn't supported: symphonia has no Opus decoder yet.
-
-## Build and run
-
-On Fedora:
+Fedora:
 
 ```sh
 sudo dnf install cargo pipewire-jack-audio-connection-kit-devel
 ```
 
-The devel package is what supplies `jack.pc`. Without it the `jack-sys` build script fails
-outright, since it calls `pkg_config::find_library("jack")` and unwraps the result on Linux.
-Fedora also drops PipeWire's `libjack.so.0` onto the default library path via
-`/etc/ld.so.conf.d/pipewire-jack-x86_64.conf`, so JACK clients find PipeWire on their own and
-the `pw-jack` wrapper is unnecessary. Checked on Fedora 44 against pipewire-jack 1.6.9 and
-cargo 1.98, where `--demo` comes up reading `JACK dj-tui @ 48000 Hz / 1024 frames, xruns 0`.
-
-If you want real JACK2 instead, `jack-audio-connection-kit-devel` replaces the PipeWire devel
-package. The two carry an RPM `Conflicts` on each other and cannot be installed together.
-
-On Debian and Ubuntu:
+Debian and Ubuntu:
 
 ```sh
-sudo apt install libjack-jackd2-dev libasound2-dev pipewire-jack   # or jackd2
+sudo apt install cargo libjack-jackd2-dev libasound2-dev pipewire-jack
 ```
 
-Either way:
+The development package supplies `jack.pc`, which the build needs. Fedora and most PipeWire
+setups put PipeWire's `libjack.so.0` on the library path, so JACK clients find PipeWire on
+their own. If yours does not, run through the wrapper: `pw-jack cargo run -- track.flac`.
+
+For real JACK2 instead of PipeWire, install `jack-audio-connection-kit-devel`, which replaces
+the PipeWire package rather than sitting beside it.
+
+Rust 1.88 or newer.
+
+## Run
 
 ```sh
-cargo run -- ~/Music/one.flac ~/Music/two.mp3
-cargo run -- --demo            # click tracks at 124 and 126 BPM; supplied files take precedence
-cargo run -- --no-audio x.wav  # no sound server needed
+cargo run -- ~/Music/one.flac ~/Music/two.mp3   # deck A, deck B
+cargo run -- --demo                             # click tracks at 124 and 126 BPM
+cargo run -- --no-audio track.flac              # no sound server; the clock runs anyway
+cargo run -- --midi-learn                       # print what a controller sends
 ```
 
-Should your distribution not route JACK clients to PipeWire by itself, go through `pw-jack`:
-`pw-jack cargo run -- track.flac`.
+WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF all play. Opus does not: symphonia has no decoder
+for it yet.
 
-With a stereo-only card, `routing = "split"` sends mono master to output 1 and mono
-headphone cue to output 2, for a Y-splitter cable.
+Without a sound server dj-tui still runs, driving a silent clock, and says so on the status
+line. Everything works except the sound.
 
-Routing lives in `~/.config/dj-tui/config.toml`:
+## The screen
+
+```
+┌ DECK A ─────────────────── 128.00  8A ┐┌ MIXER ──────┐
+│ Artist - Title          01:12  -03:48 ││        A   B │
+│ ▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█ ││ TRIM ███ ███ │
+│          ⟦        ▲1    ▲2            ││ HI   ███ ███ │
+│ [1][2][ ][ ][ ][ ][ ][ ]  PLAYING  BAR 22.3   LOOP  QUANT
+└───────────────────────────────────────┘│ FX    Echo   │
+  PHASE  B ▮▮▮▮▮|▮▮▮▮▮  +0.12 beat       │ WET  ███     │
+┌ DECK B ───────────────────────────────┐│ PK   ▮▮▮▮▯▯▯ │
+│ ...                                   ││ VOL  ███████ │
+└───────────────────────────────────────┘└──────────────┘
+┌ BROWSER ──────────────────────────────────────────────┐
+│ Loaded Artist - Title on deck A                       │
+│ JACK dj-tui @ 48000 Hz / 256 frames, xruns 0  |  ...  │
+└───────────────────────────────────────────────────────┘
+```
+
+Each deck shows its title, BPM at the current tempo fader setting, musical key in Camelot
+notation, elapsed and remaining time, and the overview waveform. Under the waveform sit the
+markers: `▲` for the main cue and each hot cue in its own colour, `⟦ ⟧` around a loop. The row
+below has the hot cue pads, the transport state, the bar and beat counter, and flags for
+`LOOP`, `QUANT` and `KEY`. In the last thirty seconds of a track the unplayed part of the
+waveform flashes red.
+
+The phase meter between the decks shows how far deck B's beat sits from deck A's, so you can
+see a mix drifting before you hear it.
+
+The mixer strip carries trim, the three-band isolator, the filter, the effect in the slot with
+its wet level, peak meters, channel faders, headphone cue and the crossfader.
+
+Press `?` for the key list at any time.
+
+## Keys
+
+Keys act on the **focused deck**, which `Tab` switches. Backtick sends the next key to the
+other deck without moving focus, so dropping the bass on B while A stays focused is `` ` ``
+then `u`. Lowercase turns a control down, Shift turns it up.
+
+### Transport
+
+| Key | What it does |
+|---|---|
+| `Space` | Play or pause |
+| `c` | Cue. Hold to preview from the cue point, release to snap back |
+| `1`–`8` | Hot cue: jump to it, or set it if the pad is empty |
+| `Alt+1`–`8` | Clear a hot cue |
+| `g` then `0`–`9` | Seek to a tenth of the track |
+| `-` / `+` | Tempo down and up, `Alt` for a fine step |
+| `,` / `.` | Nudge the playhead back and forward, for beatmatching by ear |
+| `s` | Sync: first press matches the other deck's tempo, second lines the beats up |
+| `k` | Key lock: hold the pitch while the tempo fader moves |
+| `q` | Quantize: snap loops and jumps to the beat grid |
+
+Holding `c` to preview needs a terminal that reports key releases (kitty, foot, WezTerm,
+recent Alacritty). Elsewhere cue works as a press, and the status line says so.
+
+### Loops
+
+| Key | What it does |
+|---|---|
+| `l` | Four-beat loop on and off |
+| `i` / `I` | Mark the loop in point, then close the loop where the playhead is |
+| `[` / `]` | Halve and double the loop, keeping the in point |
+| `<` / `>` | Beat jump back and forward by the loop length |
+
+A loop marked by hand needs no beat grid, so it works on anything. The running loop is saved
+with the track and comes back the next time you load it.
+
+### Mixer
+
+| Key | What it does |
+|---|---|
+| `v` / `V` | Channel fader |
+| `←` / `→` | Crossfader, `Shift` snaps it to the end |
+| `r` / `R` | Trim |
+| `t` / `T`, `y` / `Y`, `u` / `U` | EQ high, mid, low |
+| `Alt+t`, `Alt+y`, `Alt+u` | Kill a band |
+| `o` / `O` | Filter toward low-pass and high-pass |
+| `m` | Headphone cue on this channel |
+
+### Effects
+
+| Key | What it does |
+|---|---|
+| `f` | Effect on and off |
+| `F` | Next effect: Echo, Flanger, Reverb, Bitcrusher |
+| `9` / `0` | Wet down and up |
+| `p` / `P` | First knob: echo time, flanger sweep, reverb size, crusher bit depth |
+| `d` / `D` | Second knob: echo feedback, flanger depth, reverb damping, crusher rate |
+
+Echo and flanger take their timing from the track's beat grid and follow the tempo fader.
+Echo and reverb keep ringing after you switch them off, rather than cutting dead.
+
+### Everything else
+
+| Key | What it does |
+|---|---|
+| `Tab` | Switch focused deck |
+| `` ` `` | Send the next key to the other deck |
+| `w` | Waveform colour mode: 3-Band, RGB, Blue |
+| Left click on a waveform | Seek there |
+| `?` | Key list |
+| `Ctrl+Q` | Quit |
+
+## Waveforms
+
+Three colour modes, cycled with `w`:
+
+- **3-Band** — blue lows, amber mids, white highs layered as on a CDJ-3000.
+- **RGB** — one blended colour per column: red lows, green mids, blue highs.
+- **Blue** — a single blue waveform that brightens toward white as the highs rise.
+
+In Ghostty, kitty and WezTerm the overviews are drawn as real pixel images through the kitty
+graphics protocol. Inside tmux, screen or zellij, in terminals without it, or with
+`graphics = "off"`, they are drawn with block characters instead, in the same colours.
+
+## Track data
+
+Analysis, the waveform and your cues are saved beside the audio as `<file name>.dj-tui.json`,
+so they load instantly the second time and travel with the music if you move your library.
+Editing or replacing the audio file invalidates them, and the track is analysed again.
+
+## Configuration
+
+`~/.config/dj-tui/config.toml`, every key optional:
 
 ```toml
 [audio]
-routing = "explicit"            # "auto" (default), "off", "split" or "explicit"
+client_name = "dj-tui"
+routing = "auto"                # "auto", "off", "split" or "explicit"
 master_ports = ["system:playback_1", "system:playback_2"]
 cue_ports    = ["system:playback_3", "system:playback_4"]
+
+[ui]
+waveform_mode = "3band"         # "3band", "rgb" or "blue"
+end_warning_secs = 30           # red flash before the end of a track; 0 turns it off
+graphics = "auto"               # "auto" or "off" to force block characters
+
+[deck]
+tempo_range = 8                 # fader range in percent: 8, 16 or 50
+
+[mixer]
+crossfader_curve = "constant-power"   # "linear", "constant-power" or "cut"
+
+[midi]
+enabled = true
+soft_takeover = true
+mappings = []                   # empty loads every mapping file found
 ```
 
-Rust 1.88 or newer; Fedora 44's `cargo` package is well past that at 1.98.
+With a stereo-only card, `routing = "split"` sends mono master to output 1 and mono headphone
+cue to output 2, for a Y-splitter cable.
 
-In Ghostty, kitty and WezTerm the deck overviews are drawn as real pixel images through the
-kitty graphics protocol. Inside tmux, screen or zellij, in terminals without it, or with
-`[ui] graphics = "off"`, dj-tui draws them with block characters instead.
+## MIDI controllers
 
-On terminals that support the kitty keyboard protocol (kitty, foot, WezTerm, recent Alacritty),
-holding `c` previews from the cue point. Elsewhere cue works as a press.
-Startup can pause for up to two seconds on terminals that don't answer the protocol query.
+Mappings are TOML files in `~/.config/dj-tui/mappings/`. Every file there is loaded unless
+`[midi] mappings` names particular ones, and a mapping only connects to ports whose names it
+lists. Controllers plugged in while dj-tui is running are picked up within a couple of seconds.
 
-## Development: tests first
+Copy `mappings/generic.toml` from this repository as a starting point, then find out what your
+hardware sends:
 
-Every behaviour lands as a failing test before the code that makes it pass. The commit history
-follows red, green, refactor per feature. Conventions:
+```sh
+cargo run -- --midi-learn
+```
 
-- Behaviour tests live in each crate's `tests/` directory and use only the public API.
-- The engine never touches I/O, so DSP is tested by rendering into buffers and asserting on samples.
-- TUI widgets are tested by rendering into ratatui's `TestBackend` and asserting on cells,
-  including style modifiers.
-- Anything that talks to hardware sits behind a trait with an in-memory implementation for tests.
+Press a control and it prints the address to put in the file, along with a line to paste:
+
+```toml
+[[buttons]]
+input = "note 0 11"
+action = "play a"
+
+[[knobs]]
+input = "cc 0 19"
+control = "fader a"
+
+[[encoders]]
+input = "cc 0 31"
+action = "beatjump a"
+
+[[leds]]
+output = "note 0 11"
+state = "playing a"
+```
+
+Buttons and encoders name an action the way the keyboard produces it: `play a`, `cue b`,
+`hotcue a 3`, `loop a`, `fx-next b`, `eq a low up`. Add `hold = true` to a cue button so it
+previews while held. Knobs name a control they set outright: `fader a`, `crossfader`,
+`eq b mid`, `filter a`, `tempo a`, `fx wet a`, `fx param a 1`. Lights follow `playing a`,
+`cued a`, `loop a`, `fx a`, `sync a`, `keylock a`, `quantize a` or `hotcue a 1`.
+
+Knobs wait for soft takeover: a fader that is not where the screen says it is stays quiet
+until it reaches that value, so it cannot slam the sound when you first touch it. Set
+`soft_takeover = false` if your controller is already in position.
+
+## Building and testing
 
 ```sh
 cargo test --workspace
-
-# JACK integration test, against a throwaway dummy server:
-jackd -n test -d dummy -r 48000 -p 256 -P 4 -C 0 &
-JACK_DEFAULT_SERVER=test DJ_TUI_JACK_TESTS=1 cargo test -p backend --test jack_dummy
+cargo run --release --example stretch_cost     # what key lock costs the audio thread
 ```
 
-`jackd` lives in `jack-audio-connection-kit` on Fedora, which installs alongside pipewire-jack
-without complaint. Its `libjack.so.0` and PipeWire's both end up in the loader cache, so a client
-may still land on PipeWire rather than your dummy server; that combination is untested. The test
-itself is a no-op unless `DJ_TUI_JACK_TESTS=1` is set.
-
-## Layout
-
-```
-crates/engine   deck, mixer, track buffer, realtime command channel (no I/O)
-crates/loader   decoding, resampling, waveform analysis, background loader thread
-crates/backend  JACK client, port routing, planar output
-crates/input    Action enum and keymap; MIDI mapping arrives in M9
-crates/tui      layout, widgets, waveform rasteriser
-src/            config, action application, view building, main loop
-```
-
-See `docs/spec.md` for the full specification and plan.
+`docs/spec.md` has the full specification.
