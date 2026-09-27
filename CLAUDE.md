@@ -1,11 +1,14 @@
 # Working on dj-tui
 
-Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
-detection in `crates/analysis`, running on load. From M5 there are loops, beat jump and quantize, and
-cues persist through the track sidecar rather than the SQLite store the spec describes. M6 has all four effects
-with their keys and knobs, and M7 has sync, nudge and key lock. M9 has mappings, soft
-takeover, LED feedback and hotplug through JACK MIDI. Still missing: M8, and M10's raw ALSA
-backend and device setup screen. Jog scratching and two-card output are out of scope.
+Spec and milestone plan: `docs/spec.md`. M0 through M3 are done, and M4 analyses tempo and key
+on load in `crates/analysis`. M5 brought loops, beat jump and quantize, with cues kept in the
+track sidecar rather than the SQLite store the spec describes. M6 has all four effects with
+their keys and knobs, M7 has sync, nudge and key lock, and M9 has mappings, soft takeover, LED
+feedback and hotplug through JACK MIDI.
+
+Still missing: M8, and M10's raw ALSA backend and device setup screen. Out of scope, so not
+worth proposing again: jog scratching, two-card output, SysEx handshakes in mappings, and the
+hour-long stress run.
 
 ## Rules
 
