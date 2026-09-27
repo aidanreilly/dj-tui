@@ -448,6 +448,22 @@ fn the_effect_knobs_report_what_they_do_in_the_unit_they_are_turning() {
 }
 
 #[test]
+fn a_controller_drives_the_same_actions_the_keys_do() {
+    use input::Action;
+    use midi::Control;
+    let (mut app, mut p) = setup();
+    assert!(!app.on_action(Action::CycleWaveformMode));
+    assert!(app.message().contains("Waveform"), "{}", app.message());
+
+    app.set_control(Control::Fader(DeckId::B), 0.25);
+    process(&mut p, 16);
+    assert!((app.snapshot().faders[1] - 0.25).abs() < 1e-6);
+    assert_eq!(app.control_value(Control::Fader(DeckId::B)), 0.25);
+
+    assert!(app.on_action(Action::Quit), "quit still quits");
+}
+
+#[test]
 fn key_lock_reports_itself_and_shows_in_the_deck_view() {
     let (mut app, _p) = setup();
     app.on_key(KeyEvent::press(Key::Char('k')));

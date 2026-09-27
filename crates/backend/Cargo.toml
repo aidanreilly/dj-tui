@@ -8,3 +8,4 @@ rust-version.workspace = true
 [dependencies]
 engine = { path = "../engine" }
 jack = "0.13"
+rtrb = "0.3"

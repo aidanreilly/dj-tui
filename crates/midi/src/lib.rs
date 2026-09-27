@@ -101,7 +101,99 @@ struct Encoder {
 #[derive(Debug)]
 struct Led {
     address: Address,
-    state: String,
+    state: LedState,
+}
+
+/// Something on a deck a light can follow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LedState {
+    Playing(DeckId),
+    /// Sitting on the main cue, paused.
+    Cued(DeckId),
+    Loop(DeckId),
+    Fx(DeckId),
+    Sync(DeckId),
+    KeyLock(DeckId),
+    Quantize(DeckId),
+    HotCue(DeckId, usize),
+}
+
+impl LedState {
+    pub fn parse(text: &str) -> Option<LedState> {
+        let lower = text.to_ascii_lowercase();
+        let words: Vec<&str> = lower.split_whitespace().collect();
+        let deck = |w: &str| match w {
+            "a" => Some(DeckId::A),
+            "b" => Some(DeckId::B),
+            _ => None,
+        };
+        Some(match words.as_slice() {
+            ["playing", d] => LedState::Playing(deck(d)?),
+            ["cued", d] => LedState::Cued(deck(d)?),
+            ["loop", d] => LedState::Loop(deck(d)?),
+            ["fx", d] => LedState::Fx(deck(d)?),
+            ["sync", d] => LedState::Sync(deck(d)?),
+            ["keylock", d] => LedState::KeyLock(deck(d)?),
+            ["quantize", d] => LedState::Quantize(deck(d)?),
+            ["hotcue", d, pad] => {
+                let n: usize = pad.parse().ok()?;
+                LedState::HotCue(
+                    deck(d)?,
+                    (1..=engine::HOT_CUES).contains(&n).then(|| n - 1)?,
+                )
+            }
+            _ => return None,
+        })
+    }
+}
+
+/// Keeps the controller's lights in step with the app, sending only what changed.
+pub struct Feedback {
+    lights: Vec<(Address, LedState, Option<bool>)>,
+}
+
+impl Feedback {
+    pub fn new(mapping: &Mapping) -> Feedback {
+        Feedback {
+            lights: mapping
+                .leds()
+                .map(|(address, state)| (address, state, None))
+                .collect(),
+        }
+    }
+
+    /// Ask `on` about each light and return the messages for the ones that moved.
+    pub fn update(&mut self, on: impl Fn(LedState) -> bool) -> Vec<Message> {
+        let mut out = Vec::new();
+        for (address, state, last) in &mut self.lights {
+            let lit = on(*state);
+            if *last == Some(lit) {
+                continue;
+            }
+            *last = Some(lit);
+            let value = if lit { 127 } else { 0 };
+            out.push(match *address {
+                Address::Note { channel, note } => Message::NoteOn {
+                    channel,
+                    note,
+                    velocity: value,
+                },
+                Address::Cc {
+                    channel,
+                    controller,
+                } => Message::Cc {
+                    channel,
+                    controller,
+                    value,
+                },
+                Address::PitchBend { channel } => Message::PitchBend {
+                    channel,
+                    value: if lit { 16_383 } else { 0 },
+                },
+            });
+        }
+        out
+    }
 }
 
 /// One controller's mapping.
@@ -205,7 +297,8 @@ impl Mapping {
         for l in raw.leds {
             mapping.leds.push(Led {
                 address: Address::parse(&l.output)?,
-                state: l.state,
+                state: LedState::parse(&l.state)
+                    .ok_or_else(|| format!("{:?} is not a state a light can follow", l.state))?,
             });
         }
         Ok(mapping)
@@ -213,6 +306,11 @@ impl Mapping {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Port names this mapping wants, as substrings.
+    pub fn ports(&self) -> &[String] {
+        &self.ports
     }
 
     /// True when this mapping is for the named port.
@@ -297,8 +395,8 @@ impl Mapping {
     }
 
     /// Addresses this mapping lights up, with the state each one follows.
-    pub fn leds(&self) -> impl Iterator<Item = (Address, &str)> {
-        self.leds.iter().map(|l| (l.address, l.state.as_str()))
+    pub fn leds(&self) -> impl Iterator<Item = (Address, LedState)> + '_ {
+        self.leds.iter().map(|l| (l.address, l.state))
     }
 }
 

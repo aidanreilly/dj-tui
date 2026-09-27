@@ -3,7 +3,9 @@
 Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
 detection in `crates/analysis`, running on load. From M5 there are loops, beat jump and quantize, and
 cues persist through the track sidecar rather than the SQLite store the spec describes. M6 has all four effects
-with their keys and knobs, and M7 has sync, nudge and key lock. Still missing: M8 onwards.
+with their keys and knobs, and M7 has sync, nudge and key lock. M9 has mappings, soft
+takeover, LED feedback and hotplug through JACK MIDI. Still missing: M8, jog scratching, and
+M10.
 
 ## Rules
 
@@ -65,6 +67,19 @@ the fader's rate, so position, loops and cues behave the same either way, and on
 changes. It runs only with key lock on and a rate away from one, which is why `k` at normal
 speed is bit-identical to no key lock at all. `cargo run --release --example stretch_cost`
 prints what it costs: around 2.5 % of real time per deck.
+
+## Controllers
+
+`crates/midi` is the mapping layer and touches no hardware: TOML in, `Action`s and absolute
+`Control` moves out, which is why it is tested from strings. `src/controller.rs` joins it to
+the app, and `crates/backend` owns the JACK MIDI ports at both ends. MIDI goes through JACK
+rather than ALSA sequencer directly, which adds no dependency and picks up ALSA devices
+through PipeWire anyway; `Running::connect_midi` rescans every two seconds, which is hotplug.
+
+Knobs wait for soft takeover, so `controller.sync(&app)` has to run each frame to tell the
+mapping where the UI holds each control. Lights are sent only on change. Mappings live in
+`mappings/` beside the config file, and `mappings/generic.toml` in the repo is the starting
+point to copy.
 
 ## Track sidecar
 

@@ -141,3 +141,19 @@ fn split_routing_mode() {
     let c = Config::from_toml("[audio]\nrouting = \"split\"").unwrap();
     assert_eq!(c.routing().unwrap(), backend::Routing::Split);
 }
+
+#[test]
+fn midi_defaults_to_on_with_soft_takeover() {
+    let c = Config::default();
+    assert!(c.midi.enabled);
+    assert!(c.midi.soft_takeover);
+    assert!(c.midi.mappings.is_empty(), "every mapping found is loaded");
+
+    let c = Config::from_toml("[midi]\nenabled = false\nmappings = [\"ddj.toml\"]").unwrap();
+    assert!(!c.midi.enabled);
+    assert_eq!(c.midi.mappings, vec!["ddj.toml".to_string()]);
+    assert!(
+        Config::from_toml("[midi]\nwobble = 1").is_err(),
+        "typos are caught"
+    );
+}

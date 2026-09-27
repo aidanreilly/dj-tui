@@ -1,0 +1,228 @@
+# A two-deck controller with the layout most of them share. Copy this into
+# $XDG_CONFIG_HOME/dj-tui/mappings/ and change the numbers to match your hardware:
+# run dj-tui with a controller connected and the message line names what it sends.
+#
+# Deck A is on MIDI channel 0 and deck B on channel 1, which is how most units are laid out.
+
+name = "Generic 2-deck"
+ports = ["Controller", "DJ"]
+
+# --- Transport ---
+
+[[buttons]]
+input = "note 0 11"
+action = "play a"
+
+[[buttons]]
+input = "note 1 11"
+action = "play b"
+
+[[buttons]]
+input = "note 0 12"
+action = "cue a"
+hold = true
+
+[[buttons]]
+input = "note 1 12"
+action = "cue b"
+hold = true
+
+[[buttons]]
+input = "note 0 13"
+action = "sync a"
+
+[[buttons]]
+input = "note 1 13"
+action = "sync b"
+
+[[buttons]]
+input = "note 0 14"
+action = "keylock a"
+
+[[buttons]]
+input = "note 1 14"
+action = "keylock b"
+
+# --- Hot cues: eight pads a deck ---
+
+[[buttons]]
+input = "note 0 20"
+action = "hotcue a 1"
+
+[[buttons]]
+input = "note 0 21"
+action = "hotcue a 2"
+
+[[buttons]]
+input = "note 0 22"
+action = "hotcue a 3"
+
+[[buttons]]
+input = "note 0 23"
+action = "hotcue a 4"
+
+[[buttons]]
+input = "note 1 20"
+action = "hotcue b 1"
+
+[[buttons]]
+input = "note 1 21"
+action = "hotcue b 2"
+
+[[buttons]]
+input = "note 1 22"
+action = "hotcue b 3"
+
+[[buttons]]
+input = "note 1 23"
+action = "hotcue b 4"
+
+# --- Loops ---
+
+[[buttons]]
+input = "note 0 30"
+action = "loop a"
+
+[[buttons]]
+input = "note 1 30"
+action = "loop b"
+
+[[encoders]]
+input = "cc 0 31"
+action = "beatjump a"
+
+[[encoders]]
+input = "cc 1 31"
+action = "beatjump b"
+
+# --- Jog wheels, which nudge the playhead like a pitch bend ---
+
+[[encoders]]
+input = "cc 0 34"
+action = "nudge a"
+
+[[encoders]]
+input = "cc 1 34"
+action = "nudge b"
+
+# --- Mixer ---
+
+[[knobs]]
+input = "cc 0 19"
+control = "fader a"
+
+[[knobs]]
+input = "cc 1 19"
+control = "fader b"
+
+[[knobs]]
+input = "cc 0 8"
+control = "crossfader"
+
+[[knobs]]
+input = "cc 0 7"
+control = "eq a high"
+
+[[knobs]]
+input = "cc 0 6"
+control = "eq a mid"
+
+[[knobs]]
+input = "cc 0 5"
+control = "eq a low"
+
+[[knobs]]
+input = "cc 1 7"
+control = "eq b high"
+
+[[knobs]]
+input = "cc 1 6"
+control = "eq b mid"
+
+[[knobs]]
+input = "cc 1 5"
+control = "eq b low"
+
+[[knobs]]
+input = "cc 0 4"
+control = "filter a"
+
+[[knobs]]
+input = "cc 1 4"
+control = "filter b"
+
+[[knobs]]
+input = "pitchbend 0"
+control = "tempo a"
+
+[[knobs]]
+input = "pitchbend 1"
+control = "tempo b"
+
+# --- Effects ---
+
+[[buttons]]
+input = "note 0 40"
+action = "fx a"
+
+[[buttons]]
+input = "note 1 40"
+action = "fx b"
+
+[[buttons]]
+input = "note 0 41"
+action = "fx-next a"
+
+[[buttons]]
+input = "note 1 41"
+action = "fx-next b"
+
+[[knobs]]
+input = "cc 0 42"
+control = "fx wet a"
+
+[[knobs]]
+input = "cc 1 42"
+control = "fx wet b"
+
+[[knobs]]
+input = "cc 0 43"
+control = "fx param a 1"
+
+[[knobs]]
+input = "cc 1 43"
+control = "fx param b 1"
+
+# --- Lights ---
+
+[[leds]]
+output = "note 0 11"
+state = "playing a"
+
+[[leds]]
+output = "note 1 11"
+state = "playing b"
+
+[[leds]]
+output = "note 0 13"
+state = "sync a"
+
+[[leds]]
+output = "note 1 13"
+state = "sync b"
+
+[[leds]]
+output = "note 0 30"
+state = "loop a"
+
+[[leds]]
+output = "note 1 30"
+state = "loop b"
+
+[[leds]]
+output = "note 0 40"
+state = "fx a"
+
+[[leds]]
+output = "note 1 40"
+state = "fx b"

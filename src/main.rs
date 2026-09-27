@@ -28,6 +28,8 @@ use std::{
 
 const FRAME: Duration = Duration::from_millis(33);
 const COMMAND_QUEUE: usize = 256;
+/// How often to look for controllers that have been plugged in since the last look.
+const MIDI_SCAN: Duration = Duration::from_secs(2);
 
 fn load_config() -> Result<Config, String> {
     let path = config_path(
@@ -125,7 +127,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let (mut app, mut audio, notes) = match start_audio(&config, args.no_audio) {
+    let (mut app, mut audio, mut notes) = match start_audio(&config, args.no_audio) {
         Ok(x) => x,
         Err(e) => {
             eprintln!("dj-tui: audio: {e}");
@@ -156,6 +158,30 @@ fn main() -> ExitCode {
     for (path, deck) in args.files.into_iter().zip([DeckId::A, DeckId::B]) {
         app.load_path(deck, path);
     }
+
+    // Controllers: mappings come from `mappings/` beside the config file.
+    let mapping_dir = config_path(
+        std::env::var("XDG_CONFIG_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+    )
+    .and_then(|p| p.parent().map(|d| d.join("mappings")));
+    let (mut controllers, midi_problems) =
+        dj_tui::controller::load_mappings(&config.midi, mapping_dir.as_deref());
+    for problem in midi_problems {
+        notes.push(format!("MIDI mapping: {problem}"));
+    }
+    if !controllers.is_empty() {
+        notes.push(format!(
+            "MIDI mappings loaded: {}",
+            controllers
+                .iter()
+                .map(|c| c.name().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    let midi_ports: Vec<String> = controllers.iter().flat_map(|c| c.wanted_ports()).collect();
+    let mut midi_scan = Instant::now();
 
     let mut terminal = ratatui::init();
     let mouse_capture = execute!(stdout(), EnableMouseCapture).is_ok();
@@ -218,6 +244,30 @@ fn main() -> ExitCode {
                         }
                     }
                     _ => {}
+                }
+            }
+            if let Audio::Jack(running) = &mut audio {
+                if !controllers.is_empty() {
+                    // Rescanning every couple of seconds is what makes hotplug work.
+                    if midi_scan.elapsed() > MIDI_SCAN {
+                        for port in running.connect_midi(&midi_ports) {
+                            app.note(format!("Controller connected: {port}"));
+                        }
+                        midi_scan = Instant::now();
+                    }
+                    for bytes in running.take_midi() {
+                        for controller in &mut controllers {
+                            if controller.handle(&mut app, bytes) {
+                                return Ok(());
+                            }
+                        }
+                    }
+                    for controller in &mut controllers {
+                        controller.sync(&app);
+                        for message in controller.lights(&app) {
+                            running.send_midi(message.to_bytes());
+                        }
+                    }
                 }
             }
             app.tick();

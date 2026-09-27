@@ -310,6 +310,51 @@ impl App {
         let Some(action) = self.keymap.handle(key) else {
             return false;
         };
+        self.on_action(action)
+    }
+
+    /// Put a control where a MIDI fader or knob says it is.
+    pub fn set_control(&mut self, control: midi::Control, value: f32) {
+        if let Some(cmd) =
+            crate::apply::set_control(&mut self.state, &self.controls, control, value)
+        {
+            self.send(cmd);
+        }
+    }
+
+    pub fn fx_on(&self, deck: DeckId) -> bool {
+        self.state.fx[deck.index()].on
+    }
+
+    pub fn key_lock(&self, deck: DeckId) -> bool {
+        self.state.key_lock[deck.index()]
+    }
+
+    pub fn quantize(&self, deck: DeckId) -> bool {
+        self.state.quantize[deck.index()]
+    }
+
+    /// True when this deck is playing at the same beat length as the other one, which is what
+    /// a sync light on a controller follows.
+    pub fn tempo_matches_other_deck(&self, deck: DeckId) -> bool {
+        let (i, other) = (deck.index(), 1 - deck.index());
+        let (Some(mine), Some(theirs)) = (self.state.beat_frames[i], self.state.beat_frames[other])
+        else {
+            return false;
+        };
+        let played = |beat: f64, rate: f64| beat / rate;
+        let a = played(mine, self.state.rates[i]);
+        let b = played(theirs, self.state.rates[other]);
+        (a - b).abs() < a * 1e-3
+    }
+
+    /// Where the UI holds a control, from 0 to 1, for a controller's soft takeover.
+    pub fn control_value(&self, control: midi::Control) -> f32 {
+        crate::apply::control_value(&self.state, &self.controls, control)
+    }
+
+    /// Handle one action, whichever input produced it. Returns true when the user asked to quit.
+    pub fn on_action(&mut self, action: Action) -> bool {
         match action {
             Action::Quit => return true,
             Action::CycleWaveformMode => {
@@ -350,6 +395,11 @@ impl App {
 
     pub fn snapshot(&self) -> Snapshot {
         self.handle.snapshot()
+    }
+
+    /// Put a line in the message area, for something the app did not do itself.
+    pub fn note(&mut self, text: String) {
+        self.message = text;
     }
 
     pub fn message(&self) -> &str {

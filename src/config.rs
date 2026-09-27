@@ -42,6 +42,30 @@ pub struct Config {
     pub ui: Ui,
     pub deck: Deck,
     pub mixer: Mixer,
+    pub midi: Midi,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Midi {
+    /// Connect to controllers at all.
+    pub enabled: bool,
+    /// Mapping files to load. Relative paths are read from the `mappings` directory beside
+    /// this config file; with none listed, every mapping there is loaded.
+    pub mappings: Vec<String>,
+    /// Trust the controller's knob positions from the start instead of waiting for each one
+    /// to catch up with the value on screen.
+    pub soft_takeover: bool,
+}
+
+impl Default for Midi {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            mappings: Vec::new(),
+            soft_takeover: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
