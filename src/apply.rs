@@ -13,6 +13,8 @@ use input::{Action, Dir};
 #[derive(Debug, Clone)]
 pub struct Controls {
     pub tempo_range: f64,
+    /// Frames one nudge shifts the playhead by.
+    pub nudge_frames: f64,
     pub tempo_step: f64,
     pub tempo_fine_step: f64,
     pub crossfader_step: f32,
@@ -20,10 +22,12 @@ pub struct Controls {
 }
 
 impl Controls {
-    /// `tempo_range_percent` is the configured fader range (8, 16 or 50).
-    pub fn new(tempo_range_percent: u8) -> Self {
+    /// `tempo_range_percent` is the configured fader range (8, 16 or 50), `sample_rate` the
+    /// session rate, which is what a nudge in milliseconds has to be measured against.
+    pub fn new(tempo_range_percent: u8, sample_rate: u32) -> Self {
         Self {
             tempo_range: tempo_range_percent as f64 / 100.0,
+            nudge_frames: sample_rate as f64 * NUDGE_SECS,
             tempo_step: 0.005,
             tempo_fine_step: 0.0005,
             crossfader_step: 0.1,
@@ -75,6 +79,8 @@ pub const EQ_STEP_DB: f32 = 2.0;
 pub const EQ_FLOOR_DB: f32 = -26.0;
 pub const FILTER_STEP: f32 = 0.1;
 pub const FX_WET_STEP: f32 = 0.1;
+/// How far one nudge moves the playhead. Small enough to beatmatch by ear.
+pub const NUDGE_SECS: f64 = 0.01;
 /// A bar in 4/4, the length a CDJ's loop key reaches for.
 pub const DEFAULT_LOOP_BEATS: f64 = 4.0;
 pub const MIN_LOOP_BEATS: f64 = 0.125;
@@ -274,6 +280,39 @@ pub fn apply(
             let fx = &mut st.fx[d.index()];
             fx.wet = step(fx.wet, FX_WET_STEP * sign(dir), 0.0, 1.0);
             Command::SetFxWet(d, fx.wet)
+        }
+        Nudge(d, dir) => {
+            let i = d.index();
+            let frames = snap.decks[i].track_frames as f64;
+            let to = snap.decks[i].position + c.nudge_frames * sign(dir) as f64;
+            Command::Seek(d, to.clamp(0.0, frames))
+        }
+        Sync(d) => {
+            let (i, other) = (d.index(), 1 - d.index());
+            let (mine, theirs) = (st.beat_frames[i]?, st.beat_frames[other]?);
+            // Match the beat length the other deck is playing at, not the one it was cut at.
+            let played = theirs / st.rates[other];
+            let want = (mine / played).clamp(1.0 - c.tempo_range, 1.0 + c.tempo_range);
+            if (st.rates[i] - want).abs() > 1e-9 {
+                st.rates[i] = want;
+                return Some(Command::SetRate(d, want));
+            }
+            // Tempo already matches, so this press lines the beats up.
+            let phase = |deck: usize, beat: f64| {
+                ((snap.decks[deck].position - st.first_beat_frames[deck]) / beat).rem_euclid(1.0)
+            };
+            let mut shift = phase(other, theirs) - phase(i, mine);
+            // Take whichever way round is nearer, so the playhead never jumps a whole beat.
+            if shift > 0.5 {
+                shift -= 1.0;
+            } else if shift < -0.5 {
+                shift += 1.0;
+            }
+            let frames = snap.decks[i].track_frames as f64;
+            Command::Seek(
+                d,
+                (snap.decks[i].position + shift * mine).clamp(0.0, frames),
+            )
         }
         Quantize(d) => {
             let q = &mut st.quantize[d.index()];

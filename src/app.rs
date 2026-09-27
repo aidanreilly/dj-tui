@@ -47,7 +47,7 @@ impl App {
     pub fn new(handle: EngineHandle, config: &Config, sample_rate: u32) -> Self {
         let mut app = Self {
             handle,
-            controls: Controls::new(config.deck.tempo_range),
+            controls: Controls::new(config.deck.tempo_range, sample_rate),
             state: ControlState::default(),
             keymap: Keymap::new(),
             metas: Default::default(),
@@ -249,6 +249,26 @@ impl App {
         };
     }
 
+    /// Report what the sync key did. Matching tempo and lining the beats up are separate
+    /// presses, and a deck with no grid can do neither.
+    fn note_sync_key(&mut self, action: Action, cmd: Option<&Command>) {
+        let Action::Sync(d) = action else { return };
+        let letter = deck_letter(d);
+        self.message = match cmd {
+            None => format!("Deck {letter} needs a beat grid on both decks to sync"),
+            Some(Command::SetRate(_, _)) => {
+                let bpm = self.metas[d.index()]
+                    .bpm
+                    .map(|b| b * self.state.rates[d.index()]);
+                match bpm {
+                    Some(bpm) => format!("Sync: deck {letter} at {bpm:.2} BPM"),
+                    None => format!("Sync: deck {letter} matched"),
+                }
+            }
+            Some(_) => format!("Sync: deck {letter} beats lined up"),
+        };
+    }
+
     /// Report what the effect keys did, since an effect at zero wet makes no sound yet.
     fn note_fx_keys(&mut self, action: Action) {
         let (Action::FxToggle(d) | Action::FxNext(d) | Action::FxWet(d, _)) = action else {
@@ -285,6 +305,7 @@ impl App {
                 let cmd = apply(&mut self.state, &self.controls, &snap, action);
                 self.note_loop_keys(action, cmd.as_ref());
                 self.note_fx_keys(action);
+                self.note_sync_key(action, cmd.as_ref());
                 if let Some(cmd) = cmd {
                     self.send(cmd);
                 }

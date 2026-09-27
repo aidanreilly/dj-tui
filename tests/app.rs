@@ -382,6 +382,62 @@ fn a_loop_left_running_is_saved_beside_the_file_and_comes_back() {
 }
 
 #[test]
+fn sync_pulls_the_focused_deck_to_the_other_ones_tempo() {
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = (dir.path().join("a.wav"), dir.path().join("b.wav"));
+    write_wav(
+        &a,
+        &stereo(&click_track(120.0, 20.0)),
+        2,
+        RATE,
+        Fmt::Float32,
+    );
+    write_wav(
+        &b,
+        &stereo(&click_track(126.0, 20.0)),
+        2,
+        RATE,
+        Fmt::Float32,
+    );
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, a);
+    app.load_path(DeckId::B, b);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    wait_for_load(&mut app, &mut p, DeckId::B);
+
+    let before = app.view(String::new()).decks[0].bpm.unwrap();
+    assert!(
+        (before - 120.0).abs() < 0.5,
+        "deck A starts at its own tempo"
+    );
+    app.on_key(KeyEvent::press(Key::Char('s')));
+    process(&mut p, 16);
+    let after = app.view(String::new()).decks[0].bpm.unwrap();
+    assert!(
+        (after - 126.0).abs() < 0.5,
+        "deck A now runs at deck B's tempo: {after}"
+    );
+    assert!(app.message().contains("Sync"), "{}", app.message());
+}
+
+#[test]
+fn sync_without_a_grid_says_so() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("flat.wav");
+    // Steady tone: nothing for the tempo detector to lock onto.
+    write_wav(&path, &stereo(&[0.3; 96_000]), 2, RATE, Fmt::Pcm16);
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    app.on_key(KeyEvent::press(Key::Char('s')));
+    assert!(
+        app.message().contains("grid"),
+        "it says why nothing happened: {}",
+        app.message()
+    );
+}
+
+#[test]
 fn quantize_reports_itself_and_shows_in_the_deck_view() {
     let (mut app, _p) = setup();
     app.on_key(KeyEvent::press(Key::Char('q')));
