@@ -344,3 +344,103 @@ fn the_reverb_rings_out_after_it_is_switched_off() {
     }
     assert!(!fx.is_ringing(), "quiet in the end after {blocks} blocks");
 }
+
+#[test]
+fn the_two_knobs_start_where_the_defaults_are() {
+    let fx = FxSlot::new(FS);
+    assert_eq!(fx.param(0), 0.5);
+    assert_eq!(fx.param(1), 0.5);
+    assert_eq!(fx.param(9), 0.0, "there are only two");
+}
+
+#[test]
+fn the_first_knob_sets_the_echo_time_in_beats() {
+    let time = |p: f32| {
+        let mut fx = slot(FxKind::Echo, 1.0);
+        fx.set_param(0, p);
+        settle(&mut fx);
+        let mut buf = impulse(4 * BEAT as usize);
+        fx.process(&mut buf);
+        let out = left(&buf);
+        // First repeat after the dry hit.
+        out.iter()
+            .enumerate()
+            .skip(100)
+            .find(|(_, v)| v.abs() > 0.5)
+            .map(|(i, _)| i as f64 / BEAT as f64)
+            .expect("a repeat")
+    };
+    assert!((time(0.5) - ECHO_BEATS).abs() < 0.01, "{}", time(0.5));
+    assert!(time(0.0) < time(0.5), "left is shorter: {}", time(0.0));
+    assert!(time(1.0) > time(0.5), "right is longer: {}", time(1.0));
+    assert!((time(0.0) - 0.125).abs() < 0.01, "down to an eighth beat");
+    assert!((time(1.0) - 2.0).abs() < 0.02, "up to two beats");
+}
+
+#[test]
+fn the_second_knob_sets_how_long_the_echo_keeps_repeating() {
+    // Everything the repeats add up to over twenty beats, which grows with the feedback.
+    let energy = |p: f32| {
+        let mut fx = slot(FxKind::Echo, 1.0);
+        fx.set_param(1, p);
+        settle(&mut fx);
+        let mut buf = impulse(BEAT as usize / 4);
+        fx.process(&mut buf);
+        let mut tail = silence(20 * BEAT as usize);
+        fx.process(&mut tail);
+        left(&tail).iter().map(|s| s.abs()).sum::<f32>()
+    };
+    let (few, many) = (energy(0.0), energy(1.0));
+    assert!(
+        many > few * 2.0,
+        "more feedback rings longer: {few} vs {many}"
+    );
+}
+
+#[test]
+fn the_knobs_drive_the_reverb_room() {
+    let tail = |size: f32| {
+        let mut fx = slot(FxKind::Reverb, 1.0);
+        fx.set_param(0, size);
+        settle(&mut fx);
+        let mut buf = impulse(4_800);
+        fx.process(&mut buf);
+        tail_frames(&mut fx)
+    };
+    assert!(tail(1.0) > tail(0.0), "{} vs {}", tail(1.0), tail(0.0));
+}
+
+#[test]
+fn the_knobs_drive_the_crusher_and_the_flanger() {
+    let steps = |p: f32| {
+        let mut fx = slot(FxKind::Bitcrusher, 1.0);
+        fx.set_param(0, p);
+        settle(&mut fx);
+        let mut buf: Vec<f32> = (0..4_000)
+            .flat_map(|i| {
+                let s = (i as f32 / 4_000.0) * 2.0 - 1.0;
+                [s, s]
+            })
+            .collect();
+        fx.process(&mut buf);
+        left(&buf)
+            .iter()
+            .map(|s| s.to_bits())
+            .collect::<std::collections::HashSet<u32>>()
+            .len()
+    };
+    assert!(steps(1.0) < steps(0.0), "{} vs {}", steps(1.0), steps(0.0));
+
+    let sweep = |p: f32| {
+        let mut fx = slot(FxKind::Flanger, 1.0);
+        fx.set_param(1, p);
+        settle(&mut fx);
+        let dry = sine(440.0, 2 * BEAT as usize);
+        let mut wet = dry.clone();
+        fx.process(&mut wet);
+        dry.iter()
+            .zip(&wet)
+            .fold(0.0f32, |m, (a, b)| m.max((a - b).abs()))
+    };
+    assert!(sweep(1.0) > sweep(0.1), "{} vs {}", sweep(1.0), sweep(0.1));
+}

@@ -221,6 +221,7 @@ impl Engine {
             SetFxKind(d, kind) => self.channels[d.index()].fx.set_kind(kind),
             SetFxOn(d, on) => self.channels[d.index()].fx.set_on(on),
             SetFxWet(d, wet) => self.channels[d.index()].fx.set_wet(wet),
+            SetFxParam(d, i, v) => self.channels[d.index()].fx.set_param(i, v),
             SetBeatFrames(d, frames) => self.channels[d.index()].beat_frames = frames,
             SetKeyLock(d, on) => self.deck_mut(d).set_key_lock(on),
         }

@@ -282,11 +282,21 @@ impl App {
 
     /// Report what the effect keys did, since an effect at zero wet makes no sound yet.
     fn note_fx_keys(&mut self, action: Action) {
-        let (Action::FxToggle(d) | Action::FxNext(d) | Action::FxWet(d, _)) = action else {
+        let (Action::FxToggle(d)
+        | Action::FxNext(d)
+        | Action::FxWet(d, _)
+        | Action::FxParam(d, _, _)) = action
+        else {
             return;
         };
         let fx = self.state.fx[d.index()];
         let letter = deck_letter(d);
+        if let Action::FxParam(_, index, _) = action {
+            let name = fx_param_name(fx.kind, index);
+            let value = (fx.params[index] * 100.0).round() as u32;
+            self.message = format!("{} {name} {value}% on deck {letter}", fx.kind.name());
+            return;
+        }
         let wet = (fx.wet * 100.0).round() as u32;
         self.message = if fx.on {
             format!("{} on deck {letter}, {wet}% wet", fx.kind.name())
@@ -403,6 +413,21 @@ fn mode_name(m: WaveformMode) -> &'static str {
         WaveformMode::ThreeBand => "3-Band",
         WaveformMode::Rgb => "RGB",
         WaveformMode::Blue => "Blue",
+    }
+}
+
+/// What each knob does in a given unit, for the status line.
+fn fx_param_name(kind: engine::fx::FxKind, index: usize) -> &'static str {
+    use engine::fx::FxKind::*;
+    match (kind, index) {
+        (Echo, 0) => "time",
+        (Echo, _) => "feedback",
+        (Flanger, 0) => "sweep",
+        (Flanger, _) => "depth",
+        (Reverb, 0) => "size",
+        (Reverb, _) => "damping",
+        (Bitcrusher, 0) => "bits",
+        (Bitcrusher, _) => "rate",
     }
 }
 

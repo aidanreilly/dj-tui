@@ -6,16 +6,27 @@
 
 use crate::dsp::{smoothing_coeff, SMOOTH_SECS};
 
-/// Echo time as a fraction of a beat.
+/// Echo time as a fraction of a beat, with both knobs centred.
 pub const ECHO_BEATS: f64 = 0.5;
-/// How much of each repeat feeds the next one.
+/// How much of each repeat feeds the next one, with both knobs centred.
 pub const ECHO_FEEDBACK: f64 = 0.5;
+/// Shortest and longest echo the time knob reaches, in beats, as the spec asks for.
+const ECHO_MIN_BEATS: f64 = 0.125;
+const ECHO_MAX_BEATS: f64 = 2.0;
+/// Range of the feedback knob. Short of one, so the repeats always die away.
+const ECHO_MIN_FEEDBACK: f32 = 0.1;
+const ECHO_MAX_FEEDBACK: f32 = 0.9;
+/// How many knobs each unit has. Both stay where they are when the unit changes.
+pub const FX_PARAMS: usize = 2;
 /// Longest echo the delay line holds, which covers two beats down to 30 BPM.
 const MAX_ECHO_SECS: f32 = 4.0;
 /// Below this the tail counts as silence and the slot stops reporting that it rings.
 const RING_FLOOR: f32 = 1e-4;
-/// Length of one flanger sweep, in beats.
+/// Length of one flanger sweep, in beats, with the knob centred.
 pub const FLANGER_BEATS: f64 = 4.0;
+/// Sweep lengths the knob reaches, in beats. Centred it lands on `FLANGER_BEATS`.
+const FLANGER_MIN_BEATS: f64 = 1.0;
+const FLANGER_MAX_BEATS: f64 = 16.0;
 /// Shortest and longest flanger delay, in milliseconds.
 const FLANGER_MIN_MS: f32 = 0.5;
 const FLANGER_MAX_MS: f32 = 6.0;
@@ -30,10 +41,6 @@ const REVERB_SPREAD: usize = 23;
 const REVERB_ALLPASS_FEEDBACK: f32 = 0.5;
 /// Level the whole reverb is scaled to, so a full wet mix sits beside the dry.
 const REVERB_GAIN: f32 = 0.6;
-/// Bit depth the crusher quantises to.
-const CRUSH_BITS: u32 = 5;
-/// Sample rate reduction: one sample is held for this many frames.
-const CRUSH_HOLD: usize = 24;
 
 /// The units the slot can run. `next` cycles in this order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -67,6 +74,16 @@ impl FxKind {
             Self::Bitcrusher => "Bitcrusher",
         }
     }
+}
+
+/// Map a knob at 0..1 onto a range, geometrically so the centre lands on the geometric mean
+/// and each half of the travel feels the same. Used for times, which the ear hears in ratios.
+fn geometric(knob: f32, min: f64, max: f64) -> f64 {
+    min * (max / min).powf(knob.clamp(0.0, 1.0) as f64)
+}
+
+fn linear(knob: f32, min: f32, max: f32) -> f32 {
+    min + (max - min) * knob.clamp(0.0, 1.0)
 }
 
 /// One-pole ramp for gains that would otherwise click. Snaps once it is close enough,
@@ -126,7 +143,7 @@ impl Echo {
     }
 
     /// Add the repeats to `buf`. `feed` gates what enters the line, 1 while the slot is on.
-    fn process(&mut self, buf: &mut [f32], delay_frames: usize, feed: &mut Ramp) {
+    fn process(&mut self, buf: &mut [f32], delay_frames: usize, feedback: f32, feed: &mut Ramp) {
         let frames = self.line.len() / 2;
         let delay = delay_frames.clamp(1, frames - 1);
         for frame in buf.as_chunks_mut::<2>().0 {
@@ -134,8 +151,8 @@ impl Echo {
             let (l, r) = (self.line[read * 2], self.line[read * 2 + 1]);
             let feed = feed.next();
             let (wl, wr) = (
-                frame[0] * feed + l * ECHO_FEEDBACK as f32,
-                frame[1] * feed + r * ECHO_FEEDBACK as f32,
+                frame[0] * feed + l * feedback,
+                frame[1] * feed + r * feedback,
             );
             self.line[self.write * 2] = wl;
             self.line[self.write * 2 + 1] = wr;
@@ -193,10 +210,10 @@ impl Flanger {
         self.line[i * 2 + channel] * (1.0 - frac) + self.line[j * 2 + channel] * frac
     }
 
-    fn process(&mut self, buf: &mut [f32], period_frames: f32, gate: &mut Ramp) {
+    fn process(&mut self, buf: &mut [f32], period_frames: f32, depth: f32, gate: &mut Ramp) {
         let frames = self.line.len() / 2;
         let step = 1.0 / period_frames.max(1.0);
-        let span = self.max_frames - self.min_frames;
+        let span = (self.max_frames - self.min_frames) * depth.clamp(0.0, 1.0);
         for frame in buf.as_chunks_mut::<2>().0 {
             // Triangle sweep: down and back up, so the turn at each end is not a jump.
             let tri = 1.0 - (self.phase * 2.0 - 1.0).abs();
@@ -365,8 +382,9 @@ struct Bitcrusher {
 }
 
 impl Bitcrusher {
-    fn process(&mut self, buf: &mut [f32]) {
-        let levels = ((1u32 << CRUSH_BITS) - 1) as f32;
+    fn process(&mut self, buf: &mut [f32], bits: u32, hold: usize) {
+        let levels = ((1u32 << bits.clamp(1, 16)) - 1) as f32;
+        let hold = hold.max(1);
         for frame in buf.as_chunks_mut::<2>().0 {
             if self.counter == 0 {
                 self.held = [
@@ -374,7 +392,7 @@ impl Bitcrusher {
                     (frame[1].clamp(-1.0, 1.0) * levels).round() / levels,
                 ];
             }
-            self.counter = (self.counter + 1) % CRUSH_HOLD;
+            self.counter = (self.counter + 1) % hold;
             frame[0] = self.held[0];
             frame[1] = self.held[1];
         }
@@ -396,6 +414,8 @@ pub struct FxSlot {
     /// Smoothed input gate, 1 while on. What is already inside plays out as this falls.
     feed: Ramp,
     beat_frames: f32,
+    /// Two knobs, each 0 to 1, read differently by each unit.
+    params: [f32; FX_PARAMS],
     echo: Echo,
     flanger: Flanger,
     reverb: Reverb,
@@ -413,6 +433,7 @@ impl FxSlot {
             mix: Ramp::new(smoothing_coeff(fs, SMOOTH_SECS)),
             feed: Ramp::new(smoothing_coeff(fs, SMOOTH_SECS)),
             beat_frames: fs / 2.0,
+            params: [0.5; FX_PARAMS],
             echo: Echo::new(fs),
             flanger: Flanger::new(fs),
             reverb: Reverb::new(fs),
@@ -460,14 +481,39 @@ impl FxSlot {
         }
     }
 
+    /// Knob `index`, 0 to 1. What it means depends on the unit: see [`FxSlot::param_name`].
+    pub fn param(&self, index: usize) -> f32 {
+        self.params.get(index).copied().unwrap_or(0.0)
+    }
+
+    pub fn set_param(&mut self, index: usize, value: f32) {
+        if let Some(p) = self.params.get_mut(index) {
+            *p = value.clamp(0.0, 1.0);
+        }
+    }
+
+    /// What knob `index` does in the unit now in the slot.
+    pub fn param_name(&self, index: usize) -> &'static str {
+        match (self.kind, index) {
+            (FxKind::Echo, 0) => "Time",
+            (FxKind::Echo, _) => "Feedback",
+            (FxKind::Flanger, 0) => "Sweep",
+            (FxKind::Flanger, _) => "Depth",
+            (FxKind::Reverb, 0) => "Size",
+            (FxKind::Reverb, _) => "Damping",
+            (FxKind::Bitcrusher, 0) => "Bits",
+            (FxKind::Bitcrusher, _) => "Rate",
+        }
+    }
+
     /// Room size, 0 for a small space and 1 for a long tail.
     pub fn set_reverb_size(&mut self, size: f32) {
-        self.reverb.set_size(size);
+        self.set_param(0, size);
     }
 
     /// How fast the tail loses its high end.
     pub fn set_reverb_damping(&mut self, damping: f32) {
-        self.reverb.set_damping(damping);
+        self.set_param(1, damping);
     }
 
     /// True while a unit still has something to play after being switched off.
@@ -499,17 +545,29 @@ impl FxSlot {
         self.dry[..n].copy_from_slice(buf);
 
         // The gate reaches the units; the mix only decides how much comes back.
+        let [knob, knob2] = self.params;
         match self.kind {
             FxKind::Echo => {
-                let delay = (ECHO_BEATS * self.beat_frames as f64) as usize;
-                self.echo.process(buf, delay, &mut self.feed);
+                let beats = geometric(knob, ECHO_MIN_BEATS, ECHO_MAX_BEATS);
+                let delay = (beats * self.beat_frames as f64) as usize;
+                let feedback = linear(knob2, ECHO_MIN_FEEDBACK, ECHO_MAX_FEEDBACK);
+                self.echo.process(buf, delay, feedback, &mut self.feed);
             }
             FxKind::Flanger => {
-                let period = FLANGER_BEATS as f32 * self.beat_frames;
-                self.flanger.process(buf, period, &mut self.feed);
+                let beats = geometric(knob, FLANGER_MIN_BEATS, FLANGER_MAX_BEATS);
+                let period = (beats * self.beat_frames as f64) as f32;
+                self.flanger.process(buf, period, knob2, &mut self.feed);
             }
-            FxKind::Reverb => self.reverb.process(buf, &mut self.feed),
-            FxKind::Bitcrusher => self.crusher.process(buf),
+            FxKind::Reverb => {
+                self.reverb.set_size(knob);
+                self.reverb.set_damping(knob2);
+                self.reverb.process(buf, &mut self.feed);
+            }
+            FxKind::Bitcrusher => {
+                let bits = linear(1.0 - knob, 1.0, 9.0).round() as u32;
+                let hold = linear(knob2, 1.0, 47.0).round() as usize;
+                self.crusher.process(buf, bits, hold);
+            }
         }
 
         // A ringing echo keeps the wet level it had, so switching off does not cut the tail.

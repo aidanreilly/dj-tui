@@ -5,7 +5,7 @@
 //! Actions for features not built yet produce no command.
 
 use engine::dsp::{EqBand, EQ_MAX_DB, TRIM_RANGE_DB};
-use engine::fx::FxKind;
+use engine::fx::{FxKind, FX_PARAMS};
 use engine::{Command, DeckId, Snapshot};
 use input::{Action, Dir};
 
@@ -58,11 +58,24 @@ pub struct ControlState {
 }
 
 /// The effect slot for one channel, as the UI holds it.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FxState {
     pub kind: FxKind,
     pub on: bool,
     pub wet: f32,
+    /// The two knobs, which keep their positions when the unit changes.
+    pub params: [f32; FX_PARAMS],
+}
+
+impl Default for FxState {
+    fn default() -> Self {
+        Self {
+            kind: FxKind::default(),
+            on: false,
+            wet: 0.0,
+            params: [0.5; FX_PARAMS],
+        }
+    }
 }
 
 /// Trim, EQ and filter for one channel. Arrays are indexed by `EqBand as usize`.
@@ -80,6 +93,7 @@ pub const EQ_STEP_DB: f32 = 2.0;
 pub const EQ_FLOOR_DB: f32 = -26.0;
 pub const FILTER_STEP: f32 = 0.1;
 pub const FX_WET_STEP: f32 = 0.1;
+pub const FX_PARAM_STEP: f32 = 0.05;
 /// How far one nudge moves the playhead. Small enough to beatmatch by ear.
 pub const NUDGE_SECS: f64 = 0.01;
 /// A bar in 4/4, the length a CDJ's loop key reaches for.
@@ -277,6 +291,12 @@ pub fn apply(
             let fx = &mut st.fx[d.index()];
             fx.kind = fx.kind.next();
             Command::SetFxKind(d, fx.kind)
+        }
+        FxParam(d, index, dir) => {
+            let fx = &mut st.fx[d.index()];
+            let knob = fx.params.get_mut(index)?;
+            *knob = step(*knob, FX_PARAM_STEP * sign(dir), 0.0, 1.0);
+            Command::SetFxParam(d, index, *knob)
         }
         FxWet(d, dir) => {
             let fx = &mut st.fx[d.index()];

@@ -201,6 +201,18 @@ fn deck_toggles_and_loops() {
     assert_eq!(press(&mut km, ch('.')), Some(Action::Nudge(d, Dir::Up)));
     assert_eq!(press(&mut km, ch('f')), Some(Action::FxToggle(d)));
     assert_eq!(press(&mut km, ch('F')), Some(Action::FxNext(d)));
+    assert_eq!(
+        press(&mut km, ch('p')),
+        Some(Action::FxParam(d, 0, Dir::Down))
+    );
+    assert_eq!(
+        press(&mut km, ch('P')),
+        Some(Action::FxParam(d, 0, Dir::Up))
+    );
+    assert_eq!(
+        press(&mut km, ch('D')),
+        Some(Action::FxParam(d, 1, Dir::Up))
+    );
     assert_eq!(press(&mut km, ch('0')), Some(Action::FxWet(d, Dir::Up)));
     assert_eq!(press(&mut km, ch('m')), Some(Action::HeadphoneCue(d)));
 }

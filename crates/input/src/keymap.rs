@@ -183,6 +183,8 @@ impl Keymap {
             'i' => LoopIn(d),
             'I' => LoopOut(d),
             'f' => FxToggle(d),
+            'p' | 'P' => FxParam(d, 0, dir(c == 'P')),
+            'd' | 'D' => FxParam(d, 1, dir(c == 'D')),
             'F' => FxNext(d),
             'm' => HeadphoneCue(d),
             'r' | 'R' => Trim(d, dir(c == 'R')),

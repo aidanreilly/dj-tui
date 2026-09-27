@@ -38,6 +38,8 @@ pub enum Command {
     SetFxKind(DeckId, crate::fx::FxKind),
     SetFxOn(DeckId, bool),
     SetFxWet(DeckId, f32),
+    /// One of the slot's two knobs, 0 to 1.
+    SetFxParam(DeckId, usize, f32),
     /// Beat length of the loaded track in frames, which times the tempo-aware effects.
     SetBeatFrames(DeckId, f32),
     /// Hold the pitch while the tempo fader moves.

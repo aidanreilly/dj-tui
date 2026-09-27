@@ -38,6 +38,8 @@ pub enum Action {
     FxToggle(DeckId),
     FxNext(DeckId),
     FxWet(DeckId, Dir),
+    /// One of the effect's two knobs, by index.
+    FxParam(DeckId, usize, Dir),
     SeekTenth(DeckId, u8),
     Trim(DeckId, Dir),
     Eq(DeckId, Band, Dir),

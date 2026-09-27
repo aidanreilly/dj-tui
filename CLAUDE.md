@@ -3,8 +3,8 @@
 Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
 detection in `crates/analysis`, running on load. From M5 there are loops, beat jump and quantize, and
 cues persist through the track sidecar rather than the SQLite store the spec describes. M6 has all four effects
-with their keys, and M7 has sync, nudge and key lock. Still missing: M4's GiantSteps
-evaluation script, controls for reverb size and damping, and M8 onwards.
+with their keys and knobs, and M7 has sync, nudge and key lock. Still missing: M4's GiantSteps
+evaluation script, and M8 onwards.
 
 ## Rules
 
@@ -46,7 +46,10 @@ the playhead, which also sets the length the halve and double keys work from.
 `engine::fx` holds one `FxSlot` per channel, between the filter and the fader. Nothing
 allocates after `FxSlot::new`, so the slot is safe on the audio thread, and the no-alloc test
 drives it. `f` switches the slot on, `F` cycles Echo, Flanger, Reverb and Bitcrusher, and
-`9`/`0` set the wet mix.
+`9`/`0` set the wet mix. `p`/`P` and `d`/`D` turn the slot's two knobs, which each unit
+reads its own way: echo time and feedback, flanger sweep and depth, reverb size and damping,
+crusher bit depth and sample rate. The knobs keep their positions when the unit changes, and
+times map geometrically so the centre lands on the default.
 
 Echo and flanger take their time from the beat length the UI sends on load, divided by the
 deck rate, so both stay in time when the tempo fader moves. Tails work by gating the input
