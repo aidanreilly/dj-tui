@@ -34,6 +34,12 @@ pub enum Command {
     SetHotCue(DeckId, usize, Option<f64>),
     /// Loop between two frames, or clear the loop with `None`.
     SetLoop(DeckId, Option<(f64, f64)>),
+    /// Effect slot: which unit, whether it runs, and how much of it is heard.
+    SetFxKind(DeckId, crate::fx::FxKind),
+    SetFxOn(DeckId, bool),
+    SetFxWet(DeckId, f32),
+    /// Beat length of the loaded track in frames, which times the tempo-aware effects.
+    SetBeatFrames(DeckId, f32),
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -232,6 +238,11 @@ impl EngineProcessor {
         m[2].fetch_max(peaks.master.to_bits(), Relaxed);
         self.frames_processed += (master.len() / 2) as u64;
         self.publish();
+    }
+
+    /// Beat length the deck's effect slot is timing to, after the tempo fader.
+    pub fn fx_beat_frames(&self, id: DeckId) -> f32 {
+        self.engine.fx_beat_frames(id)
     }
 
     /// Size of the internal command backlog, for diagnostics.

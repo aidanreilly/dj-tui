@@ -21,7 +21,7 @@ const FILTER_Q: f64 = 0.9;
 /// Filter coefficients are recomputed every this many frames.
 const FILTER_SUBBLOCK: usize = 32;
 /// Time constant for gain smoothing.
-const SMOOTH_SECS: f32 = 0.01;
+pub(crate) const SMOOTH_SECS: f32 = 0.01;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EqBand {
@@ -40,7 +40,7 @@ pub fn db_to_gain(db: f32) -> f32 {
     10f32.powf(db / 20.0)
 }
 
-fn smoothing_coeff(fs: f32, secs: f32) -> f32 {
+pub(crate) fn smoothing_coeff(fs: f32, secs: f32) -> f32 {
     1.0 - (-1.0 / (secs * fs)).exp()
 }
 

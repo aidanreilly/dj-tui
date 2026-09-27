@@ -127,3 +127,74 @@ fn master_meter_is_post_fader() {
     let m = h.take_meters();
     assert!((m.master - 0.25).abs() < 0.01, "{m:?}");
 }
+
+#[test]
+fn the_effect_slot_sits_after_the_filter_and_before_the_fader() {
+    use engine::fx::FxKind;
+    let (mut h, mut p) = channel(Engine::new(), 16);
+    h.send(Command::Load(A, sine_track(440.0, 0.5))).unwrap();
+    h.send(Command::SetCrossfader(-1.0)).unwrap();
+    h.send(Command::PlayPause(A)).unwrap();
+    h.send(Command::SetFxKind(A, FxKind::Bitcrusher)).unwrap();
+    h.send(Command::SetFxWet(A, 1.0)).unwrap();
+    h.send(Command::SetFxOn(A, true)).unwrap();
+    // The fader is down, so nothing the effect does can reach the master bus.
+    h.send(Command::SetChannelFader(A, 0.0)).unwrap();
+    let (mut m, mut c) = (vec![0.0; 2_048], vec![0.0; 2_048]);
+    p.process(&mut m, &mut c);
+    assert!(
+        m.iter().all(|s| *s == 0.0),
+        "the fader still has the last word"
+    );
+
+    h.send(Command::SetChannelFader(A, 1.0)).unwrap();
+    p.process(&mut m, &mut c);
+    assert!(
+        m.iter().any(|s| *s != 0.0),
+        "and lets the effect through again"
+    );
+}
+
+#[test]
+fn an_effect_changes_the_sound_and_switching_it_off_brings_it_back() {
+    use engine::fx::FxKind;
+    let render = |on: bool| {
+        let (mut h, mut p) = channel(Engine::new(), 16);
+        h.send(Command::Load(A, sine_track(440.0, 0.5))).unwrap();
+        h.send(Command::SetCrossfader(-1.0)).unwrap();
+        h.send(Command::PlayPause(A)).unwrap();
+        h.send(Command::SetFxKind(A, FxKind::Bitcrusher)).unwrap();
+        h.send(Command::SetFxWet(A, 1.0)).unwrap();
+        h.send(Command::SetFxOn(A, on)).unwrap();
+        let (mut m, mut c) = (vec![0.0; 8_192], vec![0.0; 8_192]);
+        // Two blocks: the first lets the wet mix settle.
+        p.process(&mut m, &mut c);
+        p.process(&mut m, &mut c);
+        m
+    };
+    let dry = render(false);
+    let wet = render(true);
+    assert_ne!(dry, wet, "the crusher is audible");
+    let diff = dry
+        .iter()
+        .zip(&wet)
+        .fold(0.0f32, |m, (a, b)| m.max((a - b).abs()));
+    assert!(diff > 0.01, "and not by a whisker: {diff}");
+}
+
+#[test]
+fn the_echo_follows_the_deck_tempo_fader() {
+    use engine::fx::FxKind;
+    let (mut h, mut p) = channel(Engine::new(), 16);
+    h.send(Command::Load(A, sine_track(440.0, 0.5))).unwrap();
+    h.send(Command::SetBeatFrames(A, 24_000.0)).unwrap();
+    h.send(Command::SetFxKind(A, FxKind::Echo)).unwrap();
+    h.send(Command::SetRate(A, 2.0)).unwrap();
+    let (mut m, mut c) = (vec![0.0; 512], vec![0.0; 512]);
+    p.process(&mut m, &mut c);
+    assert_eq!(
+        p.fx_beat_frames(A),
+        12_000.0,
+        "a track played twice as fast has beats half as long"
+    );
+}

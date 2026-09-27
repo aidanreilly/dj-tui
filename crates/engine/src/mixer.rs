@@ -60,6 +60,9 @@ struct Channel {
     trim: Trim,
     eq: Isolator,
     filter: DjFilter,
+    fx: crate::fx::FxSlot,
+    /// Beat length of the track as analysed, before the tempo fader.
+    beat_frames: f32,
 }
 
 impl Channel {
@@ -70,6 +73,8 @@ impl Channel {
             trim: Trim::new(fs),
             eq: Isolator::new(fs),
             filter: DjFilter::new(fs),
+            fx: crate::fx::FxSlot::new(fs),
+            beat_frames: fs / 2.0,
         }
     }
 }
@@ -163,6 +168,16 @@ impl Engine {
         self.cue_mix = v.clamp(0.0, 1.0);
     }
 
+    /// Beat length the effect slot is working to, after the tempo fader.
+    pub fn fx_beat_frames(&self, id: DeckId) -> f32 {
+        let ch = &self.channels[id.index()];
+        ch.beat_frames / self.decks[id.index()].rate().max(1e-3) as f32
+    }
+
+    pub fn fx(&self, id: DeckId) -> &crate::fx::FxSlot {
+        &self.channels[id.index()].fx
+    }
+
     pub fn crossfader_curve(&self) -> CrossfaderCurve {
         self.curve
     }
@@ -200,6 +215,10 @@ impl Engine {
             SetCuePoint(d, f) => self.deck_mut(d).set_cue_point(f),
             SetHotCue(d, n, f) => self.deck_mut(d).set_hot_cue(n, f),
             SetLoop(d, span) => self.deck_mut(d).set_loop(span),
+            SetFxKind(d, kind) => self.channels[d.index()].fx.set_kind(kind),
+            SetFxOn(d, on) => self.channels[d.index()].fx.set_on(on),
+            SetFxWet(d, wet) => self.channels[d.index()].fx.set_wet(wet),
+            SetBeatFrames(d, frames) => self.channels[d.index()].beat_frames = frames,
         }
         None
     }
@@ -225,6 +244,10 @@ impl Engine {
                 ch.trim.process(buf);
                 ch.eq.process(buf);
                 ch.filter.process(buf);
+                // A track played faster has shorter beats, so the echo shortens with it.
+                let rate = deck.rate().max(1e-3) as f32;
+                ch.fx.set_beat_frames(ch.beat_frames / rate);
+                ch.fx.process(buf);
                 *peak = buf.iter().fold(*peak, |m, s| m.max(s.abs()));
             }
             let post = [
