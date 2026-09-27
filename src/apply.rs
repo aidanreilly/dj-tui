@@ -5,6 +5,7 @@
 //! Actions for features not built yet produce no command.
 
 use engine::dsp::{EqBand, EQ_MAX_DB, TRIM_RANGE_DB};
+use engine::fx::FxKind;
 use engine::{Command, DeckId, Snapshot};
 use input::{Action, Dir};
 
@@ -48,6 +49,15 @@ pub struct ControlState {
     /// Loop in point waiting for its out point, in frames.
     pub loop_in: [Option<f64>; 2],
     pub quantize: [bool; 2],
+    pub fx: [FxState; 2],
+}
+
+/// The effect slot for one channel, as the UI holds it.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct FxState {
+    pub kind: FxKind,
+    pub on: bool,
+    pub wet: f32,
 }
 
 /// Trim, EQ and filter for one channel. Arrays are indexed by `EqBand as usize`.
@@ -64,6 +74,7 @@ pub const EQ_STEP_DB: f32 = 2.0;
 /// Lowest EQ knob position short of a kill.
 pub const EQ_FLOOR_DB: f32 = -26.0;
 pub const FILTER_STEP: f32 = 0.1;
+pub const FX_WET_STEP: f32 = 0.1;
 /// A bar in 4/4, the length a CDJ's loop key reaches for.
 pub const DEFAULT_LOOP_BEATS: f64 = 4.0;
 pub const MIN_LOOP_BEATS: f64 = 0.125;
@@ -95,6 +106,7 @@ impl Default for ControlState {
             loop_beats: [DEFAULT_LOOP_BEATS; 2],
             loop_in: [None; 2],
             quantize: [false; 2],
+            fx: [FxState::default(); 2],
         }
     }
 }
@@ -247,6 +259,21 @@ pub fn apply(
             let by = st.loop_beats[i] * beat * sign(dir) as f64;
             let frames = snap.decks[i].track_frames as f64;
             Command::Seek(d, (from_here(st, snap, i) + by).clamp(0.0, frames))
+        }
+        FxToggle(d) => {
+            let fx = &mut st.fx[d.index()];
+            fx.on = !fx.on;
+            Command::SetFxOn(d, fx.on)
+        }
+        FxNext(d) => {
+            let fx = &mut st.fx[d.index()];
+            fx.kind = fx.kind.next();
+            Command::SetFxKind(d, fx.kind)
+        }
+        FxWet(d, dir) => {
+            let fx = &mut st.fx[d.index()];
+            fx.wet = step(fx.wet, FX_WET_STEP * sign(dir), 0.0, 1.0);
+            Command::SetFxWet(d, fx.wet)
         }
         Quantize(d) => {
             let q = &mut st.quantize[d.index()];

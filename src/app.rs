@@ -87,6 +87,9 @@ impl App {
         self.state.beat_frames[i] = meta.grid.map(|g| g.beat_secs() * rate);
         self.state.first_beat_frames[i] = meta.grid.map_or(0.0, |g| g.first_beat_secs * rate);
         self.state.loop_in[i] = None;
+        if let Some(beat) = self.state.beat_frames[i] {
+            self.send(Command::SetBeatFrames(deck, beat as f32));
+        }
         self.metas[i] = DeckMeta {
             loading: false,
             ..meta
@@ -246,6 +249,21 @@ impl App {
         };
     }
 
+    /// Report what the effect keys did, since an effect at zero wet makes no sound yet.
+    fn note_fx_keys(&mut self, action: Action) {
+        let (Action::FxToggle(d) | Action::FxNext(d) | Action::FxWet(d, _)) = action else {
+            return;
+        };
+        let fx = self.state.fx[d.index()];
+        let letter = deck_letter(d);
+        let wet = (fx.wet * 100.0).round() as u32;
+        self.message = if fx.on {
+            format!("{} on deck {letter}, {wet}% wet", fx.kind.name())
+        } else {
+            format!("{} off on deck {letter}", fx.kind.name())
+        };
+    }
+
     /// Handle one key event. Returns true when the user asked to quit.
     pub fn on_key(&mut self, key: KeyEvent) -> bool {
         let Some(action) = self.keymap.handle(key) else {
@@ -266,6 +284,7 @@ impl App {
                 let snap = self.handle.snapshot();
                 let cmd = apply(&mut self.state, &self.controls, &snap, action);
                 self.note_loop_keys(action, cmd.as_ref());
+                self.note_fx_keys(action);
                 if let Some(cmd) = cmd {
                     self.send(cmd);
                 }
@@ -322,12 +341,16 @@ impl App {
             .zip(&self.state.strips)
             .enumerate()
         {
+            let fx = self.state.fx[i];
             *view = tui::StripView {
                 trim_db: st.trim_db,
                 eq_db: st.eq_db,
                 kills: st.kills,
                 filter: st.filter,
                 meter: self.meters[i],
+                fx_name: fx.kind.name(),
+                fx_on: fx.on,
+                fx_wet: fx.wet,
             };
         }
         v.mixer.master_meter = self.meters[2];

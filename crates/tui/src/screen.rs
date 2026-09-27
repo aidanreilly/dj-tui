@@ -30,6 +30,10 @@ pub struct StripView {
     pub filter: f32,
     /// Channel peak, linear, pre-fader.
     pub meter: f32,
+    /// Name of the effect in the slot, empty when the strip has no slot.
+    pub fx_name: &'static str,
+    pub fx_on: bool,
+    pub fx_wet: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -140,6 +144,25 @@ fn meter_row(label: &str, a: f32, b: f32) -> Line<'static> {
     Line::from(spans)
 }
 
+/// The effect each channel is running, dimmed until it is switched on.
+fn fx_row(a: &StripView, b: &StripView) -> Line<'static> {
+    let cell = |s: &StripView| {
+        let name: String = s.fx_name.chars().take(BAR).collect();
+        let style = if s.fx_on {
+            Style::new()
+        } else {
+            Style::new().add_modifier(Modifier::DIM)
+        };
+        Span::styled(format!("{name:^w$}", w = BAR), style)
+    };
+    Line::from(vec![
+        Span::raw(format!("{:<5}", "FX")),
+        cell(a),
+        Span::raw(" "),
+        cell(b),
+    ])
+}
+
 fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
     let block = Block::bordered().title(" MIXER ");
     let inner = block.inner(area);
@@ -168,6 +191,9 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 eq_cell(b.eq_db[0], b.kills[0]),
             ),
             row("FLT", filter_cell(a.filter), filter_cell(b.filter)),
+            Line::from(""),
+            fx_row(a, b),
+            row("WET", level_bar(a.fx_wet), level_bar(b.fx_wet)),
             Line::from(""),
             meter_row("PK", a.meter, b.meter),
             row("VOL", level_bar(m.faders[0]), level_bar(m.faders[1])),

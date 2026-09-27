@@ -337,7 +337,37 @@ fn quantize_toggles_without_sending_a_command() {
 #[test]
 fn actions_the_engine_cannot_do_yet_give_no_command() {
     let mut st = ControlState::default();
-    assert!(run(&mut st, &Snapshot::default(), Action::FxToggle(A)).is_none());
+    assert!(run(&mut st, &Snapshot::default(), Action::Sync(A)).is_none());
+}
+
+#[test]
+fn the_effect_keys_switch_the_slot_cycle_it_and_set_the_wet() {
+    use engine::fx::FxKind;
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    let fx = |cmd: Option<Command>| -> String { format!("{:?}", cmd.unwrap()) };
+
+    assert!(fx(run(&mut st, &s, Action::FxToggle(A))).contains("SetFxOn(A, true)"));
+    assert!(st.fx[0].on);
+    assert!(fx(run(&mut st, &s, Action::FxToggle(A))).contains("SetFxOn(A, false)"));
+    assert!(!st.fx[0].on);
+
+    let first = st.fx[0].kind;
+    assert!(fx(run(&mut st, &s, Action::FxNext(A))).contains("SetFxKind"));
+    assert_eq!(st.fx[0].kind, first.next());
+    assert_eq!(st.fx[1].kind, first, "each deck keeps its own slot");
+
+    assert!(fx(run(&mut st, &s, Action::FxWet(A, Dir::Up))).contains("SetFxWet"));
+    assert!((st.fx[0].wet - 0.1).abs() < 1e-6);
+    for _ in 0..20 {
+        run(&mut st, &s, Action::FxWet(A, Dir::Up));
+    }
+    assert_eq!(st.fx[0].wet, 1.0, "wet stops at full");
+    for _ in 0..20 {
+        run(&mut st, &s, Action::FxWet(A, Dir::Down));
+    }
+    assert_eq!(st.fx[0].wet, 0.0, "and at dry");
+    assert_eq!(FxKind::default(), first);
 }
 
 #[test]
