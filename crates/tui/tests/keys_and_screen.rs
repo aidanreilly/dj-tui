@@ -130,7 +130,10 @@ fn whole_screen_shows_every_section() {
     }
     // Headphone cue lit on B only.
     let cue_row = text.lines().find(|l| l.contains("CUE")).expect("cue row");
-    let (a, b) = (cue_row.find('○').expect("A unlit"), cue_row.find('●').expect("B lit"));
+    let (a, b) = (
+        cue_row.find('○').expect("A unlit"),
+        cue_row.find('●').expect("B lit"),
+    );
     assert!(a < b, "{cue_row}");
 }
 
@@ -171,7 +174,14 @@ fn mixer_text(m: MixerView, w: u16, h: u16) -> String {
     let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
     let buf = term.backend().buffer();
-    (0..h).map(|y| (0..w).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>() + "\n").collect()
+    (0..h)
+        .map(|y| {
+            (0..w)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+                + "\n"
+        })
+        .collect()
 }
 
 #[test]
@@ -200,7 +210,12 @@ fn meters_fill_with_level() {
         row.matches('▮').count()
     };
     assert_eq!(lit(0.0), 0);
-    assert!(lit(0.1) > 0 && lit(0.1) < lit(1.0), "{} {}", lit(0.1), lit(1.0));
+    assert!(
+        lit(0.1) > 0 && lit(0.1) < lit(1.0),
+        "{} {}",
+        lit(0.1),
+        lit(1.0)
+    );
 }
 
 #[test]

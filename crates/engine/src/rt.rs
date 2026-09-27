@@ -183,7 +183,10 @@ impl EngineHandle {
     pub fn take_meters(&self) -> crate::Meters {
         let m = &self.shared.meters;
         let take = |i: usize| f32::from_bits(m[i].swap(0, Relaxed));
-        crate::Meters { channels: [take(0), take(1)], master: take(2) }
+        crate::Meters {
+            channels: [take(0), take(1)],
+            master: take(2),
+        }
     }
 
     /// Free tracks the audio thread has let go of. Call regularly from the UI loop.

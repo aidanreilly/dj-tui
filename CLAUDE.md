@@ -1,7 +1,7 @@
 # Working on dj-tui
 
-Spec and milestone plan: `docs/spec.md`. M0 and M1 are done; M2 (mixer EQ, filter, trim,
-meters, split-mono routing) is next.
+Spec and milestone plan: `docs/spec.md`. M0, M1 and M2 are done, plus pixel waveforms from M3. Next is the rest of M3: 3-band
+colour waveforms (needs per-band envelopes from the loader), CDJ overlays and the phase meter.
 
 ## Rules
 

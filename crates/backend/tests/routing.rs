@@ -86,3 +86,33 @@ fn routing_off_connects_nothing() {
     let plan = plan_connections("x", &Routing::Off, &physical(4));
     assert!(plan.connections.is_empty() && plan.warnings.is_empty());
 }
+
+#[test]
+fn split_mono_puts_master_left_and_cue_right_on_a_stereo_card() {
+    let plan = plan_connections("dj-tui", &Routing::Split, &physical(2));
+    assert_eq!(
+        pairs(&plan),
+        vec![
+            ("dj-tui:master_L", "system:playback_1"),
+            ("dj-tui:master_R", "system:playback_2")
+        ]
+    );
+    assert!(plan.warnings.is_empty());
+}
+
+#[test]
+fn split_mono_without_outputs_warns() {
+    assert!(!plan_connections("x", &Routing::Split, &[])
+        .warnings
+        .is_empty());
+}
+
+#[test]
+fn auto_on_a_stereo_card_suggests_split_mode() {
+    let plan = plan_connections("dj-tui", &Routing::Auto, &physical(2));
+    assert!(
+        plan.warnings[0].contains("routing = \"split\""),
+        "{:?}",
+        plan.warnings
+    );
+}

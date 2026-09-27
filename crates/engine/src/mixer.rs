@@ -1,4 +1,4 @@
-use crate::dsp::{DjFilter, EqBand, Isolator, Trim};
+use crate::dsp::{DjFilter, Isolator, Trim};
 use crate::{Deck, Track};
 use std::f32::consts::FRAC_PI_2;
 use std::sync::Arc;
@@ -64,7 +64,13 @@ struct Channel {
 
 impl Channel {
     fn new(fs: f32) -> Self {
-        Self { fader: 1.0, headphone_cue: false, trim: Trim::new(fs), eq: Isolator::new(fs), filter: DjFilter::new(fs) }
+        Self {
+            fader: 1.0,
+            headphone_cue: false,
+            trim: Trim::new(fs),
+            eq: Isolator::new(fs),
+            filter: DjFilter::new(fs),
+        }
     }
 }
 

@@ -16,7 +16,11 @@ pub fn click_track(bpm: f64, secs: f64, sample_rate: u32) -> Track {
     for n in 0..frames {
         let beat_index = (n as f64 / beat).floor();
         let t = (n as f64 - beat_index * beat) / rate;
-        let accent = if beat_index as u64 % 4 == 0 { 1.0 } else { 0.7 };
+        let accent = if (beat_index as u64).is_multiple_of(4) {
+            1.0
+        } else {
+            0.7
+        };
         let s = if t < CLICK_GATE_SECS {
             accent * (-t / CLICK_DECAY_SECS).exp() * (TAU * tone_hz * t).cos()
         } else {

@@ -4,7 +4,7 @@
 //! `ControlState`, so several key presses between two audio callbacks each count.
 //! Actions for features not built yet produce no command.
 
-use engine::dsp::{EqBand, TRIM_RANGE_DB, EQ_MAX_DB};
+use engine::dsp::{EqBand, EQ_MAX_DB, TRIM_RANGE_DB};
 use engine::{Command, Snapshot};
 use input::{Action, Dir};
 

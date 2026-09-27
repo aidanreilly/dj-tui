@@ -63,6 +63,7 @@ pub enum RoutingMode {
     #[default]
     Auto,
     Off,
+    Split,
     Explicit,
 }
 
@@ -161,6 +162,7 @@ impl Config {
         Ok(match self.audio.routing {
             RoutingMode::Auto => backend::Routing::Auto,
             RoutingMode::Off => backend::Routing::Off,
+            RoutingMode::Split => backend::Routing::Split,
             RoutingMode::Explicit => backend::Routing::Explicit {
                 master: pair(&self.audio.master_ports, "master_ports")?,
                 cue: if self.audio.cue_ports.is_empty() {

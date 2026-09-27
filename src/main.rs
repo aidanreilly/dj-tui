@@ -43,6 +43,7 @@ fn load_config() -> Result<Config, String> {
 }
 
 /// Where audio goes: a live JACK client, or a silent clock we drive from the UI loop.
+#[allow(clippy::large_enum_variant)] // one value for the whole run; boxing buys nothing
 enum Audio {
     Jack(backend::Running),
     Silent(NullClock, EngineProcessor),
@@ -81,7 +82,9 @@ fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<Strin
         }
     };
     // The engine's filters need the real session rate, which JACK decides.
-    let rate = jack.as_ref().map_or(config.audio.sample_rate, JackBackend::sample_rate);
+    let rate = jack
+        .as_ref()
+        .map_or(config.audio.sample_rate, JackBackend::sample_rate);
     let (handle, processor) = channel(Engine::with_sample_rate(rate), COMMAND_QUEUE);
     Ok(match jack {
         Some(jack) => {
@@ -90,13 +93,11 @@ fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<Strin
             notes.extend(running.warnings().iter().cloned());
             (app, Audio::Jack(running), notes)
         }
-        None => {
-            (
-                App::new(handle, config, rate),
-                Audio::Silent(NullClock::new(rate), processor),
-                notes,
-            )
-        }
+        None => (
+            App::new(handle, config, rate),
+            Audio::Silent(NullClock::new(rate), processor),
+            notes,
+        ),
     })
 }
 

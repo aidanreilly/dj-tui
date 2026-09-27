@@ -42,7 +42,9 @@ fn isolator_at_unity_is_flat() {
 #[test]
 fn isolator_at_unity_is_bit_exact() {
     let mut eq = iso();
-    let input: Vec<f32> = (0..4096).map(|i| ((i * 7919) % 1000) as f32 / 1000.0 - 0.5).collect();
+    let input: Vec<f32> = (0..4096)
+        .map(|i| ((i * 7919) % 1000) as f32 / 1000.0 - 0.5)
+        .collect();
     let mut buf = input.clone();
     eq.process(&mut buf);
     assert_eq!(buf, input);
@@ -108,8 +110,13 @@ fn gain_is_limited_to_plus_six_db() {
 #[test]
 fn kills_are_smoothed_rather_than_instant() {
     let mut eq = iso();
-    let mut sine = |start: usize, n: usize| -> Vec<f32> {
-        (start..start + n).flat_map(|i| { let s = (std::f32::consts::TAU * 50.0 * i as f32 / FS).sin(); [s, s] }).collect()
+    let sine = |start: usize, n: usize| -> Vec<f32> {
+        (start..start + n)
+            .flat_map(|i| {
+                let s = (std::f32::consts::TAU * 50.0 * i as f32 / FS).sin();
+                [s, s]
+            })
+            .collect()
     };
     let mut warm = sine(0, 24_000);
     eq.process(&mut warm);
@@ -121,7 +128,9 @@ fn kills_are_smoothed_rather_than_instant() {
     assert!(peak_first > 0.3, "kill cut in instantly ({peak_first})");
     let mut later = sine(24_144, 9600);
     eq.process(&mut later);
-    let peak_late = later[later.len() - 960..].iter().fold(0f32, |m, s| m.max(s.abs()));
+    let peak_late = later[later.len() - 960..]
+        .iter()
+        .fold(0f32, |m, s| m.max(s.abs()));
     assert!(peak_late < 0.05, "kill never took effect ({peak_late})");
 }
 
@@ -130,7 +139,9 @@ fn kills_are_smoothed_rather_than_instant() {
 #[test]
 fn filter_at_centre_is_an_exact_bypass() {
     let mut f = DjFilter::new(FS);
-    let input: Vec<f32> = (0..1024).map(|i| ((i * 7919) % 1000) as f32 / 1000.0 - 0.5).collect();
+    let input: Vec<f32> = (0..1024)
+        .map(|i| ((i * 7919) % 1000) as f32 / 1000.0 - 0.5)
+        .collect();
     let mut buf = input.clone();
     f.process(&mut buf);
     assert_eq!(buf, input);
@@ -176,9 +187,17 @@ fn sweeping_the_filter_stays_stable() {
     let mut peak = 0f32;
     for block in 0..400 {
         f.set(((block as f32) * 0.05).sin());
-        let mut buf: Vec<f32> = (0..256).map(|i| (((block * 256 + i) * 2654435761usize) % 2000) as f32 / 1000.0 - 1.0).collect();
+        let mut buf: Vec<f32> = (0..256)
+            .map(|i| (((block * 256 + i) * 2654435761usize) % 2000) as f32 / 1000.0 - 1.0)
+            .collect();
         f.process(&mut buf);
-        peak = buf.iter().fold(peak, |m, s| if s.is_finite() { m.max(s.abs()) } else { f32::INFINITY });
+        peak = buf.iter().fold(peak, |m, s| {
+            if s.is_finite() {
+                m.max(s.abs())
+            } else {
+                f32::INFINITY
+            }
+        });
     }
     assert!(peak < 4.0, "filter blew up: {peak}");
 }

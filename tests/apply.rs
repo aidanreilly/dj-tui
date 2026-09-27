@@ -152,7 +152,9 @@ use input::Band;
 fn trim_steps_one_db_within_plus_minus_twelve() {
     let mut st = ControlState::default();
     let s = Snapshot::default();
-    assert!(matches!(run(&mut st, &s, Action::Trim(A, Dir::Up)), Some(Command::SetTrim(A, v)) if v == 1.0));
+    assert!(
+        matches!(run(&mut st, &s, Action::Trim(A, Dir::Up)), Some(Command::SetTrim(A, v)) if v == 1.0)
+    );
     for _ in 0..30 {
         run(&mut st, &s, Action::Trim(A, Dir::Up));
     }
@@ -183,8 +185,14 @@ fn eq_steps_two_db_from_kill_range_up_to_plus_six() {
 fn eq_kill_toggles() {
     let mut st = ControlState::default();
     let s = Snapshot::default();
-    assert!(matches!(run(&mut st, &s, Action::EqKill(A, Band::Mid)), Some(Command::SetEqKill(A, EqBand::Mid, true))));
-    assert!(matches!(run(&mut st, &s, Action::EqKill(A, Band::Mid)), Some(Command::SetEqKill(A, EqBand::Mid, false))));
+    assert!(matches!(
+        run(&mut st, &s, Action::EqKill(A, Band::Mid)),
+        Some(Command::SetEqKill(A, EqBand::Mid, true))
+    ));
+    assert!(matches!(
+        run(&mut st, &s, Action::EqKill(A, Band::Mid)),
+        Some(Command::SetEqKill(A, EqBand::Mid, false))
+    ));
 }
 
 #[test]
@@ -202,5 +210,7 @@ fn filter_steps_and_returns_exactly_to_centre() {
     for _ in 0..30 {
         run(&mut st, &s, Action::Filter(A, Dir::Up));
     }
-    assert!(matches!(run(&mut st, &s, Action::Filter(A, Dir::Up)), Some(Command::SetFilter(A, v)) if v == 1.0));
+    assert!(
+        matches!(run(&mut st, &s, Action::Filter(A, Dir::Up)), Some(Command::SetFilter(A, v)) if v == 1.0)
+    );
 }

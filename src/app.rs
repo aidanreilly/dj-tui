@@ -69,7 +69,11 @@ impl App {
     pub fn tick(&mut self) {
         self.handle.collect_garbage();
         let fresh = self.handle.take_meters();
-        for (held, new) in self.meters.iter_mut().zip([fresh.channels[0], fresh.channels[1], fresh.master]) {
+        for (held, new) in
+            self.meters
+                .iter_mut()
+                .zip([fresh.channels[0], fresh.channels[1], fresh.master])
+        {
             *held = new.max(*held * METER_FALL_PER_TICK);
             if *held < 1e-4 {
                 *held = 0.0;
@@ -147,7 +151,13 @@ impl App {
             status,
         );
         v.message = self.message.clone();
-        for (i, (view, st)) in v.mixer.strips.iter_mut().zip(&self.state.strips).enumerate() {
+        for (i, (view, st)) in v
+            .mixer
+            .strips
+            .iter_mut()
+            .zip(&self.state.strips)
+            .enumerate()
+        {
             *view = tui::StripView {
                 trim_db: st.trim_db,
                 eq_db: st.eq_db,

@@ -60,11 +60,14 @@ cargo run -- --no-audio x.wav  # no sound server needed
 Should your distribution not route JACK clients to PipeWire by itself, go through `pw-jack`:
 `pw-jack cargo run -- track.flac`.
 
+With a stereo-only card, `routing = "split"` sends mono master to output 1 and mono
+headphone cue to output 2, for a Y-splitter cable.
+
 Routing lives in `~/.config/dj-tui/config.toml`:
 
 ```toml
 [audio]
-routing = "explicit"            # "auto" (default), "off" or "explicit"
+routing = "explicit"            # "auto" (default), "off", "split" or "explicit"
 master_ports = ["system:playback_1", "system:playback_2"]
 cue_ports    = ["system:playback_3", "system:playback_4"]
 ```

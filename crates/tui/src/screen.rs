@@ -7,8 +7,7 @@ use ratatui::{
     Frame,
 };
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct MixerView {
     /// -1 is fully deck A, 1 is fully deck B.
     pub crossfader: f32,
@@ -72,7 +71,9 @@ const METER_FLOOR_DB: f32 = -48.0;
 
 fn level_bar(fraction: f32) -> String {
     let filled = (fraction.clamp(0.0, 1.0) * BAR as f32).round() as usize;
-    (0..BAR).map(|i| if i < filled { '█' } else { '▯' }).collect()
+    (0..BAR)
+        .map(|i| if i < filled { '█' } else { '▯' })
+        .collect()
 }
 
 fn eq_cell(db: f32, kill: bool) -> String {
@@ -85,7 +86,19 @@ fn eq_cell(db: f32, kill: bool) -> String {
 
 fn filter_cell(v: f32) -> String {
     let pos = (((v.clamp(-1.0, 1.0) + 1.0) / 2.0) * (BAR - 1) as f32).round() as usize;
-    (0..BAR).map(|i| if i == pos { if v.abs() < 0.05 { '┼' } else { '●' } } else { '─' }).collect()
+    (0..BAR)
+        .map(|i| {
+            if i == pos {
+                if v.abs() < 0.05 {
+                    '┼'
+                } else {
+                    '●'
+                }
+            } else {
+                '─'
+            }
+        })
+        .collect()
 }
 
 fn meter_spans(level: f32) -> Vec<Span<'static>> {
@@ -93,7 +106,9 @@ fn meter_spans(level: f32) -> Vec<Span<'static>> {
         0
     } else {
         let db = 20.0 * level.log10();
-        (((db - METER_FLOOR_DB) / -METER_FLOOR_DB) * BAR as f32).ceil().clamp(0.0, BAR as f32) as usize
+        (((db - METER_FLOOR_DB) / -METER_FLOOR_DB) * BAR as f32)
+            .ceil()
+            .clamp(0.0, BAR as f32) as usize
     };
     (0..BAR)
         .map(|i| {
@@ -130,15 +145,37 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
     let lines = if inner.height >= 12 {
         vec![
             Line::from(format!("{:<5}{:^w$} {:^w$}", "", "A", "B", w = BAR)),
-            row("TRIM", level_bar((a.trim_db + 12.0) / 24.0), level_bar((b.trim_db + 12.0) / 24.0)),
-            row("HI", eq_cell(a.eq_db[2], a.kills[2]), eq_cell(b.eq_db[2], b.kills[2])),
-            row("MID", eq_cell(a.eq_db[1], a.kills[1]), eq_cell(b.eq_db[1], b.kills[1])),
-            row("LOW", eq_cell(a.eq_db[0], a.kills[0]), eq_cell(b.eq_db[0], b.kills[0])),
+            row(
+                "TRIM",
+                level_bar((a.trim_db + 12.0) / 24.0),
+                level_bar((b.trim_db + 12.0) / 24.0),
+            ),
+            row(
+                "HI",
+                eq_cell(a.eq_db[2], a.kills[2]),
+                eq_cell(b.eq_db[2], b.kills[2]),
+            ),
+            row(
+                "MID",
+                eq_cell(a.eq_db[1], a.kills[1]),
+                eq_cell(b.eq_db[1], b.kills[1]),
+            ),
+            row(
+                "LOW",
+                eq_cell(a.eq_db[0], a.kills[0]),
+                eq_cell(b.eq_db[0], b.kills[0]),
+            ),
             row("FLT", filter_cell(a.filter), filter_cell(b.filter)),
             Line::from(""),
             meter_row("PK", a.meter, b.meter),
             row("VOL", level_bar(m.faders[0]), level_bar(m.faders[1])),
-            Line::from(format!("{:<5}{:^w$} {:^w$}", "CUE", dot(m.headphone_cue[0]), dot(m.headphone_cue[1]), w = BAR)),
+            Line::from(format!(
+                "{:<5}{:^w$} {:^w$}",
+                "CUE",
+                dot(m.headphone_cue[0]),
+                dot(m.headphone_cue[1]),
+                w = BAR
+            )),
             Line::from(""),
             Line::from(format!("A {} B", crossfader_bar(m.crossfader))),
             {

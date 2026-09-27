@@ -6,6 +6,7 @@ pub struct PlanarRenderer {
     master: Vec<f32>,
     cue: Vec<f32>,
     frames_rendered: u64,
+    split_mono: bool,
 }
 
 impl PlanarRenderer {
@@ -14,7 +15,14 @@ impl PlanarRenderer {
             master: vec![0.0; max_frames * 2],
             cue: vec![0.0; max_frames * 2],
             frames_rendered: 0,
+            split_mono: false,
         }
+    }
+
+    /// Mono master on the first port and mono cue on the second; cue ports stay silent.
+    pub fn split_mono(mut self, on: bool) -> Self {
+        self.split_mono = on;
+        self
     }
 
     /// Grow scratch space. Call from a non-real-time context such as JACK's buffer size callback.
@@ -38,11 +46,20 @@ impl PlanarRenderer {
         let (m, c) = (&mut self.master[..n * 2], &mut self.cue[..n * 2]);
         processor.process(m, c);
         let [ml, mr, cl, cr] = outs;
-        for i in 0..n {
-            ml[i] = m[i * 2];
-            mr[i] = m[i * 2 + 1];
-            cl[i] = c[i * 2];
-            cr[i] = c[i * 2 + 1];
+        if self.split_mono {
+            for i in 0..n {
+                ml[i] = (m[i * 2] + m[i * 2 + 1]) * 0.5;
+                mr[i] = (c[i * 2] + c[i * 2 + 1]) * 0.5;
+            }
+            cl.fill(0.0);
+            cr.fill(0.0);
+        } else {
+            for i in 0..n {
+                ml[i] = m[i * 2];
+                mr[i] = m[i * 2 + 1];
+                cl[i] = c[i * 2];
+                cr[i] = c[i * 2 + 1];
+            }
         }
         self.frames_rendered += n as u64;
     }

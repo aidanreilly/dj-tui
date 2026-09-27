@@ -23,7 +23,7 @@ fn peak_envelope_is_normalised_to_one() {
     assert_eq!(env.len(), 40);
     let max = env.iter().copied().fold(0.0, f32::max);
     assert!((max - 1.0).abs() < 1e-6);
-    assert!(env.iter().any(|&v| v == 0.0));
+    assert!(env.contains(&0.0));
 }
 
 #[test]

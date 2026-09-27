@@ -80,13 +80,19 @@ impl Biquad {
     fn set_lowpass(&mut self, fs: f64, f: f64, q: f64) {
         let (c, s) = ((TAU * f / fs).cos(), (TAU * f / fs).sin());
         let alpha = s / (2.0 * q);
-        self.set_coeffs([(1.0 - c) / 2.0, 1.0 - c, (1.0 - c) / 2.0], [1.0 + alpha, -2.0 * c, 1.0 - alpha]);
+        self.set_coeffs(
+            [(1.0 - c) / 2.0, 1.0 - c, (1.0 - c) / 2.0],
+            [1.0 + alpha, -2.0 * c, 1.0 - alpha],
+        );
     }
 
     fn set_highpass(&mut self, fs: f64, f: f64, q: f64) {
         let (c, s) = ((TAU * f / fs).cos(), (TAU * f / fs).sin());
         let alpha = s / (2.0 * q);
-        self.set_coeffs([(1.0 + c) / 2.0, -(1.0 + c), (1.0 + c) / 2.0], [1.0 + alpha, -2.0 * c, 1.0 - alpha]);
+        self.set_coeffs(
+            [(1.0 + c) / 2.0, -(1.0 + c), (1.0 + c) / 2.0],
+            [1.0 + alpha, -2.0 * c, 1.0 - alpha],
+        );
     }
 
     #[inline]
@@ -192,7 +198,13 @@ impl Isolator {
     }
 
     fn targets(&self) -> [f32; 3] {
-        std::array::from_fn(|i| if self.kill[i] { 0.0 } else { db_to_gain(self.target_db[i]) })
+        std::array::from_fn(|i| {
+            if self.kill[i] {
+                0.0
+            } else {
+                db_to_gain(self.target_db[i])
+            }
+        })
     }
 
     /// Flat EQ is an exact pass-through: the crossovers keep running so their state is
@@ -212,7 +224,8 @@ impl Isolator {
                 let x = *s as f64;
                 let [l, m, h] = self.split[ch].split(x);
                 if self.wet > 0.0 {
-                    let eq = l * self.gain[0] as f64 + m * self.gain[1] as f64 + h * self.gain[2] as f64;
+                    let eq =
+                        l * self.gain[0] as f64 + m * self.gain[1] as f64 + h * self.gain[2] as f64;
                     *s = (x + self.wet as f64 * (eq - x)) as f32;
                 }
             }
@@ -273,12 +286,18 @@ impl DjFilter {
         match mode {
             FilterMode::Bypass => {}
             FilterMode::LowPass => {
-                let f = (FILTER_LP_MAX_HZ * (FILTER_LP_MIN_HZ / FILTER_LP_MAX_HZ).powf(t)).min(nyquist_guard);
-                self.biquads.iter_mut().for_each(|b| b.set_lowpass(self.fs, f, FILTER_Q));
+                let f = (FILTER_LP_MAX_HZ * (FILTER_LP_MIN_HZ / FILTER_LP_MAX_HZ).powf(t))
+                    .min(nyquist_guard);
+                self.biquads
+                    .iter_mut()
+                    .for_each(|b| b.set_lowpass(self.fs, f, FILTER_Q));
             }
             FilterMode::HighPass => {
-                let f = (FILTER_HP_MIN_HZ * (FILTER_HP_MAX_HZ / FILTER_HP_MIN_HZ).powf(t)).min(nyquist_guard);
-                self.biquads.iter_mut().for_each(|b| b.set_highpass(self.fs, f, FILTER_Q));
+                let f = (FILTER_HP_MIN_HZ * (FILTER_HP_MAX_HZ / FILTER_HP_MIN_HZ).powf(t))
+                    .min(nyquist_guard);
+                self.biquads
+                    .iter_mut()
+                    .for_each(|b| b.set_highpass(self.fs, f, FILTER_Q));
             }
         }
     }
@@ -311,7 +330,11 @@ pub struct Trim {
 
 impl Trim {
     pub fn new(fs: f32) -> Self {
-        Self { target: 1.0, gain: 1.0, smooth: smoothing_coeff(fs, SMOOTH_SECS) }
+        Self {
+            target: 1.0,
+            gain: 1.0,
+            smooth: smoothing_coeff(fs, SMOOTH_SECS),
+        }
     }
 
     pub fn set_db(&mut self, db: f32) {

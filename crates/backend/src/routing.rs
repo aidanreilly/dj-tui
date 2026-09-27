@@ -7,6 +7,9 @@ pub enum Routing {
     Auto,
     /// Leave connections to the user (qjackctl, Helvum, a session manager).
     Off,
+    /// For a stereo-only card and a Y-splitter: mono master on output 1, mono cue on 2.
+    /// The renderer carries both on the `master_L`/`master_R` ports in this mode.
+    Split,
     Explicit {
         master: [String; 2],
         cue: Option<[String; 2]>,
@@ -26,6 +29,15 @@ pub fn plan_connections(client: &str, routing: &Routing, physical: &[String]) ->
     let mut plan = Plan::default();
     match routing {
         Routing::Off => {}
+        Routing::Split => {
+            if physical.len() < 2 {
+                plan.warnings
+                    .push("split mode needs two playback outputs; none found".into());
+                return plan;
+            }
+            plan.connections.push((ours(0), physical[0].clone()));
+            plan.connections.push((ours(1), physical[1].clone()));
+        }
         Routing::Auto => {
             if physical.len() < 2 {
                 plan.warnings
@@ -37,7 +49,7 @@ pub fn plan_connections(client: &str, routing: &Routing, physical: &[String]) ->
             }
             if physical.len() < 4 {
                 plan.warnings.push(
-                    "soundcard has only two outputs; headphone cue is not connected (split-mono mode arrives in M2)"
+                    "soundcard has only two outputs, so headphone cue is not connected; set routing = \"split\" for mono master left and mono cue right"
                         .into(),
                 );
             }

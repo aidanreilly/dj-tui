@@ -27,8 +27,8 @@ pub fn amplitude_rows(ranges: &[[f32; 2]], rows: usize) -> Vec<String> {
         let max = peak;
         let top = (((1.0 - max) * 0.5) * last).round() as usize;
         let bottom = (((1.0 - min) * 0.5) * last).round() as usize;
-        for row in top.min(height - 1)..=bottom.min(height - 1) {
-            pixels[row][col] = true;
+        for row in &mut pixels[top.min(height - 1)..=bottom.min(height - 1)] {
+            row[col] = true;
         }
     }
 
@@ -77,7 +77,7 @@ pub fn downsample_ranges(src: &[[f32; 2]], n: usize) -> Vec<[f32; 2]> {
 /// `rows` must be even and at least 2.
 pub fn bar_rows(envelope: &[f32], rows: usize) -> Vec<String> {
     assert!(
-        rows >= 2 && rows % 2 == 0,
+        rows >= 2 && rows.is_multiple_of(2),
         "waveform rows must be even, got {rows}"
     );
     let half_cells = rows / 2;

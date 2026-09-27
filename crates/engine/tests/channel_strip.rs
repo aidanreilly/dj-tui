@@ -8,7 +8,10 @@ const FS: u32 = 48_000;
 
 fn sine_track(freq: f32, amp: f32) -> Arc<Track> {
     let data = (0..FS as usize * 4)
-        .flat_map(|i| { let s = amp * (std::f32::consts::TAU * freq * i as f32 / FS as f32).sin(); [s, s] })
+        .flat_map(|i| {
+            let s = amp * (std::f32::consts::TAU * freq * i as f32 / FS as f32).sin();
+            [s, s]
+        })
         .collect();
     Arc::new(Track::from_interleaved(data, FS))
 }
@@ -82,7 +85,11 @@ fn trim_command_raises_level() {
 #[test]
 fn headphone_cue_hears_eq_but_not_the_fader() {
     let (mut h, mut p) = setup(50.0);
-    for c in [Command::SetHeadphoneCue(A, true), Command::SetChannelFader(A, 0.0), Command::SetEqKill(A, EqBand::Low, true)] {
+    for c in [
+        Command::SetHeadphoneCue(A, true),
+        Command::SetChannelFader(A, 0.0),
+        Command::SetEqKill(A, EqBand::Low, true),
+    ] {
         h.send(c).unwrap();
     }
     let (m, c) = run(&mut p, 0.5);
@@ -99,7 +106,11 @@ fn meters_hold_the_peak_until_taken() {
     h.take_meters();
     run(&mut p, 0.2);
     let m = h.take_meters();
-    assert!((m.channels[0] - 0.5).abs() < 0.01, "channel meter is pre-fader: {:?}", m);
+    assert!(
+        (m.channels[0] - 0.5).abs() < 0.01,
+        "channel meter is pre-fader: {:?}",
+        m
+    );
     assert_eq!(m.channels[1], 0.0);
     assert_eq!(m.master, 0.0);
     let again = h.take_meters();
