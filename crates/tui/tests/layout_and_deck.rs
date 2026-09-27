@@ -29,6 +29,8 @@ fn loaded_view(focused: bool) -> DeckView {
         playing: true,
         hot_cues: [true, false, true, false, false, false, false, false],
         waveform: vec![[-1.0, 1.0]; 200],
+        bands: vec![],
+        waveform_mode: Default::default(),
     }
 }
 
@@ -96,6 +98,8 @@ fn empty_deck_says_so() {
     let view = DeckView {
         title: None,
         waveform: vec![],
+        bands: vec![],
+        waveform_mode: Default::default(),
         ..loaded_view(false)
     };
     let text = buffer_text(&render(&view, 80, DECK_HEIGHT));
@@ -126,5 +130,22 @@ fn every_waveform_row_is_drawn() {
     let buf = render(&loaded_view(true), 80, DECK_HEIGHT);
     for y in 2..(2 + WAVEFORM_ROWS) {
         assert_eq!(buf[(3, y)].symbol(), "▌", "row {y} empty");
+    }
+}
+
+#[test]
+fn glyph_waveform_uses_mode_colours() {
+    use ratatui::style::Color;
+    let mut view = loaded_view(true);
+    view.waveform = vec![[-0.9, 0.9]; 200];
+    view.bands = vec![[0.9, 0.0, 0.0]; 200];
+    view.waveform_mode = tui::pixel::WaveformMode::Rgb;
+    view.position_secs = 0.0;
+    let buf = render(&view, 80, 13);
+    // Centre row of the waveform, away from the playhead.
+    let cell = &buf[(40, 2 + tui::WAVEFORM_ROWS / 2 - 1)];
+    match cell.fg {
+        Color::Rgb(r, g, b) => assert!(r >= 200 && g <= 40 && b <= 40, "{:?}", cell.fg),
+        other => panic!("expected an RGB colour, got {other:?}"),
     }
 }

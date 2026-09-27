@@ -165,6 +165,23 @@ impl Splitter {
     }
 }
 
+/// The isolator's band split for one mono signal, for offline analysis such as the
+/// loader's per-band waveform. Uses the same crossovers the EQ does, so the colours in
+/// the waveform match what the EQ knobs change.
+pub struct BandSplitter(Splitter);
+
+impl BandSplitter {
+    pub fn new(fs: f32) -> Self {
+        Self(Splitter::new(fs as f64))
+    }
+
+    /// Split one sample into `[low, mid, high]`.
+    #[inline]
+    pub fn split(&mut self, x: f32) -> [f32; 3] {
+        self.0.split(x as f64).map(|v| v as f32)
+    }
+}
+
 /// DJ-style three-band isolator: each band from full kill up to +6 dB.
 pub struct Isolator {
     split: [Splitter; 2],

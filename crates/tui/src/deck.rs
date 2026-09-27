@@ -1,4 +1,5 @@
-use crate::waveform::{amplitude_rows, downsample_ranges};
+use crate::pixel::{colour_at, extent, Palette, WaveformMode};
+use crate::waveform::{amplitude_rows, downsample_bands, downsample_ranges};
 use engine::DeckId;
 use ratatui::{
     buffer::Buffer,
@@ -36,6 +37,9 @@ pub struct DeckView {
     pub hot_cues: [bool; 8],
     /// Whole-track signed `[minimum, maximum]` sample ranges, resampled to panel width.
     pub waveform: Vec<[f32; 2]>,
+    /// Peak `[low, mid, high]` per overview position; empty when not analysed.
+    pub bands: Vec<[f32; 3]>,
+    pub waveform_mode: WaveformMode,
 }
 
 pub struct DeckPanel<'a> {
@@ -109,6 +113,9 @@ impl Widget for DeckPanel<'_> {
         let wave_y = inner.y + 1;
         let columns = downsample_ranges(&v.waveform, inner.width as usize);
         let rows = amplitude_rows(&columns, WAVEFORM_ROWS as usize);
+        let bands = downsample_bands(&v.bands, inner.width as usize);
+        let palette = Palette::default();
+        let half_rows = WAVEFORM_ROWS as f32 / 2.0;
         let center_y = wave_y + WAVEFORM_ROWS / 2;
         buf.set_string(
             inner.x,
@@ -121,12 +128,19 @@ impl Widget for DeckPanel<'_> {
             if y >= inner.bottom() {
                 break;
             }
+            // Colour each cell from its inner edge, like the pixel renderer does per row.
+            let d = ((i as f32 + 0.5 - half_rows).abs() - 0.5).max(0.0) / half_rows;
             for (col, glyph) in row.chars().enumerate().filter(|(_, glyph)| *glyph != ' ') {
+                let peak = columns[col][1];
+                let b = bands[col];
+                let reach = extent(v.waveform_mode, peak, b);
+                let c = colour_at(v.waveform_mode, peak, b, d.min(reach), &palette)
+                    .unwrap_or(palette.three_band[0]);
                 buf.set_string(
                     inner.x + col as u16,
                     y,
                     glyph.to_string(),
-                    Style::new().fg(ratatui::style::Color::Rgb(126, 113, 190)),
+                    Style::new().fg(ratatui::style::Color::Rgb(c[0], c[1], c[2])),
                 );
             }
         }

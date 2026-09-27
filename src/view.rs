@@ -11,6 +11,7 @@ pub struct DeckMeta {
     pub key: Option<String>,
     pub loading: bool,
     pub waveform: Vec<[f32; 2]>,
+    pub bands: Vec<[f32; 3]>,
 }
 
 fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &DeckMeta) -> DeckView {
@@ -36,6 +37,12 @@ fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &Dec
         } else {
             Vec::new()
         },
+        bands: if loaded {
+            meta.bands.clone()
+        } else {
+            Vec::new()
+        },
+        waveform_mode: Default::default(),
     }
 }
 

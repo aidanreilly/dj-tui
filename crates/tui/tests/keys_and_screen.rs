@@ -90,6 +90,8 @@ fn deck(id: DeckId, focused: bool) -> DeckView {
         playing: false,
         hot_cues: [false; 8],
         waveform: vec![],
+        bands: vec![],
+        waveform_mode: Default::default(),
     }
 }
 

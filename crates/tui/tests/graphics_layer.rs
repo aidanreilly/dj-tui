@@ -34,6 +34,8 @@ fn deck(id: DeckId, loaded: bool, position_secs: f64) -> DeckView {
         } else {
             vec![]
         },
+        bands: vec![],
+        waveform_mode: Default::default(),
     }
 }
 

@@ -40,6 +40,8 @@ pub struct LoadedTrack {
     pub artist: Option<String>,
     /// Signed `[minimum, maximum]` sample range for each overview position.
     pub waveform: Vec<[f32; 2]>,
+    /// Peak `[low, mid, high]` per overview position, on the same scale as `waveform`.
+    pub bands: Vec<[f32; 3]>,
 }
 
 impl std::fmt::Debug for LoadedTrack {
@@ -63,6 +65,7 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
     let data: Vec<f32> = l.iter().zip(&r).flat_map(|(&a, &b)| [a, b]).collect();
     let track = Track::from_interleaved(data, session_rate);
     let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
+    let bands = band_envelope(&track, ENVELOPE_POINTS);
     let title = decoded.title.unwrap_or_else(|| {
         path.file_stem()
             .map(|s| s.to_string_lossy().into_owned())
@@ -73,7 +76,36 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
         title,
         artist: decoded.artist,
         waveform,
+        bands,
     })
+}
+
+/// Peak level of the low, mid and high bands per overview position, split with the same
+/// crossovers as the isolator EQ and normalised like [`waveform_envelope`].
+pub fn band_envelope(track: &Track, points: usize) -> Vec<[f32; 3]> {
+    let frames = track.frames();
+    if frames == 0 || points == 0 {
+        return vec![[0.0; 3]; points];
+    }
+    let mut split = engine::dsp::BandSplitter::new(track.sample_rate() as f32);
+    let mut out = vec![[0.0f32; 3]; points];
+    let mut full_peak = 0f32;
+    for (j, slot) in out.iter_mut().enumerate() {
+        let start = (j * frames / points).min(frames - 1);
+        let end = ((j + 1) * frames / points).clamp(start + 1, frames);
+        for i in start..end {
+            let (l, r) = track.frame_at(i as f64);
+            full_peak = full_peak.max(l.abs()).max(r.abs());
+            let bands = split.split((l + r) * 0.5);
+            for (acc, b) in slot.iter_mut().zip(bands) {
+                *acc = acc.max(b.abs());
+            }
+        }
+    }
+    if full_peak > 0.0 {
+        out.iter_mut().flatten().for_each(|v| *v /= full_peak);
+    }
+    out
 }
 
 /// Whole-track signed amplitude ranges, normalized so the loudest absolute sample is 1.

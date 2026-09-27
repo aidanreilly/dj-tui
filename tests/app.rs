@@ -130,3 +130,34 @@ fn meters_show_level_and_fall_back_gradually() {
     }
     assert!(app.view(String::new()).mixer.strips[0].meter < 0.01);
 }
+
+#[test]
+fn waveform_mode_starts_from_config_and_w_cycles_it() {
+    use tui::pixel::WaveformMode;
+    let (handle, _p) = channel(Engine::new(), 64);
+    let config = Config::from_toml("[ui]\nwaveform_mode = \"rgb\"").unwrap();
+    let mut app = App::new(handle, &config, RATE);
+    assert_eq!(
+        app.view(String::new()).decks[0].waveform_mode,
+        WaveformMode::Rgb
+    );
+    app.on_key(KeyEvent::press(Key::Char('W')));
+    let v = app.view(String::new());
+    assert_eq!(v.decks[0].waveform_mode, WaveformMode::Blue);
+    assert_eq!(v.decks[1].waveform_mode, WaveformMode::Blue);
+    assert!(app.message().contains("Blue"), "{}", app.message());
+}
+
+#[test]
+fn loaded_tracks_carry_band_data_to_the_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("bands.wav");
+    write_wav(&path, &stereo(&[0.3; 9600]), 2, RATE, Fmt::Pcm16);
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    assert_eq!(
+        app.view(String::new()).decks[0].bands.len(),
+        loader::ENVELOPE_POINTS
+    );
+}

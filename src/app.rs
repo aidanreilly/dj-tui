@@ -9,6 +9,7 @@ use input::{Action, KeyEvent, Keymap};
 use loader::Loader;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tui::pixel::WaveformMode;
 use tui::ScreenView;
 
 /// Meter fall per UI frame. At 30 frames a second this is about 20 dB a second.
@@ -25,6 +26,7 @@ pub struct App {
     message: String,
     /// Decaying peak meters: deck A, deck B, master.
     meters: [f32; 3],
+    waveform_mode: WaveformMode,
 }
 
 impl App {
@@ -40,6 +42,11 @@ impl App {
             sample_rate,
             message: String::new(),
             meters: [0.0; 3],
+            waveform_mode: match config.ui.waveform_mode {
+                crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
+                crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
+                crate::config::WaveformMode::Blue => WaveformMode::Blue,
+            },
         };
         app.send(Command::SetCrossfaderCurve(config.mixer.crossfader_curve));
         app
@@ -101,6 +108,7 @@ impl App {
                             key: None,
                             loading: false,
                             waveform: loaded.waveform,
+                            bands: loaded.bands,
                         },
                     );
                 }
@@ -119,6 +127,10 @@ impl App {
         };
         match action {
             Action::Quit => return true,
+            Action::CycleWaveformMode => {
+                self.waveform_mode = self.waveform_mode.next();
+                self.message = format!("Waveform: {}", mode_name(self.waveform_mode));
+            }
             Action::Load(_) => {
                 self.message =
                     "The library browser arrives in M8; pass files on the command line for now"
@@ -151,6 +163,9 @@ impl App {
             status,
         );
         v.message = self.message.clone();
+        for d in &mut v.decks {
+            d.waveform_mode = self.waveform_mode;
+        }
         for (i, (view, st)) in v
             .mixer
             .strips
@@ -174,6 +189,14 @@ impl App {
         if self.handle.send(cmd).is_err() {
             self.message = "Audio engine is not keeping up (command queue full)".into();
         }
+    }
+}
+
+fn mode_name(m: WaveformMode) -> &'static str {
+    match m {
+        WaveformMode::ThreeBand => "3-Band",
+        WaveformMode::Rgb => "RGB",
+        WaveformMode::Blue => "Blue",
     }
 }
 

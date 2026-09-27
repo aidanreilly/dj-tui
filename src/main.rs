@@ -136,7 +136,9 @@ fn main() -> ExitCode {
         for (id, bpm) in [(DeckId::A, 124.0), (DeckId::B, 126.0)] {
             let track = click_track(bpm, 180.0, app.sample_rate());
             let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
+            let bands = loader::band_envelope(&track, ENVELOPE_POINTS);
             let meta = DeckMeta {
+                bands,
                 title: Some(format!("Demo click {bpm:.0}")),
                 bpm: Some(bpm),
                 key: None,

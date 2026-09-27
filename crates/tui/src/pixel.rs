@@ -7,7 +7,7 @@
 //! The anti-aliased span drawing follows `draw_vspan_aa` in tui-wave
 //! (<https://github.com/biomassa/tui-wave>, MIT, Copyright (c) 2026 biomassa).
 
-use crate::waveform::downsample_ranges;
+use crate::waveform::{downsample_bands, downsample_ranges};
 use image::{Rgba, RgbaImage};
 use std::hash::{Hash, Hasher};
 
@@ -22,12 +22,15 @@ fn shape(peak: f32) -> f32 {
     peak.clamp(0.0, 1.0).powf(1.5)
 }
 
+/// Colour scheme for the waveform modes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Palette {
-    /// Colour at the centre line.
-    pub low: Rgba<u8>,
-    /// Colour at full scale.
-    pub high: Rgba<u8>,
+    /// 3-Band colours, indexed low, mid, high: blue, amber, white as on the CDJ-3000.
+    pub three_band: [Rgba<u8>; 3],
+    /// Blue mode: bass-heavy passages are this deep blue...
+    pub blue_dark: Rgba<u8>,
+    /// ...and bright, treble-heavy passages approach this.
+    pub blue_bright: Rgba<u8>,
     pub centre_line: Rgba<u8>,
     pub playhead: Rgba<u8>,
 }
@@ -35,12 +38,105 @@ pub struct Palette {
 impl Default for Palette {
     fn default() -> Self {
         Self {
-            low: Rgba([96, 84, 170, 255]),
-            high: Rgba([214, 208, 255, 255]),
+            three_band: [
+                Rgba([24, 72, 255, 255]),
+                Rgba([255, 160, 16, 255]),
+                Rgba([246, 246, 246, 255]),
+            ],
+            blue_dark: Rgba([34, 40, 170, 255]),
+            blue_bright: Rgba([190, 232, 255, 255]),
             centre_line: Rgba([58, 50, 84, 255]),
             playhead: Rgba([236, 232, 210, 255]),
         }
     }
+}
+
+/// How the waveform is coloured. Names follow rekordbox and the CDJ-3000.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum WaveformMode {
+    /// Separate layered shapes: blue lows, amber mids, white highs.
+    #[default]
+    ThreeBand,
+    /// One blended colour per column: red lows, green mids, blue highs.
+    Rgb,
+    /// Single blue waveform that brightens toward white as the highs rise.
+    Blue,
+}
+
+impl WaveformMode {
+    pub fn next(self) -> Self {
+        match self {
+            Self::ThreeBand => Self::Rgb,
+            Self::Rgb => Self::Blue,
+            Self::Blue => Self::ThreeBand,
+        }
+    }
+}
+
+/// Everything needed to draw one deck's overview.
+#[derive(Debug, Clone, Copy)]
+pub struct Wave<'a> {
+    /// Signed `[min, max]` per overview position.
+    pub ranges: &'a [[f32; 2]],
+    /// Peak `[low, mid, high]` per overview position; may be empty.
+    pub bands: &'a [[f32; 3]],
+    pub mode: WaveformMode,
+}
+
+/// Exponent that pushes weaker bands toward zero in RGB mode, so hues stay clear
+/// instead of washing out toward grey.
+const RGB_SATURATION: f32 = 2.2;
+
+/// How far the waveform reaches from the centre, as a fraction of half the height.
+pub fn extent(mode: WaveformMode, peak: f32, bands: [f32; 3]) -> f32 {
+    let band_max = bands.iter().copied().fold(0.0, f32::max);
+    match mode {
+        WaveformMode::ThreeBand if band_max > 0.0 => shape(band_max),
+        _ => shape(peak),
+    }
+}
+
+/// Colour of the waveform at `distance` from the centre line (0 centre, 1 edge), or
+/// `None` where the waveform doesn't reach. `peak` is the column's full-band peak.
+pub fn colour_at(
+    mode: WaveformMode,
+    peak: f32,
+    bands: [f32; 3],
+    distance: f32,
+    palette: &Palette,
+) -> Option<Rgba<u8>> {
+    if distance > extent(mode, peak, bands) {
+        return None;
+    }
+    let band_max = bands.iter().copied().fold(0.0, f32::max);
+    Some(match mode {
+        WaveformMode::ThreeBand => {
+            if band_max <= 0.0 {
+                return Some(palette.three_band[0]);
+            }
+            // Topmost layer first: highs, then mids, then lows.
+            (0..3)
+                .rev()
+                .find(|&i| distance <= shape(bands[i]))
+                .map_or(palette.three_band[0], |i| palette.three_band[i])
+        }
+        WaveformMode::Rgb => {
+            if band_max <= 0.0 {
+                return Some(Rgba([200, 200, 200, 255]));
+            }
+            let c = |v: f32| ((v / band_max).powf(RGB_SATURATION) * 255.0).round() as u8;
+            Rgba([c(bands[0]), c(bands[1]), c(bands[2]), 255])
+        }
+        WaveformMode::Blue => {
+            let total: f32 = bands.iter().sum();
+            let t = if total > 0.0 {
+                (bands[2] + 0.4 * bands[1]) / total
+            } else {
+                0.0
+            };
+            lerp(palette.blue_dark, palette.blue_bright, t)
+        }
+    })
 }
 
 fn lerp(a: Rgba<u8>, b: Rgba<u8>, t: f32) -> Rgba<u8> {
@@ -91,21 +187,26 @@ pub struct WaveformBitmaps {
 }
 
 impl WaveformBitmaps {
-    pub fn rasterize(ranges: &[[f32; 2]], width: u32, height: u32, palette: &Palette) -> Self {
+    pub fn rasterize(wave: &Wave, width: u32, height: u32, palette: &Palette) -> Self {
         let mut normal = RgbaImage::new(width, height);
         let mid = height as f32 / 2.0;
-        let columns = downsample_ranges(ranges, width as usize);
-        for (x, &[min, max]) in columns.iter().enumerate() {
+        let columns = downsample_ranges(wave.ranges, width as usize);
+        let bands = downsample_bands(wave.bands, width as usize);
+        for (x, (&[min, max], &b)) in columns.iter().zip(&bands).enumerate() {
             let x = x as u32;
-            let half = shape(min.abs().max(max.abs())) * mid;
-            if half <= 0.0 {
+            let peak = min.abs().max(max.abs());
+            let reach = extent(wave.mode, peak, b);
+            if reach <= 0.0 {
                 continue;
             }
             // Keep very quiet passages visible: at least one pixel, centred.
-            let half = half.max(0.5);
+            let half = (reach * mid).max(0.5);
             span(&mut normal, x, mid - half, mid + half, |y| {
-                let t = ((y as f32 + 0.5) - mid).abs() / mid;
-                lerp(palette.low, palette.high, t)
+                // Sample colour at the row's inner edge so partial edge rows keep the
+                // outermost band's colour.
+                let d = ((y as f32 + 0.5 - mid).abs() - 0.5).max(0.0) / mid;
+                colour_at(wave.mode, peak, b, d.min(reach), palette)
+                    .unwrap_or(palette.three_band[0])
             });
         }
         // The centre line fills whatever the bars left empty, straddling the middle.
@@ -159,12 +260,17 @@ pub fn playhead_x(position_secs: f64, duration_secs: f64, width: u32) -> Option<
     Some(((frac * width as f64) as u32).min(width.saturating_sub(PLAYHEAD_WIDTH)))
 }
 
-fn fingerprint(ranges: &[[f32; 2]]) -> u64 {
+fn fingerprint(wave: &Wave) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    ranges.len().hash(&mut h);
-    for [a, b] in ranges {
-        a.to_bits().hash(&mut h);
-        b.to_bits().hash(&mut h);
+    wave.mode.hash(&mut h);
+    wave.ranges.len().hash(&mut h);
+    for v in wave
+        .ranges
+        .iter()
+        .flatten()
+        .chain(wave.bands.iter().flatten())
+    {
+        v.to_bits().hash(&mut h);
     }
     h.finish()
 }
@@ -183,21 +289,21 @@ impl PixelWaveform {
     /// Returns an image when the terminal needs a new one.
     pub fn update(
         &mut self,
-        ranges: &[[f32; 2]],
+        wave: &Wave,
         size: (u32, u32),
         playhead: Option<u32>,
         palette: &Palette,
     ) -> Option<RgbaImage> {
-        if ranges.is_empty() || size.0 == 0 || size.1 == 0 {
+        if wave.ranges.is_empty() || size.0 == 0 || size.1 == 0 {
             *self = Self {
                 rasterizations: self.rasterizations,
                 ..Default::default()
             };
             return None;
         }
-        let source = (fingerprint(ranges), size);
+        let source = (fingerprint(wave), size);
         if self.source != Some(source) || self.bitmaps.is_none() {
-            self.bitmaps = Some(WaveformBitmaps::rasterize(ranges, size.0, size.1, palette));
+            self.bitmaps = Some(WaveformBitmaps::rasterize(wave, size.0, size.1, palette));
             self.source = Some(source);
             self.shown_playhead = None;
             self.rasterizations += 1;
