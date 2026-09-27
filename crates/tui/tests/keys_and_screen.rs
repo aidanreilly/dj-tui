@@ -209,6 +209,32 @@ fn mixer_strip_shows_trim_eq_filter_and_meters() {
 }
 
 #[test]
+fn the_mixer_shows_the_headphone_mix() {
+    let m = MixerView {
+        cue_mix: 1.0,
+        ..Default::default()
+    };
+    let text = mixer_text(m, 120, 44);
+    // "MIXER" is the panel title, so look for the row label instead.
+    let row = text
+        .lines()
+        .find(|l| l.contains("MIX ") && !l.contains("MIXER"))
+        .expect("a headphone mix row");
+    assert!(row.contains('█'), "all the way to master: {row}");
+
+    let m = MixerView {
+        cue_mix: 0.0,
+        ..Default::default()
+    };
+    let text = mixer_text(m, 120, 44);
+    let row = text
+        .lines()
+        .find(|l| l.contains("MIX ") && !l.contains("MIXER"))
+        .unwrap();
+    assert!(!row.contains('█'), "all the way to the cue bus: {row}");
+}
+
+#[test]
 fn killed_bands_say_kill() {
     let mut m = MixerView::default();
     m.strips[1].kills = [false, false, true];

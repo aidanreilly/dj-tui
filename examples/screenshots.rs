@@ -154,6 +154,7 @@ fn main() {
                 crossfader: -0.3,
                 faders: [1.0, 0.7],
                 headphone_cue: [false, true],
+                cue_mix: 0.4,
                 strips: [
                     StripView { trim_db: 0.0, eq_db: [0.0, 0.0, 2.0], kills: [false; 3], filter: 0.0, meter: 0.8,
                         fx_name: FxKind::Echo.name(), fx_on: true, fx_wet: 0.6 },

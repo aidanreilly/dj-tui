@@ -126,6 +126,7 @@ with the track and comes back the next time you load it.
 | `Alt+t`, `Alt+y`, `Alt+u` | Kill a band |
 | `o` / `O` | Filter toward low-pass and high-pass |
 | `m` | Headphone cue on this channel |
+| `h` / `H` | Headphone mix, from the cue bus toward the master |
 
 ### Effects
 

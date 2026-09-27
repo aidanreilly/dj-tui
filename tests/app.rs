@@ -484,6 +484,18 @@ fn the_question_mark_shows_the_key_list_and_any_key_puts_it_away() {
 }
 
 #[test]
+fn the_headphone_mix_key_reports_both_sides_of_the_blend() {
+    let (mut app, _p) = setup();
+    app.on_key(KeyEvent::press(Key::Char('H')));
+    assert!(
+        app.message().contains("40% cue") && app.message().contains("60% master"),
+        "{}",
+        app.message()
+    );
+    assert!((app.view(String::new()).mixer.cue_mix - 0.6).abs() < 1e-6);
+}
+
+#[test]
 fn key_lock_reports_itself_and_shows_in_the_deck_view() {
     let (mut app, _p) = setup();
     app.on_key(KeyEvent::press(Key::Char('k')));

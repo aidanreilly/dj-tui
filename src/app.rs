@@ -252,6 +252,13 @@ impl App {
         };
     }
 
+    /// Report the headphone blend, which only the person wearing them can hear.
+    fn note_cue_mix(&mut self, action: Action) {
+        let Action::CueMix(_) = action else { return };
+        let master = (self.state.cue_mix * 100.0).round() as u32;
+        self.message = format!("Headphones: {}% cue, {master}% master", 100 - master);
+    }
+
     /// Report the key lock toggle, which has no effect at all until the tempo fader moves.
     fn note_key_lock(&mut self, action: Action) {
         let Action::KeyLock(d) = action else { return };
@@ -382,6 +389,7 @@ impl App {
                 self.note_fx_keys(action);
                 self.note_sync_key(action, cmd.as_ref());
                 self.note_key_lock(action);
+                self.note_cue_mix(action);
                 if let Some(cmd) = cmd {
                     self.send(cmd);
                 }
@@ -458,6 +466,7 @@ impl App {
             };
         }
         v.mixer.master_meter = self.meters[2];
+        v.mixer.cue_mix = self.state.cue_mix;
         v
     }
 

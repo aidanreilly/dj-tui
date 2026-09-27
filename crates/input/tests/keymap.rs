@@ -215,6 +215,8 @@ fn deck_toggles_and_loops() {
     );
     assert_eq!(press(&mut km, ch('0')), Some(Action::FxWet(d, Dir::Up)));
     assert_eq!(press(&mut km, ch('m')), Some(Action::HeadphoneCue(d)));
+    assert_eq!(press(&mut km, ch('h')), Some(Action::CueMix(Dir::Down)));
+    assert_eq!(press(&mut km, ch('H')), Some(Action::CueMix(Dir::Up)));
 }
 
 #[test]
@@ -296,6 +298,8 @@ mod action_names {
         assert_eq!(parse_action("fx a"), Some(Action::FxToggle(A)));
         assert_eq!(parse_action("fx-next a"), Some(Action::FxNext(A)));
         assert_eq!(parse_action("waveform"), Some(Action::CycleWaveformMode));
+        assert_eq!(parse_action("cue-mix up"), Some(Action::CueMix(Dir::Up)));
+        assert_eq!(parse_action("headphones a"), Some(Action::HeadphoneCue(A)));
     }
 
     #[test]

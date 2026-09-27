@@ -427,6 +427,27 @@ fn sync_will_not_pull_the_tempo_past_the_fader_range() {
 }
 
 #[test]
+fn the_headphone_mix_blends_between_the_cue_bus_and_the_master() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    assert_eq!(st.cue_mix, 0.5, "half and half to start");
+    let value = |cmd: Option<Command>| match cmd {
+        Some(Command::SetCueMix(v)) => v,
+        other => panic!("expected a cue mix, got {other:?}"),
+    };
+    assert!((value(run(&mut st, &s, Action::CueMix(Dir::Up))) - 0.6).abs() < 1e-6);
+    assert_eq!(st.cue_mix, 0.6);
+    for _ in 0..10 {
+        run(&mut st, &s, Action::CueMix(Dir::Up));
+    }
+    assert_eq!(st.cue_mix, 1.0, "all master");
+    for _ in 0..20 {
+        run(&mut st, &s, Action::CueMix(Dir::Down));
+    }
+    assert_eq!(st.cue_mix, 0.0, "all cue");
+}
+
+#[test]
 fn quantize_toggles_without_sending_a_command() {
     let (mut st, s) = snap_with_beats(480_000);
     assert!(run(&mut st, &s, Action::Quantize(A)).is_none());
@@ -647,6 +668,18 @@ mod absolute {
         assert_eq!(st.faders[0], 1.0);
         set(&mut st, Control::Fader(A), -4.0);
         assert_eq!(st.faders[0], 0.0);
+    }
+
+    #[test]
+    fn a_knob_can_set_the_headphone_mix_too() {
+        let mut st = ControlState::default();
+        set(&mut st, Control::CueMix, 0.25);
+        assert_eq!(st.cue_mix, 0.25);
+        assert_eq!(
+            dj_tui::apply::control_value(&st, &ctl(), Control::CueMix),
+            0.25,
+            "and reads back for takeover"
+        );
     }
 
     #[test]

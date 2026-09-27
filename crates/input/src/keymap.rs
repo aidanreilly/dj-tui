@@ -187,6 +187,7 @@ impl Keymap {
             'd' | 'D' => FxParam(d, 1, dir(c == 'D')),
             'F' => FxNext(d),
             'm' => HeadphoneCue(d),
+            'h' | 'H' => CueMix(dir(c == 'H')),
             'r' | 'R' => Trim(d, dir(c == 'R')),
             'o' | 'O' => Filter(d, dir(c == 'O')),
             'v' | 'V' => Fader(d, dir(c == 'V')),

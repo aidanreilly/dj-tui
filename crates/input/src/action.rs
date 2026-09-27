@@ -47,6 +47,8 @@ pub enum Action {
     Filter(DeckId, Dir),
     Fader(DeckId, Dir),
     HeadphoneCue(DeckId),
+    /// Blend the headphones between the cue bus and the master.
+    CueMix(Dir),
     /// Direction and whether to snap to the end.
     Crossfader(Dir, bool),
     BrowserMove(Dir),

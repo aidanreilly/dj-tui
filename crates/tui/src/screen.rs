@@ -13,6 +13,8 @@ pub struct MixerView {
     pub crossfader: f32,
     pub faders: [f32; 2],
     pub headphone_cue: [bool; 2],
+    /// Headphone blend: 0 is the cue bus alone, 1 is the master alone.
+    pub cue_mix: f32,
     pub strips: [StripView; 2],
     /// Master bus peak, linear.
     pub master_meter: f32,
@@ -73,6 +75,7 @@ const HELP: &[(&str, &str)] = &[
     ("o / O", "filter toward low-pass and high-pass"),
     ("v / V", "channel fader"),
     ("m", "headphone cue"),
+    ("h / H", "headphone mix, cue toward master"),
     ("arrows", "crossfader, Shift snaps to the end"),
     ("w", "waveform colour mode"),
     ("click", "seek on the waveform"),
@@ -237,6 +240,7 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 dot(m.headphone_cue[1]),
                 w = BAR
             )),
+            row("MIX", level_bar(m.cue_mix), String::new()),
             Line::from(""),
             Line::from(format!("A {} B", crossfader_bar(m.crossfader))),
             {

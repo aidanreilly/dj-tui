@@ -55,6 +55,8 @@ pub struct ControlState {
     pub loop_in: [Option<f64>; 2],
     pub quantize: [bool; 2],
     pub key_lock: [bool; 2],
+    /// Headphone blend: 0 is the cue bus alone, 1 is the master alone.
+    pub cue_mix: f32,
     pub fx: [FxState; 2],
 }
 
@@ -95,6 +97,7 @@ pub const EQ_FLOOR_DB: f32 = -26.0;
 pub const FILTER_STEP: f32 = 0.1;
 pub const FX_WET_STEP: f32 = 0.1;
 pub const FX_PARAM_STEP: f32 = 0.05;
+pub const CUE_MIX_STEP: f32 = 0.1;
 /// How far one nudge moves the playhead. Small enough to beatmatch by ear.
 pub const NUDGE_SECS: f64 = 0.01;
 /// A bar in 4/4, the length a CDJ's loop key reaches for.
@@ -129,6 +132,7 @@ impl Default for ControlState {
             loop_in: [None; 2],
             quantize: [false; 2],
             key_lock: [false; 2],
+            cue_mix: 0.5,
             fx: [FxState::default(); 2],
         }
     }
@@ -179,7 +183,10 @@ pub fn set_control(
             st.crossfader = v * 2.0 - 1.0;
             Command::SetCrossfader(st.crossfader)
         }
-        Control::CueMix => Command::SetCueMix(v),
+        Control::CueMix => {
+            st.cue_mix = v;
+            Command::SetCueMix(v)
+        }
         Control::Fader(d) => {
             st.faders[d.index()] = v;
             Command::SetChannelFader(d, v)
@@ -226,7 +233,7 @@ pub fn set_control(
 pub fn control_value(st: &ControlState, c: &Controls, control: Control) -> f32 {
     match control {
         Control::Crossfader => (st.crossfader + 1.0) / 2.0,
-        Control::CueMix => 0.5,
+        Control::CueMix => st.cue_mix,
         Control::Fader(d) => st.faders[d.index()],
         Control::Tempo(d) => {
             (((st.rates[d.index()] - 1.0) / c.tempo_range + 1.0) / 2.0).clamp(0.0, 1.0) as f32
@@ -284,6 +291,10 @@ pub fn apply(
             let v = &mut st.faders[d.index()];
             *v = (*v + c.fader_step * sign(dir)).clamp(0.0, 1.0);
             Command::SetChannelFader(d, *v)
+        }
+        CueMix(dir) => {
+            st.cue_mix = step(st.cue_mix, CUE_MIX_STEP * sign(dir), 0.0, 1.0);
+            Command::SetCueMix(st.cue_mix)
         }
         HeadphoneCue(d) => {
             let on = &mut st.headphone_cue[d.index()];
