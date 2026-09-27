@@ -28,6 +28,10 @@ pub enum Command {
     SetEq(DeckId, crate::dsp::EqBand, f32),
     SetEqKill(DeckId, crate::dsp::EqBand, bool),
     SetFilter(DeckId, f32),
+    /// Place the main cue at a frame, as when restoring saved cues.
+    SetCuePoint(DeckId, f64),
+    /// Place or clear hot cue `n` at a frame without moving the playhead.
+    SetHotCue(DeckId, usize, Option<f64>),
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

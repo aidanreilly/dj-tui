@@ -207,3 +207,39 @@ fn phase_offset_is_b_relative_to_a_wrapped_to_half_a_beat() {
     assert!((phase_offset(0.9, 0.1) - 0.2).abs() < 1e-9);
     assert!((phase_offset(0.1, 0.9) + 0.2).abs() < 1e-9);
 }
+
+#[test]
+fn cues_set_on_a_deck_are_saved_beside_the_file_and_come_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("keep.wav");
+    write_wav(&path, &stereo(&[0.3; 96_000]), 2, RATE, Fmt::Pcm16);
+    let sidecar = loader::sidecar::sidecar_path(&path);
+    {
+        let (mut app, mut p) = setup();
+        app.load_path(DeckId::A, path.clone());
+        wait_for_load(&mut app, &mut p, DeckId::A);
+        app.on_key(KeyEvent::press(Key::Space));
+        process(&mut p, 4800);
+        app.on_key(KeyEvent::press(Key::Char('2')));
+        process(&mut p, 16);
+        let start = Instant::now();
+        loop {
+            app.tick();
+            let text = std::fs::read_to_string(&sidecar).unwrap_or_default();
+            if text.contains("\"pad\":2") || text.contains("\"pad\": 2") {
+                break;
+            }
+            assert!(
+                start.elapsed() < Duration::from_secs(10),
+                "cue never saved: {text}"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    process(&mut p, 16);
+    let cue = app.snapshot().decks[0].hot_cues[1].expect("hot cue 2 restored");
+    assert!((cue - 4800.0).abs() < 1.0, "{cue}");
+}

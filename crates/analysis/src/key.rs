@@ -48,6 +48,23 @@ impl Key {
         format!("{n}{letter}")
     }
 
+    /// Parse a Camelot code such as `8A` or `11B`.
+    pub fn from_camelot(code: &str) -> Option<Key> {
+        let (num, letter) = code.trim().split_at(code.trim().len().checked_sub(1)?);
+        let n: u32 = num.parse().ok().filter(|n| (1..=12).contains(n))?;
+        let (offset, mode) = match letter {
+            "A" | "a" => (5, Mode::Minor),
+            "B" | "b" => (8, Mode::Major),
+            _ => return None,
+        };
+        // Invert `n = (7·pc + offset - 1) mod 12 + 1`; 7 is its own inverse mod 12.
+        let pc = ((n + 12 * 2 - offset) * 7) % 12;
+        Some(Key {
+            tonic: PitchClass(pc as u8),
+            mode,
+        })
+    }
+
     pub fn name(&self) -> String {
         let mode = match self.mode {
             Mode::Major => "major",

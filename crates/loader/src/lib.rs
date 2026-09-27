@@ -5,6 +5,7 @@
 
 mod decode;
 mod resample;
+pub mod sidecar;
 
 use engine::{DeckId, Track};
 use std::path::{Path, PathBuf};
@@ -44,6 +45,12 @@ pub struct LoadedTrack {
     pub bands: Vec<[f32; 3]>,
     pub grid: Option<analysis::tempo::BeatGrid>,
     pub key: Option<analysis::key::Key>,
+    /// Cues saved beside the file, in seconds.
+    pub cues: sidecar::Cues,
+    /// True when analysis and waveform came from the sidecar instead of being computed.
+    pub from_sidecar: bool,
+    /// Set when the sidecar couldn't be written; loading still succeeded.
+    pub sidecar_note: Option<String>,
 }
 
 impl std::fmt::Debug for LoadedTrack {
@@ -66,10 +73,42 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
     };
     let data: Vec<f32> = l.iter().zip(&r).flat_map(|(&a, &b)| [a, b]).collect();
     let track = Track::from_interleaved(data, session_rate);
-    let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
-    let bands = band_envelope(&track, ENVELOPE_POINTS);
-    let grid = analysis::tempo::detect_tempo(&track, analysis::tempo::TempoRange::default());
-    let key = analysis::key::detect_key(&track);
+    let id = sidecar::fingerprint_file(path).map_err(LoadError::Io)?;
+    let saved = sidecar::Sidecar::read(path).filter(|s| s.audio == id);
+    let cues = saved.as_ref().map(|s| s.cues.clone()).unwrap_or_default();
+    let reusable = saved
+        .and_then(|s| s.analysis)
+        .filter(|a| a.waveform.len() == ENVELOPE_POINTS && a.bands.len() == ENVELOPE_POINTS);
+    let from_sidecar = reusable.is_some();
+    let stored = match reusable {
+        Some(a) => a,
+        None => sidecar::Stored {
+            waveform: waveform_envelope(&track, ENVELOPE_POINTS),
+            bands: band_envelope(&track, ENVELOPE_POINTS),
+            grid: analysis::tempo::detect_tempo(&track, analysis::tempo::TempoRange::default()),
+            key: analysis::key::detect_key(&track),
+        },
+    };
+    let mut sidecar_note = None;
+    if !from_sidecar {
+        let file = sidecar::Sidecar {
+            audio: id,
+            analysis: Some(stored.clone()),
+            cues: cues.clone(),
+        };
+        if let Err(e) = file.write(path) {
+            sidecar_note = Some(format!(
+                "could not save {}: {e}",
+                sidecar::sidecar_path(path).display()
+            ));
+        }
+    }
+    let sidecar::Stored {
+        grid,
+        key,
+        waveform,
+        bands,
+    } = stored;
     let title = decoded.title.unwrap_or_else(|| {
         path.file_stem()
             .map(|s| s.to_string_lossy().into_owned())
@@ -83,6 +122,9 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
         bands,
         grid,
         key,
+        cues,
+        from_sidecar,
+        sidecar_note,
     })
 }
 
@@ -182,23 +224,43 @@ pub struct LoadResult {
     pub result: Result<LoadedTrack, LoadError>,
 }
 
-/// A background thread that loads files on request. Dropping it stops the thread.
+enum Request {
+    Load(DeckId, PathBuf),
+    SaveCues(PathBuf, sidecar::Cues),
+}
+
+/// A background thread that loads files and saves cue changes, so the UI never waits on
+/// the disk. Dropping it stops the thread.
 pub struct Loader {
-    requests: Sender<(DeckId, PathBuf)>,
+    requests: Sender<Request>,
     results: Receiver<LoadResult>,
+    notes: Receiver<String>,
 }
 
 impl Loader {
     pub fn spawn(session_rate: u32) -> Self {
-        let (req_tx, req_rx) = channel::<(DeckId, PathBuf)>();
+        let (req_tx, req_rx) = channel::<Request>();
         let (res_tx, res_rx) = channel();
+        let (note_tx, note_rx) = channel();
         std::thread::Builder::new()
             .name("dj-tui-loader".into())
             .spawn(move || {
-                for (deck, path) in req_rx {
-                    let result = load_file(&path, session_rate);
-                    if res_tx.send(LoadResult { deck, path, result }).is_err() {
-                        break;
+                for req in req_rx {
+                    match req {
+                        Request::Load(deck, path) => {
+                            let result = load_file(&path, session_rate);
+                            if res_tx.send(LoadResult { deck, path, result }).is_err() {
+                                break;
+                            }
+                        }
+                        Request::SaveCues(path, cues) => {
+                            if let Err(e) = sidecar::save_cues(&path, &cues) {
+                                let _ = note_tx.send(format!(
+                                    "Could not save cues to {}: {e}",
+                                    sidecar::sidecar_path(&path).display()
+                                ));
+                            }
+                        }
                     }
                 }
             })
@@ -206,15 +268,26 @@ impl Loader {
         Self {
             requests: req_tx,
             results: res_rx,
+            notes: note_rx,
         }
     }
 
     pub fn request(&self, deck: DeckId, path: PathBuf) {
         // The thread only exits once `self` is gone, so this cannot fail while we exist.
-        let _ = self.requests.send((deck, path));
+        let _ = self.requests.send(Request::Load(deck, path));
+    }
+
+    /// Write `cues` into the sidecar beside `path`, in the background.
+    pub fn save_cues(&self, path: PathBuf, cues: sidecar::Cues) {
+        let _ = self.requests.send(Request::SaveCues(path, cues));
     }
 
     pub fn try_recv(&self) -> Option<LoadResult> {
         self.results.try_recv().ok()
+    }
+
+    /// Problems from background saves, for the message line.
+    pub fn try_recv_note(&self) -> Option<String> {
+        self.notes.try_recv().ok()
     }
 }

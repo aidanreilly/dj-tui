@@ -197,6 +197,8 @@ impl Engine {
             SetEq(d, band, db) => self.channels[d.index()].eq.set_gain_db(band, db),
             SetEqKill(d, band, kill) => self.channels[d.index()].eq.set_kill(band, kill),
             SetFilter(d, v) => self.channels[d.index()].filter.set(v),
+            SetCuePoint(d, f) => self.deck_mut(d).set_cue_point(f),
+            SetHotCue(d, n, f) => self.deck_mut(d).set_hot_cue(n, f),
         }
         None
     }

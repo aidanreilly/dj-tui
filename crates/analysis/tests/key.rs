@@ -94,3 +94,18 @@ fn standard_names() {
         "F♯ minor"
     );
 }
+
+#[test]
+fn camelot_codes_parse_back() {
+    for pc in 0..12 {
+        for mode in [Mode::Major, Mode::Minor] {
+            let k = Key {
+                tonic: PitchClass(pc),
+                mode,
+            };
+            assert_eq!(Key::from_camelot(&k.camelot()), Some(k));
+        }
+    }
+    assert_eq!(Key::from_camelot("13A"), None);
+    assert_eq!(Key::from_camelot("8C"), None);
+}

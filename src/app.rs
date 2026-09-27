@@ -6,6 +6,7 @@ use crate::config::Config;
 use crate::view::{screen_view, DeckMeta};
 use engine::{Command, DeckId, EngineHandle, Snapshot};
 use input::{Action, KeyEvent, Keymap};
+use loader::sidecar::Cues;
 use loader::Loader;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -29,6 +30,16 @@ pub struct App {
     waveform_mode: WaveformMode,
     end_warning_secs: u32,
     started: std::time::Instant,
+    /// Where each deck's track came from, and the cues last saved beside it.
+    persisted: [Option<Persisted>; 2],
+}
+
+struct Persisted {
+    path: PathBuf,
+    cues: Cues,
+    /// Engine frames processed when the track and its cues were sent. Snapshots from before
+    /// that point still describe the previous track, so they must not be saved.
+    after_frames: u64,
 }
 
 impl App {
@@ -46,6 +57,7 @@ impl App {
             meters: [0.0; 3],
             end_warning_secs: config.ui.end_warning_secs,
             started: std::time::Instant::now(),
+            persisted: [None, None],
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -79,6 +91,10 @@ impl App {
     /// Call once per UI frame: frees replaced tracks and picks up finished loads.
     pub fn tick(&mut self) {
         self.handle.collect_garbage();
+        self.save_changed_cues();
+        while let Some(note) = self.loader.try_recv_note() {
+            self.message = note;
+        }
         let fresh = self.handle.take_meters();
         for (held, new) in
             self.meters
@@ -102,7 +118,14 @@ impl App {
                         Some(a) => format!("{a} - {}", loaded.title),
                         None => loaded.title.clone(),
                     };
-                    self.message = format!("Loaded {title} on deck {}", deck_letter(done.deck));
+                    self.message = match &loaded.sidecar_note {
+                        Some(note) => format!(
+                            "Loaded {title} on deck {}, but {note}",
+                            deck_letter(done.deck)
+                        ),
+                        None => format!("Loaded {title} on deck {}", deck_letter(done.deck)),
+                    };
+                    let cues = loaded.cues.clone();
                     self.load_track(
                         done.deck,
                         loaded.track,
@@ -116,11 +139,52 @@ impl App {
                             grid: loaded.grid,
                         },
                     );
+                    self.restore_cues(done.deck, done.path, cues);
                 }
                 Err(e) => {
                     self.metas[done.deck.index()].loading = false;
                     self.message = format!("Could not load {name}: {e}");
                 }
+            }
+        }
+    }
+
+    fn restore_cues(&mut self, deck: DeckId, path: PathBuf, cues: Cues) {
+        let rate = self.sample_rate as f64;
+        if let Some(secs) = cues.main_cue_secs {
+            self.send(Command::SetCuePoint(deck, secs * rate));
+        }
+        for (n, secs) in cues.hot_cues.iter().enumerate() {
+            if let Some(secs) = secs {
+                self.send(Command::SetHotCue(deck, n, Some(secs * rate)));
+            }
+        }
+        let after_frames = self.handle.snapshot().frames_processed;
+        self.persisted[deck.index()] = Some(Persisted {
+            path,
+            cues,
+            after_frames,
+        });
+    }
+
+    /// Save cues that changed since the last save. Positions are compared in seconds.
+    fn save_changed_cues(&mut self) {
+        let snap = self.handle.snapshot();
+        let rate = self.sample_rate as f64;
+        for (i, slot) in self.persisted.iter_mut().enumerate() {
+            let Some(p) = slot else { continue };
+            let d = &snap.decks[i];
+            if snap.frames_processed <= p.after_frames || d.track_frames == 0 {
+                continue;
+            }
+            let now = Cues {
+                // A main cue at the very start is the default, not a choice worth saving.
+                main_cue_secs: (d.cue_point > 0.0).then(|| d.cue_point / rate),
+                hot_cues: d.hot_cues.map(|c| c.map(|f| f / rate)),
+            };
+            if now != p.cues {
+                self.loader.save_cues(p.path.clone(), now.clone());
+                p.cues = now;
             }
         }
     }
