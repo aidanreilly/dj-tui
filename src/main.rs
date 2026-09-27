@@ -13,12 +13,13 @@ use engine::{channel, DeckId, Engine, EngineProcessor};
 use loader::ENVELOPE_POINTS;
 use ratatui::crossterm::{
     event::{
-        self, Event, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
-        PushKeyboardEnhancementFlags,
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyboardEnhancementFlags,
+        MouseButton, MouseEventKind, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
     execute,
     terminal::supports_keyboard_enhancement,
 };
+use ratatui::layout::Rect;
 use std::{
     io::stdout,
     process::ExitCode,
@@ -157,6 +158,7 @@ fn main() -> ExitCode {
     }
 
     let mut terminal = ratatui::init();
+    let mouse_capture = execute!(stdout(), EnableMouseCapture).is_ok();
     let key_release = supports_keyboard_enhancement().unwrap_or(false)
         && execute!(
             stdout(),
@@ -183,10 +185,39 @@ fn main() -> ExitCode {
     let result = (|| -> std::io::Result<()> {
         loop {
             if event::poll(FRAME)? {
-                if let Event::Key(k) = event::read()? {
-                    if tui::convert_key(k).is_some_and(|k| app.on_key(k)) {
-                        return Ok(());
+                match event::read()? {
+                    Event::Key(k) => {
+                        if tui::convert_key(k).is_some_and(|k| app.on_key(k)) {
+                            return Ok(());
+                        }
                     }
+                    Event::Mouse(mouse)
+                        if mouse.kind == MouseEventKind::Down(MouseButton::Left) =>
+                    {
+                        let size = terminal.size()?;
+                        let layout = tui::screen_layout(Rect::new(0, 0, size.width, size.height));
+                        for (deck, panel) in
+                            [(DeckId::A, layout.deck_a), (DeckId::B, layout.deck_b)]
+                        {
+                            let area = tui::waveform_area(panel);
+                            if mouse.column >= area.x
+                                && mouse.column < area.right()
+                                && mouse.row >= area.y
+                                && mouse.row < area.bottom()
+                            {
+                                let column = mouse.column - area.x;
+                                let last = area.width.saturating_sub(1);
+                                let fraction = if last == 0 {
+                                    0.0
+                                } else {
+                                    column as f64 / last as f64
+                                };
+                                app.seek_to_fraction(deck, fraction);
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
             app.tick();
@@ -203,7 +234,7 @@ fn main() -> ExitCode {
             let status = match &note {
                 Some(n) => format!("{}  |  {n}", audio.status()),
                 None => format!(
-                    "{}  |  {keys}  |  {}  |  ? help  Ctrl+Q quit",
+                    "{}  |  {keys}  |  click waveform to seek  |  {}  |  ? help  Ctrl+Q quit",
                     audio.status(),
                     if graphics.is_some() {
                         "pixel waveforms"
@@ -224,6 +255,9 @@ fn main() -> ExitCode {
 
     if key_release {
         let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
+    }
+    if mouse_capture {
+        let _ = execute!(stdout(), DisableMouseCapture);
     }
     ratatui::restore();
     if let Audio::Jack(running) = audio {

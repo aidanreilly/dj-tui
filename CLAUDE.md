@@ -1,7 +1,9 @@
 # Working on dj-tui
 
-Spec and milestone plan: `docs/spec.md`. M0, M1 and M2 are done, plus pixel waveforms from M3. Next is the rest of M3: 3-band
-colour waveforms (needs per-band envelopes from the loader), CDJ overlays and the phase meter.
+Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
+detection in `crates/analysis`, running on load. Cues persist through the track sidecar rather
+than the SQLite store M5 describes. The GiantSteps evaluation script from M4 is still missing,
+and so is everything from M5 onwards.
 
 ## Rules
 
@@ -22,6 +24,20 @@ the kitty graphics protocol when `detect_graphics()` finds it (Ghostty, kitty, W
 deck keeps a fixed kitty image id and only resends when the playhead reaches a new pixel
 column. The glyph renderer in `tui::waveform` stays as the fallback and always draws first.
 `[ui] graphics = "off"` forces glyphs.
+
+The loader produces a per-band envelope alongside the peak envelope, and both renderers share
+the colour rules that turn those bands into 3-Band, RGB or Blue. Downsampling averages bands
+the same way it averages peaks, and a cell takes its colour from the row centres it covers.
+`w` cycles the modes, and `[ui] waveform_mode` sets the one the app starts in.
+
+## Track sidecar
+
+Analysis, the overview waveform and cues live in `<file name>.dj-tui.json` beside the audio,
+written by `loader::sidecar`, so a library keeps its data when it moves between machines. An
+`AudioId` of file size plus an FNV-1a hash of the first megabyte tells the loader when the
+audio changed and the stored data no longer applies. Bump `SIDECAR_VERSION` when the meaning
+of a stored field changes. Cue edits are saved from a background thread, never from the audio
+thread.
 
 ## Commands
 

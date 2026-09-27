@@ -229,7 +229,7 @@ impl Isolator {
     pub fn process(&mut self, buf: &mut [f32]) {
         let target = self.targets();
         let wet_target = if target == [1.0; 3] { 0.0 } else { 1.0 };
-        for frame in buf.chunks_exact_mut(2) {
+        for frame in buf.as_chunks_mut::<2>().0 {
             for (g, t) in self.gain.iter_mut().zip(target) {
                 *g += (t - *g) * self.smooth;
             }
@@ -329,7 +329,7 @@ impl DjFilter {
             if self.mode == FilterMode::Bypass {
                 continue;
             }
-            for frame in block.chunks_exact_mut(2) {
+            for frame in block.as_chunks_mut::<2>().0 {
                 for (ch, s) in frame.iter_mut().enumerate() {
                     *s = self.biquads[ch].tick(*s as f64) as f32;
                 }
@@ -362,7 +362,7 @@ impl Trim {
         if self.gain == self.target && self.gain == 1.0 {
             return;
         }
-        for frame in buf.chunks_exact_mut(2) {
+        for frame in buf.as_chunks_mut::<2>().0 {
             self.gain += (self.target - self.gain) * self.smooth;
             frame[0] *= self.gain;
             frame[1] *= self.gain;

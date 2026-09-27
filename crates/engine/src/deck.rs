@@ -86,7 +86,7 @@ impl Deck {
             return;
         };
         let len = track.frames() as f64;
-        for frame in out.chunks_exact_mut(2) {
+        for frame in out.as_chunks_mut::<2>().0 {
             if !self.playing {
                 frame.fill(0.0);
                 continue;

@@ -132,6 +132,33 @@ fn meters_show_level_and_fall_back_gradually() {
 }
 
 #[test]
+fn seeking_to_a_fraction_moves_the_playhead_and_clamps_at_the_ends() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("seek.wav");
+    write_wav(&path, &stereo(&[0.2; 9600]), 2, RATE, Fmt::Pcm16);
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    let frames = app.snapshot().decks[0].track_frames as f64;
+
+    app.seek_to_fraction(DeckId::A, 0.5);
+    process(&mut p, 16);
+    assert!(
+        (app.snapshot().decks[0].position - frames / 2.0).abs() < 1.0,
+        "half way: {}",
+        app.snapshot().decks[0].position
+    );
+
+    app.seek_to_fraction(DeckId::A, 2.0);
+    process(&mut p, 16);
+    assert!(
+        (app.snapshot().decks[0].position - frames).abs() < 1.0,
+        "past the end clamps to the end: {}",
+        app.snapshot().decks[0].position
+    );
+}
+
+#[test]
 fn waveform_mode_starts_from_config_and_w_cycles_it() {
     use tui::pixel::WaveformMode;
     let (handle, _p) = channel(Engine::new(), 64);
