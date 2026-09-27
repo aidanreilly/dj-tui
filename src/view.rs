@@ -12,6 +12,7 @@ pub struct DeckMeta {
     pub loading: bool,
     pub waveform: Vec<[f32; 2]>,
     pub bands: Vec<[f32; 3]>,
+    pub grid: Option<analysis::tempo::BeatGrid>,
 }
 
 fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &DeckMeta) -> DeckView {
@@ -25,7 +26,8 @@ fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &Dec
         id,
         focused: id == focused,
         title: if loaded { meta.title.clone() } else { None },
-        bpm: meta.bpm,
+        // Shown at the current tempo fader setting.
+        bpm: meta.bpm.map(|b| b * d.rate),
         key: meta.key.clone(),
         position_secs: d.position / rate,
         duration_secs: d.track_frames as f64 / rate,
@@ -43,6 +45,13 @@ fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &Dec
             Vec::new()
         },
         waveform_mode: Default::default(),
+        beat: meta
+            .grid
+            .filter(|_| loaded)
+            .map(|g| g.bar_and_beat(d.position / rate)),
+        cue_secs: loaded.then(|| d.cue_point / rate),
+        hot_cue_secs: d.hot_cues.map(|c| c.filter(|_| loaded).map(|f| f / rate)),
+        end_warning: false,
     }
 }
 
@@ -68,5 +77,38 @@ pub fn screen_view(
         },
         status,
         message: String::new(),
+        phase: match (&metas[0].grid, &metas[1].grid) {
+            (Some(a), Some(b))
+                if snap.decks[0].track_frames > 0 && snap.decks[1].track_frames > 0 =>
+            {
+                Some(phase_offset(
+                    a.phase(snap.decks[0].position / rate),
+                    b.phase(snap.decks[1].position / rate),
+                ))
+            }
+            _ => None,
+        },
     }
+}
+
+/// Seconds of flashing per on/off cycle of the end-of-track warning.
+const WARNING_FLASH_SECS: f64 = 1.0;
+
+/// Whether the end-of-track warning is lit right now: playing, inside the last
+/// `threshold_secs`, and in the on half of the flash. A threshold of 0 disables it.
+pub fn end_warning(
+    remaining_secs: f64,
+    playing: bool,
+    threshold_secs: u32,
+    elapsed_secs: f64,
+) -> bool {
+    playing
+        && threshold_secs > 0
+        && remaining_secs < threshold_secs as f64
+        && (elapsed_secs / WARNING_FLASH_SECS).fract() < 0.5
+}
+
+/// Deck B's beat phase minus deck A's, wrapped into -0.5..0.5 beats.
+pub fn phase_offset(a: f64, b: f64) -> f64 {
+    (b - a + 0.5).rem_euclid(1.0) - 0.5
 }

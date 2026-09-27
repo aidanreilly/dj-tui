@@ -36,6 +36,10 @@ fn deck(id: DeckId, loaded: bool, position_secs: f64) -> DeckView {
         },
         bands: vec![],
         waveform_mode: Default::default(),
+        beat: None,
+        cue_secs: None,
+        hot_cue_secs: [None; 8],
+        end_warning: false,
     }
 }
 
@@ -53,6 +57,7 @@ fn view(pos_a: f64, b_loaded: bool) -> ScreenView {
         },
         status: String::new(),
         message: String::new(),
+        phase: None,
     }
 }
 

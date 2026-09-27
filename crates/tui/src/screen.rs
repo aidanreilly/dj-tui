@@ -39,6 +39,8 @@ pub struct ScreenView {
     pub status: String,
     /// Latest event for the user (load results, errors). Shown above the status line.
     pub message: String,
+    /// Deck B's beat phase relative to deck A, -0.5..0.5 beats; `None` without two grids.
+    pub phase: Option<f64>,
 }
 
 const XFADE_WIDTH: usize = 13;
@@ -204,13 +206,48 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
     f.render_widget(Paragraph::new(lines).block(block), area);
 }
 
+const PHASE_WIDTH: usize = 33;
+
+fn render_phase(f: &mut Frame, area: Rect, phase: Option<f64>) {
+    let line = match phase {
+        None => Line::from(Span::styled(
+            " PHASE  no beat grid on both decks",
+            Style::new().add_modifier(Modifier::DIM),
+        )),
+        Some(p) => {
+            let centre = PHASE_WIDTH / 2;
+            let pos = (((p.clamp(-0.5, 0.5) + 0.5) * (PHASE_WIDTH - 1) as f64).round()) as usize;
+            let bar: String = (0..PHASE_WIDTH)
+                .map(|i| {
+                    if i == pos {
+                        '█'
+                    } else if i == centre {
+                        '│'
+                    } else {
+                        '░'
+                    }
+                })
+                .collect();
+            let aligned = p.abs() < 0.02;
+            let style = if aligned {
+                Style::new().fg(Color::Green)
+            } else {
+                Style::new().fg(Color::Yellow)
+            };
+            Line::from(vec![
+                Span::raw(" PHASE  B "),
+                Span::styled(bar, style),
+                Span::raw(format!(" {:+.2} beat", p)),
+            ])
+        }
+    };
+    f.render_widget(Paragraph::new(line), area);
+}
+
 pub fn render_screen(f: &mut Frame, v: &ScreenView) {
     let l = screen_layout(f.area());
     f.render_widget(DeckPanel::new(&v.decks[0]), l.deck_a);
-    f.render_widget(
-        Paragraph::new(" PHASE ").style(Style::new().add_modifier(Modifier::DIM)),
-        l.phase,
-    );
+    render_phase(f, l.phase, v.phase);
     f.render_widget(DeckPanel::new(&v.decks[1]), l.deck_b);
     render_mixer(f, l.mixer, &v.mixer);
 

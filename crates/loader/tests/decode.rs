@@ -129,3 +129,33 @@ fn waveform_ranges_are_computed_and_normalised() {
     assert!((loaded.waveform[0][1] - 1.0).abs() < 1e-6);
     assert_eq!(loaded.waveform.last().unwrap(), &[0.0, 0.0]);
 }
+
+#[test]
+fn loading_analyses_tempo_and_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("clicks.wav");
+    // 128 BPM clicks over an A minor drone.
+    let rate = 48_000;
+    let beat = 60.0 / 128.0;
+    let mono: Vec<f32> = (0..rate * 30)
+        .map(|i| {
+            let t = i as f32 / rate as f32;
+            let tb = t % beat;
+            let click = if tb < 0.02 {
+                (-tb / 0.004).exp() * (std::f32::consts::TAU * 1500.0 * tb).sin()
+            } else {
+                0.0
+            };
+            let drone: f32 = [110.0, 220.0, 261.63, 329.63]
+                .iter()
+                .map(|f| (std::f32::consts::TAU * f * t).sin() * 0.05)
+                .sum();
+            0.6 * click + drone
+        })
+        .collect();
+    write_wav(&path, &stereo(&mono), 2, rate as u32, Fmt::Float32);
+    let loaded = load_file(&path, 48_000).unwrap();
+    let grid = loaded.grid.expect("tempo");
+    assert!((grid.bpm - 128.0).abs() < 0.05, "{}", grid.bpm);
+    assert_eq!(loaded.key.expect("key").camelot(), "8A");
+}

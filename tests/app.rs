@@ -161,3 +161,49 @@ fn loaded_tracks_carry_band_data_to_the_view() {
         loader::ENVELOPE_POINTS
     );
 }
+
+#[test]
+fn analysis_results_reach_the_deck_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("beats.wav");
+    let beat = 60.0 / 124.0;
+    let mono: Vec<f32> = (0..RATE as usize * 20)
+        .map(|i| {
+            let tb = (i as f32 / RATE as f32) % beat;
+            if tb < 0.02 {
+                (-tb / 0.004).exp() * (std::f32::consts::TAU * 1500.0 * tb).sin()
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    write_wav(&path, &stereo(&mono), 2, RATE, Fmt::Float32);
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    let v = app.view(String::new());
+    assert!(
+        (v.decks[0].bpm.unwrap() - 124.0).abs() < 0.05,
+        "{:?}",
+        v.decks[0].bpm
+    );
+    assert!(v.decks[0].beat.is_some(), "bar and beat counter available");
+}
+
+#[test]
+fn end_of_track_warning_flashes_in_the_last_stretch_while_playing() {
+    use dj_tui::view::end_warning;
+    assert!(end_warning(20.0, true, 30, 0.1));
+    assert!(!end_warning(20.0, true, 30, 0.6), "off half of the flash");
+    assert!(!end_warning(40.0, true, 30, 0.1), "too early");
+    assert!(!end_warning(20.0, false, 30, 0.1), "paused");
+    assert!(!end_warning(20.0, true, 0, 0.1), "disabled");
+}
+
+#[test]
+fn phase_offset_is_b_relative_to_a_wrapped_to_half_a_beat() {
+    use dj_tui::view::phase_offset;
+    assert!((phase_offset(0.1, 0.35) - 0.25).abs() < 1e-9);
+    assert!((phase_offset(0.9, 0.1) - 0.2).abs() < 1e-9);
+    assert!((phase_offset(0.1, 0.9) + 0.2).abs() < 1e-9);
+}

@@ -96,7 +96,7 @@ fn main() {
     let out = std::env::args().nth(1).unwrap_or_else(|| ".".into());
     let decks = [deck(0), deck(20)];
     let titles = ["Synthetic - Warehouse Tool", "Synthetic - Breakdown Edit"];
-    let positions = [41.0, 28.0];
+    let positions = [41.0, 101.0];
     for (mode, name) in [
         (WaveformMode::ThreeBand, "3band"),
         (WaveformMode::Rgb, "rgb"),
@@ -112,11 +112,15 @@ fn main() {
                 position_secs: positions[i],
                 duration_secs: decks[i].secs,
                 loading: false,
-                playing: i == 0,
+                playing: true,
                 hot_cues: [true, true, false, true, false, false, false, false],
                 waveform: decks[i].ranges.clone(),
                 bands: decks[i].bands.clone(),
                 waveform_mode: mode,
+                beat: Some([(22, 3), (54, 1)][i]),
+                cue_secs: Some([15.0, 7.5][i]),
+                hot_cue_secs: [[Some(15.0), Some(45.0), None, Some(75.0), None, None, None, None], [Some(7.5), None, Some(52.5), None, None, None, Some(97.5), None]][i],
+                end_warning: i == 1,
             }),
             mixer: MixerView {
                 crossfader: -0.3,
@@ -130,6 +134,7 @@ fn main() {
             },
             status: "JACK dj-tui @ 48000 Hz / 256 frames, xruns 0  |  hold-cue on  |  pixel waveforms  |  ? help".into(),
             message: format!("Waveform: {}", match mode { WaveformMode::ThreeBand => "3-Band", WaveformMode::Rgb => "RGB", WaveformMode::Blue => "Blue" }),
+            phase: Some(0.12),
         };
         let mut term = Terminal::new(TestBackend::new(COLS, ROWS)).unwrap();
         term.draw(|f| render_screen(f, &view)).unwrap();
@@ -157,10 +162,14 @@ fn main() {
                 ranges: &decks[i].ranges,
                 bands: &decks[i].bands,
                 mode,
+                warning: i == 1,
             };
             let pal = Palette::default();
-            let img = WaveformBitmaps::rasterize(&wave, w, h, &pal)
-                .compose(playhead_x(positions[i], decks[i].secs, w), &pal);
+            let img = WaveformBitmaps::rasterize(&wave, w, h, &pal).compose_with(
+                playhead_x(positions[i], decks[i].secs, w),
+                wave.warning,
+                &pal,
+            );
             let mut f = std::fs::File::create(format!("{out}/{name}_deck{i}.rgba")).unwrap();
             writeln!(f, "{w} {h} {} {}", area.x, area.y).unwrap();
             f.write_all(img.as_raw()).unwrap();

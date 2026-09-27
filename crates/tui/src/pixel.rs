@@ -33,6 +33,7 @@ pub struct Palette {
     pub blue_bright: Rgba<u8>,
     pub centre_line: Rgba<u8>,
     pub playhead: Rgba<u8>,
+    pub warning: Rgba<u8>,
 }
 
 impl Default for Palette {
@@ -47,6 +48,7 @@ impl Default for Palette {
             blue_bright: Rgba([190, 232, 255, 255]),
             centre_line: Rgba([58, 50, 84, 255]),
             playhead: Rgba([236, 232, 210, 255]),
+            warning: Rgba([230, 30, 30, 255]),
         }
     }
 }
@@ -81,6 +83,8 @@ pub struct Wave<'a> {
     /// Peak `[low, mid, high]` per overview position; may be empty.
     pub bands: &'a [[f32; 3]],
     pub mode: WaveformMode,
+    /// End-of-track warning flash: tint the unplayed part red.
+    pub warning: bool,
 }
 
 /// Exponent that pushes weaker bands toward zero in RGB mode, so hues stay clear
@@ -237,7 +241,31 @@ impl WaveformBitmaps {
 
     /// The image to show: played part dimmed, then the playhead line.
     pub fn compose(&self, playhead: Option<u32>, palette: &Palette) -> RgbaImage {
+        self.compose_with(playhead, false, palette)
+    }
+
+    /// Like [`compose`](Self::compose), with the end-of-track warning tint on the unplayed part.
+    pub fn compose_with(
+        &self,
+        playhead: Option<u32>,
+        warning: bool,
+        palette: &Palette,
+    ) -> RgbaImage {
         let mut img = self.normal.clone();
+        if warning {
+            let start = playhead.map_or(0, |p| p + PLAYHEAD_WIDTH);
+            let (w, h) = img.dimensions();
+            for y in 0..h {
+                for x in start.min(w)..w {
+                    let p = img.get_pixel_mut(x, y);
+                    if p[3] > 0 {
+                        let a = p[3];
+                        *p = lerp(*p, palette.warning, 0.75);
+                        p[3] = a;
+                    }
+                }
+            }
+        }
         let Some(px) = playhead else { return img };
         let (w, h) = img.dimensions();
         for y in 0..h {
@@ -282,7 +310,7 @@ fn fingerprint(wave: &Wave) -> u64 {
 pub struct PixelWaveform {
     source: Option<(u64, (u32, u32))>,
     bitmaps: Option<WaveformBitmaps>,
-    shown_playhead: Option<Option<u32>>,
+    shown: Option<(Option<u32>, bool)>,
     rasterizations: u64,
 }
 
@@ -306,14 +334,16 @@ impl PixelWaveform {
         if self.source != Some(source) || self.bitmaps.is_none() {
             self.bitmaps = Some(WaveformBitmaps::rasterize(wave, size.0, size.1, palette));
             self.source = Some(source);
-            self.shown_playhead = None;
+            self.shown = None;
             self.rasterizations += 1;
         }
-        if self.shown_playhead == Some(playhead) {
+        if self.shown == Some((playhead, wave.warning)) {
             return None;
         }
-        self.shown_playhead = Some(playhead);
-        self.bitmaps.as_ref().map(|b| b.compose(playhead, palette))
+        self.shown = Some((playhead, wave.warning));
+        self.bitmaps
+            .as_ref()
+            .map(|b| b.compose_with(playhead, wave.warning, palette))
     }
 
     pub fn has_image(&self) -> bool {

@@ -27,6 +27,8 @@ pub struct App {
     /// Decaying peak meters: deck A, deck B, master.
     meters: [f32; 3],
     waveform_mode: WaveformMode,
+    end_warning_secs: u32,
+    started: std::time::Instant,
 }
 
 impl App {
@@ -42,6 +44,8 @@ impl App {
             sample_rate,
             message: String::new(),
             meters: [0.0; 3],
+            end_warning_secs: config.ui.end_warning_secs,
+            started: std::time::Instant::now(),
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -104,11 +108,12 @@ impl App {
                         loaded.track,
                         DeckMeta {
                             title: Some(title),
-                            bpm: None,
-                            key: None,
+                            bpm: loaded.grid.map(|g| g.bpm),
+                            key: loaded.key.map(|k| k.camelot()),
                             loading: false,
                             waveform: loaded.waveform,
                             bands: loaded.bands,
+                            grid: loaded.grid,
                         },
                     );
                 }
@@ -163,8 +168,15 @@ impl App {
             status,
         );
         v.message = self.message.clone();
+        let elapsed = self.started.elapsed().as_secs_f64();
         for d in &mut v.decks {
             d.waveform_mode = self.waveform_mode;
+            d.end_warning = crate::view::end_warning(
+                d.duration_secs - d.position_secs,
+                d.playing,
+                self.end_warning_secs,
+                elapsed,
+            );
         }
         for (i, (view, st)) in v
             .mixer

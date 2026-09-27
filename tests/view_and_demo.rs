@@ -43,6 +43,7 @@ fn view_reports_times_in_seconds_and_focus() {
             loading: false,
             waveform: vec![[0.0, 0.5]],
             bands: vec![],
+            grid: None,
         },
     ];
     let v = screen_view(&snap, 1000, DeckId::B, &metas, "ok".into());

@@ -60,6 +60,7 @@ impl Graphics {
                 ranges,
                 bands: &dv.bands,
                 mode: dv.waveform_mode,
+                warning: dv.end_warning,
             };
             match deck.pixel.update(&wave, px, playhead, &self.palette) {
                 Some(img) => {

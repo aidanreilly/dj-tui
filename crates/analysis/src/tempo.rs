@@ -29,7 +29,10 @@ pub struct TempoRange {
 
 impl Default for TempoRange {
     fn default() -> Self {
-        Self { min: 85.0, max: 175.0 }
+        Self {
+            min: 85.0,
+            max: 175.0,
+        }
     }
 }
 
@@ -67,18 +70,29 @@ fn onset_envelope(track: &Track) -> Vec<f64> {
     if n < WIN * 2 {
         return Vec::new();
     }
-    let mono: Vec<f32> = (0..n).map(|i| { let (l, r) = track.frame_at(i as f64); (l + r) * 0.5 }).collect();
-    let window: Vec<f32> = (0..WIN).map(|i| 0.5 - 0.5 * (TAU as f32 * i as f32 / WIN as f32).cos()).collect();
+    let mono: Vec<f32> = (0..n)
+        .map(|i| {
+            let (l, r) = track.frame_at(i as f64);
+            (l + r) * 0.5
+        })
+        .collect();
+    let window: Vec<f32> = (0..WIN)
+        .map(|i| 0.5 - 0.5 * (TAU as f32 * i as f32 / WIN as f32).cos())
+        .collect();
     let fft = RealFftPlanner::<f32>::new().plan_fft_forward(WIN);
     let mut input = fft.make_input_vec();
     let mut spectrum = fft.make_output_vec();
     let mut prev = vec![0f32; spectrum.len()];
     let mut out = Vec::with_capacity(n / HOP);
     for start in (0..n - WIN).step_by(HOP) {
-        for (d, (s, w)) in input.iter_mut().zip(mono[start..start + WIN].iter().zip(&window)) {
+        for (d, (s, w)) in input
+            .iter_mut()
+            .zip(mono[start..start + WIN].iter().zip(&window))
+        {
             *d = s * w;
         }
-        fft.process(&mut input, &mut spectrum).expect("fft sizes match");
+        fft.process(&mut input, &mut spectrum)
+            .expect("fft sizes match");
         let mut flux = 0.0;
         for (p, c) in prev.iter_mut().zip(&spectrum) {
             let m = (1.0 + 100.0 * c.norm()).ln();
@@ -149,7 +163,13 @@ pub fn detect_tempo(track: &Track, range: TempoRange) -> Option<BeatGrid> {
         if c < range.min || c >= range.max {
             continue;
         }
-        let (bpm, score) = best_in(&env, fps, c - 2.0 * COARSE_STEP * m.max(1.0), c + 2.0 * COARSE_STEP * m.max(1.0), COARSE_STEP / 2.0);
+        let (bpm, score) = best_in(
+            &env,
+            fps,
+            c - 2.0 * COARSE_STEP * m.max(1.0),
+            c + 2.0 * COARSE_STEP * m.max(1.0),
+            COARSE_STEP / 2.0,
+        );
         if score >= 0.6 * raw_score && choice.is_none_or(|(_, s)| score > s * 1.05) {
             choice = Some((bpm, score));
         }
@@ -177,5 +197,8 @@ pub fn detect_tempo(track: &Track, range: TempoRange) -> Option<BeatGrid> {
     // the window's midpoint.
     let secs = (onset_frame * HOP as f64 + WIN as f64 / 2.0) / track.sample_rate() as f64;
     let beat = 60.0 / bpm;
-    Some(BeatGrid { bpm: (bpm * 100.0).round() / 100.0, first_beat_secs: secs.rem_euclid(beat) })
+    Some(BeatGrid {
+        bpm: (bpm * 100.0).round() / 100.0,
+        first_beat_secs: secs.rem_euclid(beat),
+    })
 }

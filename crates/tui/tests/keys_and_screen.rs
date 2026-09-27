@@ -92,6 +92,10 @@ fn deck(id: DeckId, focused: bool) -> DeckView {
         waveform: vec![],
         bands: vec![],
         waveform_mode: Default::default(),
+        beat: None,
+        cue_secs: None,
+        hot_cue_secs: [None; 8],
+        end_warning: false,
     }
 }
 
@@ -107,6 +111,7 @@ fn whole_screen_shows_every_section() {
         },
         status: "keyboard: kitty protocol".into(),
         message: "Loaded Some Track on deck A".into(),
+        phase: None,
     };
     let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -151,6 +156,7 @@ fn long_status_does_not_hide_the_message() {
         },
         status: "x".repeat(300),
         message: "Could not load a.flac".into(),
+        phase: None,
     };
     let mut term = Terminal::new(TestBackend::new(100, 40)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -172,6 +178,7 @@ fn mixer_text(m: MixerView, w: u16, h: u16) -> String {
         mixer: m,
         status: String::new(),
         message: String::new(),
+        phase: None,
     };
     let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -224,4 +231,33 @@ fn meters_fill_with_level() {
 fn narrow_mixer_bar_still_shows_volume_and_crossfader() {
     let text = mixer_text(MixerView::default(), 100, 44);
     assert!(text.contains("VOL") && text.contains("╋"), "{text}");
+}
+
+#[test]
+fn phase_meter_shows_the_offset_between_decks() {
+    let render_phase = |phase: Option<f64>| {
+        let view = ScreenView {
+            decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
+            mixer: MixerView::default(),
+            status: String::new(),
+            message: String::new(),
+            phase,
+        };
+        let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
+        term.draw(|f| render_screen(f, &view)).unwrap();
+        let l = tui::screen_layout(ratatui::layout::Rect::new(0, 0, 120, 44));
+        let buf = term.backend().buffer();
+        (l.phase.x..l.phase.right())
+            .map(|x| buf[(x, l.phase.y)].symbol().to_string())
+            .collect::<String>()
+    };
+    let none = render_phase(None);
+    assert!(
+        none.contains("PHASE") && none.contains("no beat grid"),
+        "{none}"
+    );
+    let centred = render_phase(Some(0.0));
+    let ahead = render_phase(Some(0.25));
+    let pos = |s: &str| s.chars().position(|c| c == '█').expect("marker");
+    assert!(pos(&ahead) > pos(&centred), "{centred}\n{ahead}");
 }

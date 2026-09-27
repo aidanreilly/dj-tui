@@ -8,7 +8,10 @@ pub mod pixel;
 mod screen;
 pub mod waveform;
 
-pub use deck::{waveform_area, DeckPanel, DeckView, WAVEFORM_ROWS};
+pub use deck::{
+    waveform_area, DeckPanel, DeckView, END_WARNING_COLOUR, HOT_CUE_COLOURS, MAIN_CUE_COLOUR,
+    WAVEFORM_ROWS,
+};
 pub use graphics::{detect_graphics, multiplexer_detected, Graphics};
 pub use keys::convert_key;
 pub use layout::{screen_layout, ScreenLayout, DECK_HEIGHT};

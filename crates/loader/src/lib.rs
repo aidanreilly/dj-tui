@@ -42,6 +42,8 @@ pub struct LoadedTrack {
     pub waveform: Vec<[f32; 2]>,
     /// Peak `[low, mid, high]` per overview position, on the same scale as `waveform`.
     pub bands: Vec<[f32; 3]>,
+    pub grid: Option<analysis::tempo::BeatGrid>,
+    pub key: Option<analysis::key::Key>,
 }
 
 impl std::fmt::Debug for LoadedTrack {
@@ -66,6 +68,8 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
     let track = Track::from_interleaved(data, session_rate);
     let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
     let bands = band_envelope(&track, ENVELOPE_POINTS);
+    let grid = analysis::tempo::detect_tempo(&track, analysis::tempo::TempoRange::default());
+    let key = analysis::key::detect_key(&track);
     let title = decoded.title.unwrap_or_else(|| {
         path.file_stem()
             .map(|s| s.to_string_lossy().into_owned())
@@ -77,6 +81,8 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
         artist: decoded.artist,
         waveform,
         bands,
+        grid,
+        key,
     })
 }
 

@@ -386,6 +386,7 @@ dependencies = [
 name = "dj-tui"
 version = "0.1.0"
 dependencies = [
+ "analysis",
  "backend",
  "engine",
  "input",
@@ -841,6 +842,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 name = "loader"
 version = "0.1.0"
 dependencies = [
+ "analysis",
  "engine",
  "rubato",
  "symphonia",

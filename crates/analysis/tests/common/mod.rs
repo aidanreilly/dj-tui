@@ -19,7 +19,11 @@ pub fn clicks(bpm: f32, secs: f32, first_beat: f32) -> Track {
                 return 0.0;
             }
             let tb = t % beat;
-            if tb < 0.03 { (-tb / 0.005).exp() * (TAU * 1500.0 * tb).sin() } else { 0.0 }
+            if tb < 0.03 {
+                (-tb / 0.005).exp() * (TAU * 1500.0 * tb).sin()
+            } else {
+                0.0
+            }
         })
         .collect();
     track(mono)
@@ -43,7 +47,11 @@ pub fn house(bpm: f32, secs: f32) -> Track {
             let hp = noise - prev;
             prev = noise;
             let off = (tb - beat / 2.0).abs();
-            let hat = if off < 0.04 { 0.25 * hp * (1.0 - off / 0.04) } else { 0.0 };
+            let hat = if off < 0.04 {
+                0.25 * hp * (1.0 - off / 0.04)
+            } else {
+                0.0
+            };
             let bass = 0.2 * (TAU * 55.0 * t).sin();
             0.7 * kick + hat + bass
         })
@@ -59,7 +67,11 @@ pub fn chord(freqs: &[f32], secs: f32) -> Track {
             let t = i as f32 / FS as f32;
             freqs
                 .iter()
-                .map(|f| (1..=4).map(|h| (TAU * f * h as f32 * t).sin() / h as f32).sum::<f32>())
+                .map(|f| {
+                    (1..=4)
+                        .map(|h| (TAU * f * h as f32 * t).sin() / h as f32)
+                        .sum::<f32>()
+                })
                 .sum::<f32>()
                 * 0.1
         })

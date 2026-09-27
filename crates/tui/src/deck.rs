@@ -40,6 +40,30 @@ pub struct DeckView {
     /// Peak `[low, mid, high]` per overview position; empty when not analysed.
     pub bands: Vec<[f32; 3]>,
     pub waveform_mode: WaveformMode,
+    /// Bar and beat-in-bar at the playhead, when a beat grid exists.
+    pub beat: Option<(i64, i64)>,
+    pub cue_secs: Option<f64>,
+    pub hot_cue_secs: [Option<f64>; 8],
+    /// Flash phase of the end-of-track warning: true while the unplayed part shows red.
+    pub end_warning: bool,
+}
+
+/// Hot cue colours, one per pad, following the CDJ palette's spread of hues.
+pub const HOT_CUE_COLOURS: [[u8; 3]; 8] = [
+    [40, 226, 20],
+    [16, 177, 118],
+    [48, 90, 255],
+    [170, 114, 255],
+    [255, 18, 123],
+    [230, 40, 40],
+    [255, 140, 20],
+    [224, 224, 30],
+];
+pub const MAIN_CUE_COLOUR: [u8; 3] = [255, 120, 0];
+pub const END_WARNING_COLOUR: [u8; 3] = [230, 30, 30];
+
+fn rgb(c: [u8; 3]) -> ratatui::style::Color {
+    ratatui::style::Color::Rgb(c[0], c[1], c[2])
 }
 
 pub struct DeckPanel<'a> {
@@ -161,6 +185,44 @@ impl Widget for DeckPanel<'_> {
             }
         }
 
+        if v.end_warning && v.duration_secs > 0.0 {
+            let frac = (v.position_secs / v.duration_secs).clamp(0.0, 1.0);
+            let head = inner.x + ((inner.width as f64 * frac) as u16).min(inner.width - 1);
+            for y in wave_y..(wave_y + WAVEFORM_ROWS).min(inner.bottom()) {
+                for x in head + 1..inner.right() {
+                    if buf[(x, y)].symbol() != " " {
+                        buf[(x, y)].set_fg(rgb(END_WARNING_COLOUR));
+                    }
+                }
+            }
+        }
+
+        // Marker row: main cue, then hot cues on top in their colours.
+        let marker_y = wave_y + WAVEFORM_ROWS;
+        if marker_y < inner.bottom() && v.duration_secs > 0.0 {
+            let column = |secs: f64| {
+                let frac = (secs / v.duration_secs).clamp(0.0, 1.0);
+                inner.x + ((inner.width as f64 * frac) as u16).min(inner.width - 1)
+            };
+            if let Some(cue) = v.cue_secs {
+                buf.set_string(
+                    column(cue),
+                    marker_y,
+                    "▲",
+                    Style::new().fg(rgb(MAIN_CUE_COLOUR)),
+                );
+            }
+            for (i, secs) in v.hot_cue_secs.iter().enumerate() {
+                let Some(secs) = secs else { continue };
+                let x = column(*secs);
+                let style = Style::new().fg(rgb(HOT_CUE_COLOURS[i]));
+                buf.set_string(x, marker_y, "▲", style);
+                if x + 1 < inner.right() {
+                    buf.set_string(x + 1, marker_y, (i + 1).to_string(), style);
+                }
+            }
+        }
+
         // Status row: hot cues and transport state.
         let status_y = wave_y + WAVEFORM_ROWS + 1;
         if status_y < inner.bottom() {
@@ -177,7 +239,16 @@ impl Widget for DeckPanel<'_> {
                 })
                 .collect();
             let state = if v.playing { "PLAYING" } else { "PAUSED" };
-            buf.set_string(inner.x, status_y, format!("{cues}   {state}"), Style::new());
+            let bar = v
+                .beat
+                .map(|(bar, beat)| format!("   BAR {bar}.{beat}"))
+                .unwrap_or_default();
+            buf.set_string(
+                inner.x,
+                status_y,
+                format!("{cues}   {state}{bar}"),
+                Style::new(),
+            );
         }
     }
 }

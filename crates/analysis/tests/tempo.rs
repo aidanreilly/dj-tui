@@ -31,7 +31,15 @@ fn half_time_is_folded_into_the_default_range() {
 
 #[test]
 fn the_range_is_configurable() {
-    let got = detect_tempo(&clicks(70.0, 60.0, 0.0), TempoRange { min: 60.0, max: 120.0 }).unwrap().bpm;
+    let got = detect_tempo(
+        &clicks(70.0, 60.0, 0.0),
+        TempoRange {
+            min: 60.0,
+            max: 120.0,
+        },
+    )
+    .unwrap()
+    .bpm;
     assert!((got - 70.0).abs() < 0.05, "got {got:.3}");
 }
 
@@ -42,8 +50,13 @@ fn beat_grid_lines_up_with_the_first_beat() {
     let first = 0.35;
     let g = detect_tempo(&clicks(bpm, 60.0, first as f32), TempoRange::default()).unwrap();
     // The offset is reported modulo one beat.
-    let err = ((g.first_beat_secs - first).rem_euclid(beat) + beat / 2.0).rem_euclid(beat) - beat / 2.0;
-    assert!(err.abs() < 0.012, "offset {:.4} vs {first}, error {err:.4}", g.first_beat_secs);
+    let err =
+        ((g.first_beat_secs - first).rem_euclid(beat) + beat / 2.0).rem_euclid(beat) - beat / 2.0;
+    assert!(
+        err.abs() < 0.012,
+        "offset {:.4} vs {first}, error {err:.4}",
+        g.first_beat_secs
+    );
     assert!(g.first_beat_secs >= 0.0 && g.first_beat_secs < beat);
 }
 
@@ -54,7 +67,10 @@ fn silence_has_no_tempo() {
 
 #[test]
 fn beat_position_helpers() {
-    let g = analysis::tempo::BeatGrid { bpm: 120.0, first_beat_secs: 0.25 };
+    let g = analysis::tempo::BeatGrid {
+        bpm: 120.0,
+        first_beat_secs: 0.25,
+    };
     assert_eq!(g.beat_secs(), 0.5);
     // 0.25 s is beat 0 of bar 1; 2.25 s is four beats later: bar 2, beat 1.
     assert_eq!(g.bar_and_beat(0.25), (1, 1));

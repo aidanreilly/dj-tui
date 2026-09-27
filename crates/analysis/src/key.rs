@@ -10,10 +10,16 @@ const MAX_HZ: f32 = 2_000.0;
 const C0_HZ: f32 = 16.351_6;
 
 /// Krumhansl-Kessler probe-tone profiles, C first.
-const MAJOR: [f32; 12] = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const MINOR: [f32; 12] = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const MAJOR: [f32; 12] = [
+    6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
+];
+const MINOR: [f32; 12] = [
+    6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17,
+];
 
-const NAMES: [&str; 12] = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
+const NAMES: [&str; 12] = [
+    "C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B",
+];
 
 /// Pitch class, 0 = C.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,11 +66,16 @@ fn chroma(track: &Track) -> Option<[f32; 12]> {
     let fft = RealFftPlanner::<f32>::new().plan_fft_forward(WIN);
     let mut input = fft.make_input_vec();
     let mut spectrum = fft.make_output_vec();
-    let window: Vec<f32> = (0..WIN).map(|i| 0.5 - 0.5 * (std::f32::consts::TAU * i as f32 / WIN as f32).cos()).collect();
+    let window: Vec<f32> = (0..WIN)
+        .map(|i| 0.5 - 0.5 * (std::f32::consts::TAU * i as f32 / WIN as f32).cos())
+        .collect();
     let bin_pc: Vec<Option<usize>> = (0..spectrum.len())
         .map(|b| {
             let f = b as f32 * fs / WIN as f32;
-            (MIN_HZ..=MAX_HZ).contains(&f).then(|| (12.0 * (f / C0_HZ).log2()).round() as i64).map(|p| p.rem_euclid(12) as usize)
+            (MIN_HZ..=MAX_HZ)
+                .contains(&f)
+                .then(|| (12.0 * (f / C0_HZ).log2()).round() as i64)
+                .map(|p| p.rem_euclid(12) as usize)
         })
         .collect();
     let mut acc = [0f32; 12];
@@ -73,7 +84,8 @@ fn chroma(track: &Track) -> Option<[f32; 12]> {
             let (l, r) = track.frame_at((start + i) as f64);
             *d = (l + r) * 0.5 * w;
         }
-        fft.process(&mut input, &mut spectrum).expect("fft sizes match");
+        fft.process(&mut input, &mut spectrum)
+            .expect("fft sizes match");
         for (c, pc) in spectrum.iter().zip(&bin_pc) {
             if let Some(pc) = pc {
                 acc[*pc] += c.norm_sqr().sqrt();
@@ -97,13 +109,26 @@ fn correlation(a: &[f32; 12], b: &[f32; 12]) -> f32 {
 
 pub fn detect_key(track: &Track) -> Option<Key> {
     let c = chroma(track)?;
-    let mut best = (f32::MIN, Key { tonic: PitchClass(0), mode: Mode::Major });
+    let mut best = (
+        f32::MIN,
+        Key {
+            tonic: PitchClass(0),
+            mode: Mode::Major,
+        },
+    );
     for tonic in 0..12u8 {
         for (mode, profile) in [(Mode::Major, &MAJOR), (Mode::Minor, &MINOR)] {
-            let rotated: [f32; 12] = std::array::from_fn(|i| profile[(i + 12 - tonic as usize) % 12]);
+            let rotated: [f32; 12] =
+                std::array::from_fn(|i| profile[(i + 12 - tonic as usize) % 12]);
             let r = correlation(&c, &rotated);
             if r > best.0 {
-                best = (r, Key { tonic: PitchClass(tonic), mode });
+                best = (
+                    r,
+                    Key {
+                        tonic: PitchClass(tonic),
+                        mode,
+                    },
+                );
             }
         }
     }

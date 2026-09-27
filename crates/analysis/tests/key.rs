@@ -23,8 +23,14 @@ fn c_major_chord_with_bass() {
 
 #[test]
 fn f_sharp_minor_and_e_flat_major() {
-    assert_eq!(camelot(&chord(&[midi(42), midi(54), midi(57), midi(61)], 8.0)), "11A");
-    assert_eq!(camelot(&chord(&[midi(39), midi(51), midi(55), midi(58)], 8.0)), "5B");
+    assert_eq!(
+        camelot(&chord(&[midi(42), midi(54), midi(57), midi(61)], 8.0)),
+        "11A"
+    );
+    assert_eq!(
+        camelot(&chord(&[midi(39), midi(51), midi(55), midi(58)], 8.0)),
+        "5B"
+    );
 }
 
 #[test]
@@ -35,10 +41,24 @@ fn silence_has_no_key() {
 #[test]
 fn camelot_wheel_is_complete_and_correct() {
     let all: std::collections::HashSet<String> = (0..12)
-        .flat_map(|pc| [Mode::Major, Mode::Minor].map(move |m| Key { tonic: PitchClass(pc), mode: m }.camelot()))
+        .flat_map(|pc| {
+            [Mode::Major, Mode::Minor].map(move |m| {
+                Key {
+                    tonic: PitchClass(pc),
+                    mode: m,
+                }
+                .camelot()
+            })
+        })
         .collect();
     assert_eq!(all.len(), 24);
-    let k = |pc: u8, mode| Key { tonic: PitchClass(pc), mode }.camelot();
+    let k = |pc: u8, mode| {
+        Key {
+            tonic: PitchClass(pc),
+            mode,
+        }
+        .camelot()
+    };
     assert_eq!(k(9, Mode::Minor), "8A");
     assert_eq!(k(0, Mode::Major), "8B");
     assert_eq!(k(4, Mode::Minor), "9A");
@@ -49,7 +69,28 @@ fn camelot_wheel_is_complete_and_correct() {
 
 #[test]
 fn standard_names() {
-    assert_eq!(Key { tonic: PitchClass(9), mode: Mode::Minor }.name(), "A minor");
-    assert_eq!(Key { tonic: PitchClass(3), mode: Mode::Major }.name(), "E♭ major");
-    assert_eq!(Key { tonic: PitchClass(6), mode: Mode::Minor }.name(), "F♯ minor");
+    assert_eq!(
+        Key {
+            tonic: PitchClass(9),
+            mode: Mode::Minor
+        }
+        .name(),
+        "A minor"
+    );
+    assert_eq!(
+        Key {
+            tonic: PitchClass(3),
+            mode: Mode::Major
+        }
+        .name(),
+        "E♭ major"
+    );
+    assert_eq!(
+        Key {
+            tonic: PitchClass(6),
+            mode: Mode::Minor
+        }
+        .name(),
+        "F♯ minor"
+    );
 }

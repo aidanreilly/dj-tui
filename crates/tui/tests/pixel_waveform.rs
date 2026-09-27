@@ -19,6 +19,7 @@ fn blue(ranges: &[[f32; 2]]) -> Wave<'_> {
         ranges,
         bands: &[],
         mode: WaveformMode::Blue,
+        warning: false,
     }
 }
 
@@ -132,6 +133,7 @@ fn three_band_image_uses_only_the_three_band_colours_inside() {
         ranges: &ranges,
         bands: &bands,
         mode: WaveformMode::ThreeBand,
+        warning: false,
     };
     let b = WaveformBitmaps::rasterize(&wave, 10, H, &p);
     let mut seen = std::collections::HashSet::new();
@@ -159,6 +161,7 @@ fn rgb_image_colours_a_bass_column_red() {
         ranges: &ranges,
         bands: &bands,
         mode: WaveformMode::Rgb,
+        warning: false,
     };
     let b = WaveformBitmaps::rasterize(&wave, 10, H, &pal());
     let px = b.normal().get_pixel(5, H / 2);
@@ -175,6 +178,7 @@ fn changing_mode_rasterises_again() {
             ranges: &ranges,
             bands: &bands,
             mode: WaveformMode::ThreeBand,
+            warning: false,
         },
         (W, H),
         None,
@@ -185,6 +189,7 @@ fn changing_mode_rasterises_again() {
             ranges: &ranges,
             bands: &bands,
             mode: WaveformMode::Rgb,
+            warning: false,
         },
         (W, H),
         None,
@@ -303,4 +308,30 @@ fn no_waveform_means_no_image() {
     assert!(pw.has_image());
     pw.update(&blue(&[]), (W, H), None, &pal());
     assert!(!pw.has_image(), "unloading clears the image");
+}
+
+#[test]
+fn end_warning_tints_the_unplayed_part_red() {
+    let p = pal();
+    let b = WaveformBitmaps::rasterize(&blue(&flat(1.0, 64)), W, H, &p);
+    let img = b.compose_with(Some(100), true, &p);
+    let unplayed = img.get_pixel(150, H / 2);
+    assert!(
+        unplayed[0] > 150 && unplayed[0] > unplayed[2],
+        "{unplayed:?}"
+    );
+    assert_eq!(img.get_pixel(10, H / 2), b.dimmed().get_pixel(10, H / 2));
+}
+
+#[test]
+fn toggling_the_warning_sends_a_new_image() {
+    let mut pw = PixelWaveform::default();
+    let r = flat(0.5, 64);
+    pw.update(&blue(&r), (W, H), Some(10), &pal());
+    let w = Wave {
+        warning: true,
+        ..blue(&r)
+    };
+    assert!(pw.update(&w, (W, H), Some(10), &pal()).is_some());
+    assert_eq!(pw.rasterizations(), 1, "recompose only");
 }

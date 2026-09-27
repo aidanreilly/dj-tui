@@ -139,6 +139,10 @@ fn main() -> ExitCode {
             let bands = loader::band_envelope(&track, ENVELOPE_POINTS);
             let meta = DeckMeta {
                 bands,
+                grid: Some(analysis::tempo::BeatGrid {
+                    bpm,
+                    first_beat_secs: 0.0,
+                }),
                 title: Some(format!("Demo click {bpm:.0}")),
                 bpm: Some(bpm),
                 key: None,
