@@ -80,17 +80,17 @@ fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<Strin
             }
         }
     };
-    let (handle, processor) = channel(Engine::new(), COMMAND_QUEUE);
+    // The engine's filters need the real session rate, which JACK decides.
+    let rate = jack.as_ref().map_or(config.audio.sample_rate, JackBackend::sample_rate);
+    let (handle, processor) = channel(Engine::with_sample_rate(rate), COMMAND_QUEUE);
     Ok(match jack {
         Some(jack) => {
-            let rate = jack.sample_rate();
             let app = App::new(handle, config, rate);
             let running = jack.activate(processor, &routing)?;
             notes.extend(running.warnings().iter().cloned());
             (app, Audio::Jack(running), notes)
         }
         None => {
-            let rate = config.audio.sample_rate;
             (
                 App::new(handle, config, rate),
                 Audio::Silent(NullClock::new(rate), processor),

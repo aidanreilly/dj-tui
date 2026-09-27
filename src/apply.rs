@@ -4,6 +4,7 @@
 //! `ControlState`, so several key presses between two audio callbacks each count.
 //! Actions for features not built yet produce no command.
 
+use engine::dsp::{EqBand, TRIM_RANGE_DB, EQ_MAX_DB};
 use engine::{Command, Snapshot};
 use input::{Action, Dir};
 
@@ -37,6 +38,35 @@ pub struct ControlState {
     pub faders: [f32; 2],
     pub headphone_cue: [bool; 2],
     pub rates: [f64; 2],
+    pub strips: [StripState; 2],
+}
+
+/// Trim, EQ and filter for one channel. Arrays are indexed by `EqBand as usize`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StripState {
+    pub trim_db: f32,
+    pub eq_db: [f32; 3],
+    pub kills: [bool; 3],
+    pub filter: f32,
+}
+
+pub const TRIM_STEP_DB: f32 = 1.0;
+pub const EQ_STEP_DB: f32 = 2.0;
+/// Lowest EQ knob position short of a kill.
+pub const EQ_FLOOR_DB: f32 = -26.0;
+pub const FILTER_STEP: f32 = 0.1;
+
+fn band(b: input::Band) -> EqBand {
+    match b {
+        input::Band::Low => EqBand::Low,
+        input::Band::Mid => EqBand::Mid,
+        input::Band::High => EqBand::High,
+    }
+}
+
+/// Step `v` and round to the step grid, so stepping back always lands exactly.
+fn step(v: f32, by: f32, lo: f32, hi: f32) -> f32 {
+    (((v + by) / by.abs()).round() * by.abs()).clamp(lo, hi)
 }
 
 impl Default for ControlState {
@@ -46,6 +76,7 @@ impl Default for ControlState {
             faders: [1.0; 2],
             headphone_cue: [false; 2],
             rates: [1.0; 2],
+            strips: Default::default(),
         }
     }
 }
@@ -108,6 +139,32 @@ pub fn apply(
             };
             st.crossfader = x.clamp(-1.0, 1.0);
             Command::SetCrossfader(st.crossfader)
+        }
+        Trim(d, dir) => {
+            let t = &mut st.strips[d.index()].trim_db;
+            *t = step(*t, TRIM_STEP_DB * sign(dir), -TRIM_RANGE_DB, TRIM_RANGE_DB);
+            Command::SetTrim(d, *t)
+        }
+        Eq(d, b, dir) => {
+            let b = band(b);
+            let g = &mut st.strips[d.index()].eq_db[b as usize];
+            *g = step(*g, EQ_STEP_DB * sign(dir), EQ_FLOOR_DB, EQ_MAX_DB);
+            Command::SetEq(d, b, *g)
+        }
+        EqKill(d, b) => {
+            let b = band(b);
+            let k = &mut st.strips[d.index()].kills[b as usize];
+            *k = !*k;
+            Command::SetEqKill(d, b, *k)
+        }
+        Filter(d, dir) => {
+            let f = &mut st.strips[d.index()].filter;
+            *f = step(*f, FILTER_STEP * sign(dir), -1.0, 1.0);
+            // Rounding leaves -0.0 when stepping back from below; keep centre exact.
+            if *f == 0.0 {
+                *f = 0.0;
+            }
+            Command::SetFilter(d, *f)
         }
         _ => return None,
     })

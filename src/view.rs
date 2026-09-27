@@ -57,6 +57,7 @@ pub fn screen_view(
             crossfader: snap.crossfader,
             faders: snap.faders,
             headphone_cue: snap.headphone_cue,
+            ..Default::default()
         },
         status,
         message: String::new(),

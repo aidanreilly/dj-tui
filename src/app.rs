@@ -11,6 +11,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tui::ScreenView;
 
+/// Meter fall per UI frame. At 30 frames a second this is about 20 dB a second.
+const METER_FALL_PER_TICK: f32 = 0.926;
+
 pub struct App {
     handle: EngineHandle,
     controls: Controls,
@@ -20,6 +23,8 @@ pub struct App {
     loader: Loader,
     sample_rate: u32,
     message: String,
+    /// Decaying peak meters: deck A, deck B, master.
+    meters: [f32; 3],
 }
 
 impl App {
@@ -34,6 +39,7 @@ impl App {
             loader: Loader::spawn(sample_rate),
             sample_rate,
             message: String::new(),
+            meters: [0.0; 3],
         };
         app.send(Command::SetCrossfaderCurve(config.mixer.crossfader_curve));
         app
@@ -62,6 +68,13 @@ impl App {
     /// Call once per UI frame: frees replaced tracks and picks up finished loads.
     pub fn tick(&mut self) {
         self.handle.collect_garbage();
+        let fresh = self.handle.take_meters();
+        for (held, new) in self.meters.iter_mut().zip([fresh.channels[0], fresh.channels[1], fresh.master]) {
+            *held = new.max(*held * METER_FALL_PER_TICK);
+            if *held < 1e-4 {
+                *held = 0.0;
+            }
+        }
         while let Some(done) = self.loader.try_recv() {
             let name = done
                 .path
@@ -134,6 +147,16 @@ impl App {
             status,
         );
         v.message = self.message.clone();
+        for (i, (view, st)) in v.mixer.strips.iter_mut().zip(&self.state.strips).enumerate() {
+            *view = tui::StripView {
+                trim_db: st.trim_db,
+                eq_db: st.eq_db,
+                kills: st.kills,
+                filter: st.filter,
+                meter: self.meters[i],
+            };
+        }
+        v.mixer.master_meter = self.meters[2];
         v
     }
 

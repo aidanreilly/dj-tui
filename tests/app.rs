@@ -105,3 +105,28 @@ fn configured_crossfader_curve_is_sent_at_start() {
         engine::CrossfaderCurve::Cut
     );
 }
+
+#[test]
+fn meters_show_level_and_fall_back_gradually() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("loud.wav");
+    write_wav(&path, &stereo(&[0.5; 48_000]), 2, RATE, Fmt::Pcm16);
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    app.on_key(KeyEvent::press(Key::Space));
+    process(&mut p, 4800);
+    app.tick();
+    let level = app.view(String::new()).mixer.strips[0].meter;
+    assert!((level - 0.5).abs() < 0.02, "{level}");
+    app.on_key(KeyEvent::press(Key::Space));
+    process(&mut p, 480);
+    app.tick();
+    let falling = app.view(String::new()).mixer.strips[0].meter;
+    assert!(falling > 0.2 && falling < level, "{falling}");
+    for _ in 0..200 {
+        process(&mut p, 480);
+        app.tick();
+    }
+    assert!(app.view(String::new()).mixer.strips[0].meter < 0.01);
+}

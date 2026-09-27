@@ -47,6 +47,7 @@ fn view(pos_a: f64, b_loaded: bool) -> ScreenView {
             crossfader: 0.0,
             faders: [1.0, 1.0],
             headphone_cue: [false, false],
+            ..Default::default()
         },
         status: String::new(),
         message: String::new(),
