@@ -118,6 +118,14 @@ impl From<&CuesJson> for Cues {
     }
 }
 
+/// What a track list shows without opening the audio: the tags and the length.
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
+pub struct TrackInfo {
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub duration_secs: Option<f64>,
+}
+
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct AnalysisJson {
     pub bpm: Option<f64>,
@@ -147,6 +155,9 @@ struct FileJson {
     cues: CuesJson,
     #[serde(default)]
     waveform: Option<WaveformJson>,
+    /// Absent in sidecars written before the browser needed these.
+    #[serde(default)]
+    track: Option<TrackInfo>,
 }
 
 /// Analysis results as stored and restored.
@@ -164,6 +175,8 @@ pub struct Sidecar {
     /// `None` until the track has been analysed.
     pub analysis: Option<Stored>,
     pub cues: Cues,
+    /// Tags and length, for a track list that has not opened the file.
+    pub track: Option<TrackInfo>,
 }
 
 impl Sidecar {
@@ -202,6 +215,7 @@ impl Sidecar {
             audio: j.audio,
             analysis,
             cues: (&j.cues).into(),
+            track: j.track,
         })
     }
 
@@ -238,6 +252,7 @@ impl Sidecar {
             analysis,
             cues: (&self.cues).into(),
             waveform,
+            track: self.track.clone(),
         };
         let path = sidecar_path(audio);
         let mut tmp = path.clone().into_os_string();
@@ -259,10 +274,14 @@ pub fn save_cues(audio: &Path, cues: &Cues) -> std::io::Result<()> {
     let analysis = Sidecar::read(audio)
         .filter(|s| s.audio == id)
         .and_then(|s| s.analysis);
+    let track = Sidecar::read(audio)
+        .filter(|s| s.audio == id)
+        .and_then(|s| s.track);
     Sidecar {
         audio: id,
         analysis,
         cues: cues.clone(),
+        track,
     }
     .write(audio)
 }

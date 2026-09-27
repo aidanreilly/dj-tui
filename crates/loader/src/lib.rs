@@ -89,12 +89,28 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
             key: analysis::key::detect_key(&track),
         },
     };
+    let title = decoded.title.clone().unwrap_or_else(|| {
+        path.file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    });
+    let info = sidecar::TrackInfo {
+        title: Some(title.clone()),
+        artist: decoded.artist.clone(),
+        duration_secs: Some(track.frames() as f64 / session_rate as f64),
+    };
     let mut sidecar_note = None;
-    if !from_sidecar {
+    // The browser reads the tags and the length straight out of the sidecar, so they are
+    // written even when the analysis came back from it.
+    let saved_info = sidecar::Sidecar::read(path)
+        .filter(|s| s.audio == id)
+        .and_then(|s| s.track);
+    if !from_sidecar || saved_info.as_ref() != Some(&info) {
         let file = sidecar::Sidecar {
             audio: id,
             analysis: Some(stored.clone()),
             cues: cues.clone(),
+            track: Some(info),
         };
         if let Err(e) = file.write(path) {
             sidecar_note = Some(format!(
@@ -109,11 +125,6 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
         waveform,
         bands,
     } = stored;
-    let title = decoded.title.unwrap_or_else(|| {
-        path.file_stem()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_default()
-    });
     Ok(LoadedTrack {
         track,
         title,

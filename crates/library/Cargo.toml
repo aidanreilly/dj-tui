@@ -1,0 +1,13 @@
+[package]
+name = "library"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+analysis = { path = "../analysis" }
+loader = { path = "../loader" }
+
+[dev-dependencies]
+tempfile = "3"

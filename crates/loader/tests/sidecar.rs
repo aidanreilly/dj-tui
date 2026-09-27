@@ -218,3 +218,37 @@ fn a_sidecar_written_before_loops_existed_still_reads() {
     assert!(loaded.from_sidecar, "the file is still valid");
     assert_eq!(loaded.cues.loop_secs, None);
 }
+
+#[test]
+fn the_sidecar_carries_what_a_track_list_has_to_show() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = track(&dir);
+    let loaded = load_file(&audio, RATE).unwrap();
+    let j = json(&audio);
+    assert_eq!(j["track"]["title"], loaded.title.as_str());
+    assert!(
+        (j["track"]["duration_secs"].as_f64().unwrap() - 12.0).abs() < 0.1,
+        "{:?}",
+        j["track"]["duration_secs"]
+    );
+
+    let stored = loader::sidecar::Sidecar::read(&audio).unwrap();
+    let info = stored
+        .track
+        .expect("a track list reads this without decoding");
+    assert_eq!(info.title.as_deref(), Some(loaded.title.as_str()));
+    assert!((info.duration_secs.unwrap() - 12.0).abs() < 0.1);
+}
+
+#[test]
+fn a_sidecar_from_before_the_track_details_still_reads() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = track(&dir);
+    load_file(&audio, RATE).unwrap();
+    let mut j = json(&audio);
+    j.as_object_mut().unwrap().remove("track");
+    std::fs::write(sidecar_path(&audio), serde_json::to_string(&j).unwrap()).unwrap();
+    let stored = loader::sidecar::Sidecar::read(&audio).unwrap();
+    assert!(stored.track.is_none());
+    assert!(load_file(&audio, RATE).unwrap().from_sidecar, "still valid");
+}
