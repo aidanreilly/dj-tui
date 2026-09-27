@@ -31,6 +31,8 @@ fn process_with_commands_does_not_allocate_or_free() {
         .unwrap();
     h.send(Command::SetFxWet(A, 0.8)).unwrap();
     h.send(Command::SetFxOn(A, true)).unwrap();
+    h.send(Command::SetKeyLock(A, true)).unwrap();
+    h.send(Command::SetRate(A, 1.08)).unwrap();
     assert_no_alloc(|| p.process(&mut master, &mut cue));
 
     // Replacing a track must not free the old one on this thread.

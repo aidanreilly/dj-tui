@@ -3,8 +3,8 @@
 Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
 detection in `crates/analysis`, running on load. From M5 there are loops, beat jump and quantize, and
 cues persist through the track sidecar rather than the SQLite store the spec describes. M6 has all four effects
-with their keys. Still missing: M4's GiantSteps evaluation script, controls for reverb size
-and damping, and M7 onwards.
+with their keys, and M7 has sync, nudge and key lock. Still missing: M4's GiantSteps
+evaluation script, controls for reverb size and damping, and M8 onwards.
 
 ## Rules
 
@@ -53,6 +53,16 @@ deck rate, so both stay in time when the tempo fader moves. Tails work by gating
 rather than cutting the output: what is already inside an echo or a reverb plays out, and
 `FxSlot::is_ringing` is true until it is silent. Gains ride a `Ramp` that snaps within 80 dB
 of its target, which is what makes a bypass bit-exact.
+
+## Key lock
+
+`engine::stretch` is a WSOLA stretcher: overlapping grains cut from the track, each slid a
+little to line its waveform up with what has already been written, then overlap-added with a
+Hann window that sums to one at half-grain overlap. The deck still advances its playhead at
+the fader's rate, so position, loops and cues behave the same either way, and only the reading
+changes. It runs only with key lock on and a rate away from one, which is why `k` at normal
+speed is bit-identical to no key lock at all. `cargo run --release --example stretch_cost`
+prints what it costs: around 2.5 % of real time per deck.
 
 ## Track sidecar
 

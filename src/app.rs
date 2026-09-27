@@ -249,6 +249,17 @@ impl App {
         };
     }
 
+    /// Report the key lock toggle, which has no effect at all until the tempo fader moves.
+    fn note_key_lock(&mut self, action: Action) {
+        let Action::KeyLock(d) = action else { return };
+        let on = if self.state.key_lock[d.index()] {
+            "on"
+        } else {
+            "off"
+        };
+        self.message = format!("Key lock {on} on deck {}", deck_letter(d));
+    }
+
     /// Report what the sync key did. Matching tempo and lining the beats up are separate
     /// presses, and a deck with no grid can do neither.
     fn note_sync_key(&mut self, action: Action, cmd: Option<&Command>) {
@@ -306,6 +317,7 @@ impl App {
                 self.note_loop_keys(action, cmd.as_ref());
                 self.note_fx_keys(action);
                 self.note_sync_key(action, cmd.as_ref());
+                self.note_key_lock(action);
                 if let Some(cmd) = cmd {
                     self.send(cmd);
                 }
@@ -347,6 +359,7 @@ impl App {
         for (i, d) in v.decks.iter_mut().enumerate() {
             d.waveform_mode = self.waveform_mode;
             d.quantize = self.state.quantize[i];
+            d.key_lock = self.state.key_lock[i];
             d.loop_in_secs = self.state.loop_in[i].map(|f| f / self.sample_rate as f64);
             d.end_warning = crate::view::end_warning(
                 d.duration_secs - d.position_secs,

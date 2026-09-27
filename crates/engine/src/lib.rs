@@ -5,6 +5,7 @@ pub mod dsp;
 pub mod fx;
 mod mixer;
 mod rt;
+mod stretch;
 mod track;
 
 pub use deck::{Deck, HOT_CUES};

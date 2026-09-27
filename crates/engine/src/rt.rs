@@ -40,6 +40,8 @@ pub enum Command {
     SetFxWet(DeckId, f32),
     /// Beat length of the loaded track in frames, which times the tempo-aware effects.
     SetBeatFrames(DeckId, f32),
+    /// Hold the pitch while the tempo fader moves.
+    SetKeyLock(DeckId, bool),
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

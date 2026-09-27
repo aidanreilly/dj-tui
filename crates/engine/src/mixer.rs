@@ -115,7 +115,10 @@ impl Engine {
     pub fn with_sample_rate(sample_rate: u32) -> Self {
         let fs = sample_rate as f32;
         Self {
-            decks: [Deck::new(), Deck::new()],
+            decks: [
+                Deck::with_sample_rate(sample_rate),
+                Deck::with_sample_rate(sample_rate),
+            ],
             channels: [Channel::new(fs), Channel::new(fs)],
             peaks: Meters::default(),
             crossfader: 0.0,
@@ -219,6 +222,7 @@ impl Engine {
             SetFxOn(d, on) => self.channels[d.index()].fx.set_on(on),
             SetFxWet(d, wet) => self.channels[d.index()].fx.set_wet(wet),
             SetBeatFrames(d, frames) => self.channels[d.index()].beat_frames = frames,
+            SetKeyLock(d, on) => self.deck_mut(d).set_key_lock(on),
         }
         None
     }

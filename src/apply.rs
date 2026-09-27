@@ -53,6 +53,7 @@ pub struct ControlState {
     /// Loop in point waiting for its out point, in frames.
     pub loop_in: [Option<f64>; 2],
     pub quantize: [bool; 2],
+    pub key_lock: [bool; 2],
     pub fx: [FxState; 2],
 }
 
@@ -112,6 +113,7 @@ impl Default for ControlState {
             loop_beats: [DEFAULT_LOOP_BEATS; 2],
             loop_in: [None; 2],
             quantize: [false; 2],
+            key_lock: [false; 2],
             fx: [FxState::default(); 2],
         }
     }
@@ -313,6 +315,11 @@ pub fn apply(
                 d,
                 (snap.decks[i].position + shift * mine).clamp(0.0, frames),
             )
+        }
+        KeyLock(d) => {
+            let on = &mut st.key_lock[d.index()];
+            *on = !*on;
+            Command::SetKeyLock(d, *on)
         }
         Quantize(d) => {
             let q = &mut st.quantize[d.index()];

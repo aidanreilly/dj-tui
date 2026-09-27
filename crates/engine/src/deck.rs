@@ -1,10 +1,10 @@
+use crate::stretch::Stretcher;
 use crate::Track;
 use std::sync::Arc;
 
 pub const HOT_CUES: usize = 8;
 
 /// One playback deck: transport, main cue and hot cues. Positions are in frames.
-#[derive(Default)]
 pub struct Deck {
     track: Option<Arc<Track>>,
     pos: f64,
@@ -16,28 +16,64 @@ pub struct Deck {
     hot_cues: [Option<f64>; HOT_CUES],
     /// Active loop as (start, end) in frames. The end is the frame the playhead wraps at.
     loop_span: Option<(f64, f64)>,
+    key_lock: bool,
+    stretch: Stretcher,
+}
+
+impl Default for Deck {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Deck {
+    /// A deck at 48 kHz. Use [`Deck::with_sample_rate`] for anything else; it only changes
+    /// the grain size key lock works with.
     pub fn new() -> Self {
+        Self::with_sample_rate(48_000)
+    }
+
+    pub fn with_sample_rate(sample_rate: u32) -> Self {
         Self {
+            track: None,
+            pos: 0.0,
             rate: 1.0,
-            ..Default::default()
+            playing: false,
+            previewing: false,
+            cue_point: 0.0,
+            hot_cues: [None; HOT_CUES],
+            loop_span: None,
+            key_lock: false,
+            stretch: Stretcher::new(sample_rate),
+        }
+    }
+
+    pub fn key_lock(&self) -> bool {
+        self.key_lock
+    }
+
+    /// Hold the pitch while the tempo fader moves. Switching it on starts from silence in the
+    /// stretcher, not from whatever the last grain left behind.
+    pub fn set_key_lock(&mut self, on: bool) {
+        if on != self.key_lock {
+            self.stretch.reset();
+            self.key_lock = on;
         }
     }
 
     /// Load `track`, resetting transport and cues. Returns the previous track so the caller
     /// decides where it gets freed (never on the audio thread).
     pub fn load(&mut self, track: Arc<Track>) -> Option<Arc<Track>> {
-        let old = std::mem::replace(
-            self,
-            Self {
-                rate: self.rate,
-                ..Default::default()
-            },
-        );
+        let old = self.track.take();
+        self.pos = 0.0;
+        self.playing = false;
+        self.previewing = false;
+        self.cue_point = 0.0;
+        self.hot_cues = [None; HOT_CUES];
+        self.loop_span = None;
+        self.stretch.reset();
         self.track = Some(track);
-        old.track
+        old
     }
 
     /// Set the active loop, or clear it with `None`. Ends are clamped to the track, and a span
@@ -113,7 +149,12 @@ impl Deck {
                 frame.fill(0.0);
                 continue;
             }
-            let (l, r) = track.frame_at(self.pos);
+            // Key lock only has work to do when the rate is not one.
+            let (l, r) = if self.key_lock && (self.rate - 1.0).abs() > 1e-9 {
+                self.stretch.next_frame(track, self.pos)
+            } else {
+                track.frame_at(self.pos)
+            };
             frame[0] = l;
             frame[1] = r;
             let next = self.pos + self.rate;

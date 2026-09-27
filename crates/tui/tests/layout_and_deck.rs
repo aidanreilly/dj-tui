@@ -37,6 +37,7 @@ fn loaded_view(focused: bool) -> DeckView {
         loop_secs: None,
         loop_in_secs: None,
         quantize: false,
+        key_lock: false,
         end_warning: false,
     }
 }
@@ -113,6 +114,7 @@ fn empty_deck_says_so() {
         loop_secs: None,
         loop_in_secs: None,
         quantize: false,
+        key_lock: false,
         end_warning: false,
         ..loaded_view(false)
     };
@@ -258,6 +260,15 @@ fn a_loop_is_bracketed_under_the_waveform_and_tinted_behind_it() {
     assert_eq!(inside.bg, Color::Rgb(18, 46, 30), "the loop region is lit");
     let outside = &buf[(60, 2 + tui::WAVEFORM_ROWS / 2)];
     assert_ne!(outside.bg, inside.bg, "only the loop region is lit");
+}
+
+#[test]
+fn the_status_row_says_when_key_lock_is_on() {
+    let mut v = loaded_view(true);
+    v.key_lock = true;
+    assert!(buffer_text(&render(&v, 80, 13)).contains("KEY"));
+    let quiet = buffer_text(&render(&loaded_view(true), 80, 13));
+    assert!(!quiet.contains("KEY"), "{quiet}");
 }
 
 #[test]

@@ -438,6 +438,17 @@ fn sync_without_a_grid_says_so() {
 }
 
 #[test]
+fn key_lock_reports_itself_and_shows_in_the_deck_view() {
+    let (mut app, _p) = setup();
+    app.on_key(KeyEvent::press(Key::Char('k')));
+    assert!(app.message().contains("Key lock on"), "{}", app.message());
+    assert!(app.view(String::new()).decks[0].key_lock);
+    app.on_key(KeyEvent::press(Key::Char('k')));
+    assert!(app.message().contains("Key lock off"), "{}", app.message());
+    assert!(!app.view(String::new()).decks[0].key_lock);
+}
+
+#[test]
 fn quantize_reports_itself_and_shows_in_the_deck_view() {
     let (mut app, _p) = setup();
     app.on_key(KeyEvent::press(Key::Char('q')));

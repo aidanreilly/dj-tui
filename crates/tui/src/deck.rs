@@ -50,6 +50,8 @@ pub struct DeckView {
     pub loop_in_secs: Option<f64>,
     /// True while cues, loops and jumps snap to the beat grid.
     pub quantize: bool,
+    /// True while the tempo fader moves speed without moving pitch.
+    pub key_lock: bool,
     /// Flash phase of the end-of-track warning: true while the unplayed part shows red.
     pub end_warning: bool,
 }
@@ -281,12 +283,17 @@ impl Widget for DeckPanel<'_> {
                 .beat
                 .map(|(bar, beat)| format!("   BAR {bar}.{beat}"))
                 .unwrap_or_default();
-            let flags = match (v.loop_secs.is_some(), v.quantize) {
-                (true, true) => "   LOOP  QUANT",
-                (true, false) => "   LOOP",
-                (false, true) => "   QUANT",
-                (false, false) => "",
-            };
+            let mut flags = String::new();
+            for (on, label) in [
+                (v.loop_secs.is_some(), "LOOP"),
+                (v.quantize, "QUANT"),
+                (v.key_lock, "KEY"),
+            ] {
+                if on {
+                    flags.push_str("   ");
+                    flags.push_str(label);
+                }
+            }
             buf.set_string(
                 inner.x,
                 status_y,

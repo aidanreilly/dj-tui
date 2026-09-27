@@ -147,6 +147,7 @@ fn main() {
                 loop_secs: (i == 0).then_some((28.0, 43.0)),
                 loop_in_secs: None,
                 quantize: i == 0,
+                key_lock: i == 1,
                 end_warning: i == 1,
             }),
             mixer: MixerView {
