@@ -59,6 +59,8 @@ pub enum Action {
     BrowserSort(bool),
     /// Analyse every track in the browser that has no sidecar yet.
     AnalyseLibrary,
+    /// Open the audio device chooser.
+    Devices,
     CycleWaveformMode,
     Help,
     Quit,

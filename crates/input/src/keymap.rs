@@ -116,7 +116,11 @@ impl Keymap {
         };
 
         if e.ctrl {
-            return (e.key == Key::Char('q')).then_some(Action::Quit);
+            return match e.key {
+                Key::Char('q') => Some(Action::Quit),
+                Key::Char('d') => Some(Action::Devices),
+                _ => None,
+            };
         }
 
         match e.key {

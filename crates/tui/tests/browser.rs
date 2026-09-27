@@ -50,6 +50,7 @@ fn screen(browser: BrowserView) -> ScreenView {
         phase: None,
         help: false,
         browser,
+        devices: None,
     }
 }
 
@@ -205,5 +206,80 @@ fn the_browser_survives_a_tiny_terminal() {
         let mut full = listing();
         full.fullscreen = true;
         draw(&screen(full), w, h);
+    }
+}
+
+mod devices {
+    use super::*;
+    use tui::DeviceView;
+
+    fn with_devices(view: DeviceView) -> ScreenView {
+        let mut screen = screen(Default::default());
+        screen.devices = Some(view);
+        screen
+    }
+
+    fn listing() -> DeviceView {
+        DeviceView {
+            devices: vec![
+                ("hw:0,0".into(), "Built-in Audio".into()),
+                ("default".into(), "Default ALSA Output".into()),
+            ],
+            selected: 0,
+            current: "default".into(),
+            note: "48000 Hz / 256 frames".into(),
+        }
+    }
+
+    #[test]
+    fn the_device_screen_lists_what_can_be_opened() {
+        let t = text(&draw(&with_devices(listing()), 120, 44));
+        assert!(t.contains("AUDIO DEVICE"), "{t}");
+        assert!(t.contains("hw:0,0"), "{t}");
+        assert!(t.contains("Built-in Audio"), "{t}");
+        assert!(t.contains("48000 Hz"), "what is running now\n{t}");
+    }
+
+    #[test]
+    fn the_device_in_use_is_marked_and_the_selection_stands_out() {
+        use ratatui::style::Modifier;
+        let mut view = listing();
+        view.selected = 1;
+        let buf = draw(&with_devices(view), 120, 44);
+        let row_of = |needle: &str| {
+            (0..buf.area.height)
+                .find(|&y| {
+                    (0..buf.area.width)
+                        .map(|x| buf[(x, y)].symbol().to_string())
+                        .collect::<String>()
+                        .contains(needle)
+                })
+                .expect("row on screen")
+        };
+        let default_row = row_of("Default ALSA Output");
+        let line: String = (0..buf.area.width)
+            .map(|x| buf[(x, default_row)].symbol().to_string())
+            .collect();
+        assert!(line.contains('●'), "the one in use is marked: {line}");
+        assert!(
+            (0..buf.area.width)
+                .any(|x| buf[(x, default_row)].modifier.contains(Modifier::REVERSED)),
+            "and the selection is picked out"
+        );
+    }
+
+    #[test]
+    fn no_devices_says_so() {
+        let mut view = listing();
+        view.devices.clear();
+        let t = text(&draw(&with_devices(view), 120, 44));
+        assert!(t.contains("No audio devices"), "{t}");
+    }
+
+    #[test]
+    fn the_device_screen_fits_a_small_terminal() {
+        for (w, h) in [(30, 8), (60, 20)] {
+            draw(&with_devices(listing()), w, h);
+        }
     }
 }

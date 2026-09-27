@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+alsa = "0.12.1"
 engine = { path = "../engine" }
 jack = "0.13"
 rtrb = "0.3"

@@ -277,3 +277,62 @@ fn analysis_leaves_tracks_that_already_have_a_sidecar_alone() {
         app.message()
     );
 }
+
+mod devices {
+    use super::*;
+    use input::KeyEvent;
+
+    fn devices() -> Vec<(String, String)> {
+        vec![
+            ("hw:0,0".into(), "Built-in Audio".into()),
+            ("default".into(), "Default ALSA Output".into()),
+        ]
+    }
+
+    #[test]
+    fn ctrl_d_opens_the_device_screen_and_closes_it_again() {
+        let (mut app, _p) = setup();
+        app.set_devices(devices(), "default".into(), "48000 Hz / 256 frames".into());
+        assert!(app.view(String::new()).devices.is_none());
+
+        app.on_key(KeyEvent::press(Key::Char('d')).ctrl());
+        let view = app.view(String::new());
+        let screen = view.devices.expect("the screen is up");
+        assert_eq!(screen.devices.len(), 2);
+        assert_eq!(screen.current, "default");
+        assert_eq!(screen.selected, 1, "it starts on the device in use");
+
+        app.on_key(KeyEvent::press(Key::Esc));
+        assert!(app.view(String::new()).devices.is_none());
+    }
+
+    #[test]
+    fn the_arrows_move_and_enter_picks_a_device() {
+        let (mut app, _p) = setup();
+        app.set_devices(devices(), "default".into(), String::new());
+        app.on_key(KeyEvent::press(Key::Char('d')).ctrl());
+        app.on_key(KeyEvent::press(Key::Up));
+        assert_eq!(app.view(String::new()).devices.unwrap().selected, 0);
+
+        app.on_key(KeyEvent::press(Key::Enter));
+        assert!(
+            app.view(String::new()).devices.is_none(),
+            "choosing closes the screen"
+        );
+        assert_eq!(app.chosen_device().as_deref(), Some("hw:0,0"));
+        assert!(app.message().contains("hw:0,0"), "{}", app.message());
+    }
+
+    #[test]
+    fn the_keys_underneath_are_left_alone_while_the_screen_is_up() {
+        let (mut app, _p) = setup();
+        app.set_devices(devices(), "default".into(), String::new());
+        app.on_key(KeyEvent::press(Key::Char('d')).ctrl());
+        app.on_key(KeyEvent::press(Key::Space));
+        assert!(
+            !app.snapshot().decks[0].playing,
+            "space does not start a deck from the device screen"
+        );
+        assert!(app.view(String::new()).devices.is_some(), "and it stays up");
+    }
+}

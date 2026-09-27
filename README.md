@@ -155,6 +155,7 @@ Echo and reverb keep ringing after you switch them off, rather than cutting dead
 | `b` | Browser full screen |
 | `S` / `Alt+S` | Sort column, and the direction |
 | `A` | Analyse every track in the list that has none |
+| `Ctrl+D` | Audio device screen |
 | `?` | Key list |
 | `Ctrl+Q` | Quit |
 
@@ -209,12 +210,31 @@ set one. It records each session's start, the audio device it found, tracks that
 load, sidecar files it could not write, and the xrun count on the way out. Past a megabyte the
 file moves to `dj-tui.log.old` and a new one starts.
 
+## Without a sound server
+
+dj-tui can drive a card directly:
+
+```toml
+[audio]
+backend = "alsa"
+device = "default"          # or hw:0,0 for a card with nothing in the way
+sample_rate = 48000
+buffer_frames = 256
+```
+
+`Ctrl+D` lists what ALSA offers and marks the one in use. Picking one writes it into your
+config and takes effect the next time you start, since changing device means reopening it.
+A card with four or more outputs carries the master and the headphone cue separately; on a
+stereo card they share, as they do under JACK.
+
 ## Configuration
 
 `~/.config/dj-tui/config.toml`, every key optional:
 
 ```toml
 [audio]
+backend = "jack"                # "jack", or "alsa" to drive a card directly
+device = "default"              # which card, for the ALSA backend
 client_name = "dj-tui"
 routing = "auto"                # "auto", "off", "split" or "explicit"
 master_ports = ["system:playback_1", "system:playback_2"]

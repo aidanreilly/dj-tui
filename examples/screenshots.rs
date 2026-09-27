@@ -168,6 +168,7 @@ fn main() {
             phase: Some(0.12),
             help: false,
             browser: Default::default(),
+            devices: None,
         };
         let mut term = Terminal::new(TestBackend::new(COLS, ROWS)).unwrap();
         term.draw(|f| render_screen(f, &view)).unwrap();

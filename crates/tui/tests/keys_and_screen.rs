@@ -118,6 +118,7 @@ fn whole_screen_shows_every_section() {
         phase: None,
         help: false,
         browser: Default::default(),
+        devices: None,
     };
     let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -165,6 +166,7 @@ fn long_status_does_not_hide_the_message() {
         phase: None,
         help: false,
         browser: Default::default(),
+        devices: None,
     };
     let mut term = Terminal::new(TestBackend::new(100, 40)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -189,6 +191,7 @@ fn mixer_text(m: MixerView, w: u16, h: u16) -> String {
         phase: None,
         help: false,
         browser: Default::default(),
+        devices: None,
     };
     let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -280,6 +283,7 @@ fn phase_meter_shows_the_offset_between_decks() {
             phase,
             help: false,
             browser: Default::default(),
+            devices: None,
         };
         let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
         term.draw(|f| render_screen(f, &view)).unwrap();
@@ -337,6 +341,7 @@ fn an_effect_that_is_off_is_dimmed() {
             phase: None,
             help: false,
             browser: Default::default(),
+            devices: None,
         };
         let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
         term.draw(|f| render_screen(f, &screen)).unwrap();
@@ -362,6 +367,7 @@ fn the_help_overlay_lists_the_keys_over_the_screen() {
         phase: None,
         help: false,
         browser: Default::default(),
+        devices: None,
     };
     let text = |view: &ScreenView| {
         let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
@@ -396,6 +402,7 @@ fn the_help_overlay_fits_a_small_terminal() {
         phase: None,
         help: true,
         browser: Default::default(),
+        devices: None,
     };
     // Nothing here should panic or write outside the buffer.
     for (w, h) in [(40, 12), (60, 20), (200, 60)] {

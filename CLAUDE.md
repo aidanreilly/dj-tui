@@ -6,8 +6,9 @@ track sidecar rather than the SQLite store the spec describes. M6 has all four e
 their keys and knobs, M7 has sync, nudge and key lock, and M9 has mappings, soft takeover, LED
 feedback and hotplug through JACK MIDI.
 
-Still missing: M10's raw ALSA backend and device setup screen. Out of scope, so not
-worth proposing again: jog scratching, two-card output, SysEx handshakes in mappings, and the
+M8 has the browser with search,
+sorting and batch analysis, and M10 has the raw ALSA backend and the device screen. Out of
+scope, so not worth proposing again: jog scratching, two-card output, SysEx handshakes in mappings, and the
 hour-long stress run.
 
 ## Rules
@@ -91,6 +92,21 @@ megabyte. It is for what a session leaves behind, not for tracing: startup, fail
 warnings, and the xrun count at the end. `App::take_log` hands over what happened since the
 last frame, so anything worth keeping is pushed there rather than only shown in the message
 line. Nothing logs from the audio thread.
+
+## ALSA backend
+
+`backend::alsa_backend` drives a card directly for running without a sound server, from a
+thread of its own. Memory mapping is asked for and then actually tested at open time, because
+the plugin devices advertise it in their hardware parameters and refuse the mapping itself;
+when that happens the device is opened again for the copying transfer. The device is prepared
+and its ring prefilled with silence before anything starts, which is what keeps the xrun
+count at zero from the first period.
+
+`Ctrl+D` opens the device screen. Changing device means reopening it, so the choice is
+written into the config file with `config::with_device`, which edits only that line and
+leaves the person's comments and ordering alone.
+
+`cargo test -p backend --test alsa` skips the playback test unless `DJ_TUI_ALSA_TESTS=1`.
 
 ## Browser
 

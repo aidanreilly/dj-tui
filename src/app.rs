@@ -40,6 +40,14 @@ pub struct App {
     /// Files waiting for background analysis, and how many the run started with.
     analysing: std::collections::VecDeque<PathBuf>,
     analysis_total: usize,
+    /// The audio devices offered, and which is in use.
+    devices: Vec<(String, String)>,
+    current_device: String,
+    device_note: String,
+    /// Where the chooser is sitting, while it is open.
+    device_selected: Option<usize>,
+    /// A device the user picked, for the caller to act on.
+    chosen_device: Option<String>,
 }
 
 struct Persisted {
@@ -71,6 +79,11 @@ impl App {
             browser: crate::browser::Browser::new(),
             analysing: std::collections::VecDeque::new(),
             analysis_total: 0,
+            devices: Vec::new(),
+            current_device: String::new(),
+            device_note: String::new(),
+            device_selected: None,
+            chosen_device: None,
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -368,10 +381,59 @@ impl App {
             }
             return false;
         }
+        if self.device_selected.is_some() {
+            match key.key {
+                Key::Up => self.move_device(-1),
+                Key::Down => self.move_device(1),
+                Key::Enter => self.choose_device(),
+                Key::Esc => self.device_selected = None,
+                Key::Char('d') if key.ctrl => self.device_selected = None,
+                _ => {}
+            }
+            return false;
+        }
         let Some(action) = self.keymap.handle(key) else {
             return false;
         };
         self.on_action(action)
+    }
+
+    /// Offer `devices` in the chooser, with `current` the one in use and `note` what it is
+    /// doing. The caller owns the audio, so it owns this list.
+    pub fn set_devices(&mut self, devices: Vec<(String, String)>, current: String, note: String) {
+        self.devices = devices;
+        self.current_device = current;
+        self.device_note = note;
+    }
+
+    /// A device the user picked since the last call.
+    pub fn chosen_device(&mut self) -> Option<String> {
+        self.chosen_device.take()
+    }
+
+    fn move_device(&mut self, by: isize) {
+        let Some(selected) = self.device_selected else {
+            return;
+        };
+        if self.devices.is_empty() {
+            return;
+        }
+        let last = self.devices.len() - 1;
+        self.device_selected = Some(match by {
+            b if b < 0 => selected.saturating_sub(1),
+            _ => (selected + 1).min(last),
+        });
+    }
+
+    fn choose_device(&mut self) {
+        let Some(selected) = self.device_selected.take() else {
+            return;
+        };
+        let Some((name, _)) = self.devices.get(selected) else {
+            return;
+        };
+        self.message = format!("Audio device: {name}");
+        self.chosen_device = Some(name.clone());
     }
 
     /// Analyse everything in the browser that has no sidecar yet, one file at a time so the
@@ -484,6 +546,14 @@ impl App {
             Action::BrowserFullscreen => self.browser.fullscreen = !self.browser.fullscreen,
             Action::Search => self.browser.start_search(),
             Action::AnalyseLibrary => self.start_analysis(),
+            Action::Devices => {
+                // Open on the device in use, so Enter on it changes nothing.
+                let current = self
+                    .devices
+                    .iter()
+                    .position(|(name, _)| *name == self.current_device);
+                self.device_selected = Some(current.unwrap_or(0));
+            }
             _ => {
                 let snap = self.handle.snapshot();
                 let cmd = apply(&mut self.state, &self.controls, &snap, action);
@@ -548,6 +618,12 @@ impl App {
             .and_then(|&i| self.metas[i].key.as_deref())
             .and_then(analysis::key::Key::from_camelot);
         v.browser = self.browser.view(playing);
+        v.devices = self.device_selected.map(|selected| tui::DeviceView {
+            devices: self.devices.clone(),
+            selected,
+            current: self.current_device.clone(),
+            note: self.device_note.clone(),
+        });
         let elapsed = self.started.elapsed().as_secs_f64();
         for (i, d) in v.decks.iter_mut().enumerate() {
             d.waveform_mode = self.waveform_mode;

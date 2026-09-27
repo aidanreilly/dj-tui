@@ -50,6 +50,20 @@ pub struct ScreenView {
     /// Draw the key list over everything else.
     pub help: bool,
     pub browser: BrowserView,
+    /// The audio device screen, while it is open.
+    pub devices: Option<DeviceView>,
+}
+
+/// The audio device chooser: what can be opened, and what is open now.
+#[derive(Debug, Clone, Default)]
+pub struct DeviceView {
+    /// Name to open and what to show, in the order to list them.
+    pub devices: Vec<(String, String)>,
+    pub selected: usize,
+    /// The device in use, marked in the list.
+    pub current: String,
+    /// What the device in use is doing: rate and period.
+    pub note: String,
 }
 
 /// What `?` puts on screen: the keys, in the order the spec's control table has them.
@@ -84,6 +98,7 @@ const HELP: &[(&str, &str)] = &[
     ("/  b", "search the browser, full screen"),
     ("S  Alt+S", "sort column, and the direction"),
     ("A", "analyse everything not analysed yet"),
+    ("Ctrl+D", "audio device"),
     ("?", "this list"),
     ("Ctrl+Q", "quit"),
 ];
@@ -354,9 +369,62 @@ pub fn render_screen(f: &mut Frame, v: &ScreenView) {
         };
         f.render_widget(Paragraph::new(v.message.as_str()), message);
     }
+    if let Some(devices) = &v.devices {
+        render_devices(f, devices);
+    }
     if v.help {
         render_help(f);
     }
+}
+
+/// The device chooser, centred over whatever is behind it.
+fn render_devices(f: &mut Frame, v: &DeviceView) {
+    let area = f.area();
+    let widest = v
+        .devices
+        .iter()
+        .map(|(name, description)| name.len() + description.len() + 6)
+        .max()
+        .unwrap_or(30)
+        .max(30);
+    let width = (widest as u16 + 4).min(area.width);
+    let height = (v.devices.len().max(1) as u16 + 4).min(area.height);
+    let box_area = Rect {
+        x: area.x + (area.width - width) / 2,
+        y: area.y + (area.height - height) / 2,
+        width,
+        height,
+    };
+    let block = Block::bordered().title(" AUDIO DEVICE ");
+    let inner = block.inner(box_area);
+    f.render_widget(Clear, box_area);
+    f.render_widget(block, box_area);
+    if inner.height == 0 {
+        return;
+    }
+    let mut lines: Vec<Line> = Vec::new();
+    if v.devices.is_empty() {
+        lines.push(Line::from("No audio devices found"));
+    } else {
+        let name_width = v.devices.iter().map(|(n, _)| n.len()).max().unwrap_or(0);
+        for (i, (name, description)) in v.devices.iter().enumerate() {
+            let mark = if *name == v.current { '●' } else { ' ' };
+            let mut style = Style::new();
+            if i == v.selected {
+                style = style.add_modifier(Modifier::REVERSED);
+            }
+            lines.push(Line::from(Span::styled(
+                format!("{mark} {name:<name_width$}  {description}"),
+                style,
+            )));
+        }
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        format!("in use: {} ({})", v.current, v.note),
+        Style::new().add_modifier(Modifier::DIM),
+    )));
+    f.render_widget(Paragraph::new(lines), inner);
 }
 
 /// The key list, centred over whatever is behind it.

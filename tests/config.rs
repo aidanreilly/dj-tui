@@ -168,3 +168,38 @@ fn library_folders_expand_a_leading_tilde() {
     );
     assert!(Config::default().library.folders.is_empty());
 }
+
+#[test]
+fn saving_a_device_leaves_the_rest_of_the_file_alone() {
+    use dj_tui::config::with_device;
+
+    let original = "# my settings\n[audio]\nclient_name = \"dj-tui\"\ndevice = \"default\"\n\n[ui]\ngraphics = \"off\"\n";
+    let updated = with_device(original, "hw:1,0");
+    assert!(updated.contains("# my settings"), "{updated}");
+    assert!(updated.contains("device = \"hw:1,0\""), "{updated}");
+    assert!(!updated.contains("\"default\""), "{updated}");
+    assert!(updated.contains("graphics = \"off\""), "{updated}");
+    assert_eq!(
+        Config::from_toml(&updated).unwrap().audio.device,
+        "hw:1,0",
+        "and it still parses"
+    );
+}
+
+#[test]
+fn saving_a_device_adds_what_the_file_is_missing() {
+    use dj_tui::config::with_device;
+
+    let added = with_device("[ui]\ngraphics = \"off\"\n", "hw:0,0");
+    assert!(added.contains("[audio]"), "{added}");
+    assert_eq!(Config::from_toml(&added).unwrap().audio.device, "hw:0,0");
+
+    let section_only = with_device("[audio]\nclient_name = \"x\"\n", "pipewire");
+    assert_eq!(
+        Config::from_toml(&section_only).unwrap().audio.device,
+        "pipewire"
+    );
+
+    let empty = with_device("", "default");
+    assert_eq!(Config::from_toml(&empty).unwrap().audio.device, "default");
+}

@@ -64,6 +64,7 @@ fn view(pos_a: f64, b_loaded: bool) -> ScreenView {
         phase: None,
         help: false,
         browser: Default::default(),
+        devices: None,
     }
 }
 

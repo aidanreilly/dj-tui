@@ -93,6 +93,8 @@ impl Default for Midi {
 #[serde(default, deny_unknown_fields)]
 pub struct Audio {
     pub backend: Backend,
+    /// ALSA device to open, such as `default` or `hw:0,0`. Ignored by the JACK backend.
+    pub device: String,
     /// Used only by backends that choose their own rate; JACK's server rate always wins.
     pub sample_rate: u32,
     pub buffer_frames: u32,
@@ -115,6 +117,7 @@ pub enum RoutingMode {
 impl Default for Audio {
     fn default() -> Self {
         Self {
+            device: "default".into(),
             backend: Backend::Jack,
             sample_rate: 48_000,
             buffer_frames: 256,
@@ -236,6 +239,46 @@ impl Config {
         }
         Ok(())
     }
+}
+
+/// Put `device` into a config file's `[audio]` section, leaving the rest of the file alone:
+/// comments and ordering are the person's, not ours to rewrite.
+pub fn with_device(text: &str, device: &str) -> String {
+    let line = format!("device = \"{device}\"");
+    let mut out = Vec::new();
+    let mut in_audio = false;
+    let mut replaced = false;
+    for raw in text.lines() {
+        let trimmed = raw.trim();
+        if trimmed.starts_with('[') {
+            // Leaving [audio] without having found the key: add it at the end of the section.
+            if in_audio && !replaced {
+                out.push(line.clone());
+                replaced = true;
+            }
+            in_audio = trimmed == "[audio]";
+        }
+        if in_audio && trimmed.starts_with("device") && trimmed.contains('=') {
+            out.push(line.clone());
+            replaced = true;
+            continue;
+        }
+        out.push(raw.to_string());
+    }
+    if !replaced {
+        if in_audio {
+            out.push(line);
+        } else {
+            if !out.is_empty() && !out.last().is_some_and(|l| l.trim().is_empty()) {
+                out.push(String::new());
+            }
+            out.push("[audio]".into());
+            out.push(line);
+        }
+    }
+    let mut text = out.join("\n");
+    text.push('\n');
+    text
 }
 
 /// `$XDG_CONFIG_HOME/dj-tui/config.toml`, falling back to `~/.config/dj-tui/config.toml`.

@@ -46,6 +46,22 @@ fn load_config() -> Result<Config, String> {
     }
 }
 
+/// Write the chosen device into the config file, leaving everything else as it was.
+fn save_device_choice(device: &str) -> Result<std::path::PathBuf, String> {
+    let path = config_path(
+        std::env::var("XDG_CONFIG_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+    )
+    .ok_or("no config directory")?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let text = std::fs::read_to_string(&path).unwrap_or_default();
+    let updated = dj_tui::config::with_device(&text, device);
+    std::fs::write(&path, updated).map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
 /// Print what a controller sends, so its numbers can go into a mapping file. Runs until
 /// Ctrl+C, since there is no way to know when the user has finished pressing things.
 fn midi_learn() -> ExitCode {
@@ -93,6 +109,7 @@ fn midi_learn() -> ExitCode {
 #[allow(clippy::large_enum_variant)] // one value for the whole run; boxing buys nothing
 enum Audio {
     Jack(backend::Running),
+    Alsa(backend::AlsaRunning),
     Silent(NullClock, EngineProcessor),
 }
 
@@ -106,6 +123,13 @@ impl Audio {
                 r.buffer_size(),
                 r.xruns()
             ),
+            Audio::Alsa(r) => format!(
+                "ALSA {} @ {} Hz / {} frames, xruns {}",
+                r.device(),
+                r.sample_rate(),
+                r.buffer_size(),
+                r.xruns()
+            ),
             Audio::Silent(..) => "no audio output".into(),
         }
     }
@@ -113,10 +137,31 @@ impl Audio {
 
 fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<String>), String> {
     let mut notes = Vec::new();
-    if config.audio.backend == Backend::Alsa {
-        notes.push("raw ALSA backend arrives in M10; using JACK".to_string());
-    }
     let routing = config.routing()?;
+    if config.audio.backend == Backend::Alsa && !no_audio {
+        // Straight to the card, for running without a sound server.
+        match backend::AlsaBackend::open(
+            &config.audio.device,
+            config.audio.sample_rate,
+            config.audio.buffer_frames,
+        ) {
+            Ok(alsa) => {
+                let rate = alsa.sample_rate();
+                if alsa.channels() < 4 {
+                    notes.push(format!(
+                        "{} has {} channels, so the headphone cue shares them",
+                        config.audio.device,
+                        alsa.channels()
+                    ));
+                }
+                let (handle, processor) = channel(Engine::with_sample_rate(rate), COMMAND_QUEUE);
+                let app = App::new(handle, config, rate);
+                let running = alsa.activate(processor, &routing)?;
+                return Ok((app, Audio::Alsa(running), notes));
+            }
+            Err(e) => notes.push(format!("{e}; falling back to JACK")),
+        }
+    }
     let jack = if no_audio {
         None
     } else {
@@ -250,6 +295,24 @@ fn main() -> ExitCode {
         log.line(note);
     }
 
+    // The chooser lists what ALSA offers, whichever backend is running.
+    let devices: Vec<(String, String)> = backend::alsa_devices()
+        .into_iter()
+        .map(|d| (d.name, d.description))
+        .collect();
+    let (current_device, device_note) = match &audio {
+        Audio::Alsa(r) => (
+            r.device().to_string(),
+            format!("{} Hz / {} frames", r.sample_rate(), r.buffer_size()),
+        ),
+        Audio::Jack(r) => (
+            "JACK".to_string(),
+            format!("{} Hz / {} frames", r.sample_rate(), r.buffer_size()),
+        ),
+        Audio::Silent(..) => ("none".to_string(), "no audio output".to_string()),
+    };
+    app.set_devices(devices, current_device, device_note);
+
     let mut terminal = ratatui::init();
     let mouse_capture = execute!(stdout(), EnableMouseCapture).is_ok();
     let key_release = supports_keyboard_enhancement().unwrap_or(false)
@@ -338,6 +401,25 @@ fn main() -> ExitCode {
                 }
             }
             app.tick();
+            if let Some(device) = app.chosen_device() {
+                // Changing device means reopening it, which is a restart: write the choice
+                // into the config so the next run picks it up, and say so.
+                match save_device_choice(&device) {
+                    Ok(path) => {
+                        let line = format!(
+                            "Audio device {device} saved to {}; restart to use it",
+                            path.display()
+                        );
+                        log.line(&line);
+                        app.note(line);
+                    }
+                    Err(e) => {
+                        let line = format!("Could not save the device choice: {e}");
+                        log.line(&line);
+                        app.note(line);
+                    }
+                }
+            }
             for line in app.take_log() {
                 log.line(&line);
             }
@@ -380,11 +462,16 @@ fn main() -> ExitCode {
         let _ = execute!(stdout(), DisableMouseCapture);
     }
     ratatui::restore();
-    if let Audio::Jack(running) = audio {
-        log.line(&format!("stopping after {} xruns", running.xruns()));
-        running.stop();
-    } else {
-        log.line("stopping");
+    match audio {
+        Audio::Jack(running) => {
+            log.line(&format!("stopping after {} xruns", running.xruns()));
+            running.stop();
+        }
+        Audio::Alsa(running) => {
+            log.line(&format!("stopping after {} xruns", running.xruns()));
+            running.stop();
+        }
+        Audio::Silent(..) => log.line("stopping"),
     }
     match result {
         Ok(()) => ExitCode::SUCCESS,
