@@ -58,11 +58,13 @@ pub fn fingerprint_file(path: &Path) -> std::io::Result<AudioId> {
     })
 }
 
-/// Cue positions in seconds of track time.
+/// Cue and loop positions in seconds of track time.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Cues {
     pub main_cue_secs: Option<f64>,
     pub hot_cues: [Option<f64>; 8],
+    /// The loop left running on the deck, as (start, end).
+    pub loop_secs: Option<(f64, f64)>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -76,6 +78,9 @@ struct HotCueJson {
 struct CuesJson {
     main_cue_secs: Option<f64>,
     hot_cues: Vec<HotCueJson>,
+    /// Absent in sidecars written before loops were saved.
+    #[serde(default)]
+    loop_secs: Option<[f64; 2]>,
 }
 
 impl From<&Cues> for CuesJson {
@@ -88,6 +93,7 @@ impl From<&Cues> for CuesJson {
                 .enumerate()
                 .filter_map(|(i, s)| s.map(|secs| HotCueJson { pad: i + 1, secs }))
                 .collect(),
+            loop_secs: c.loop_secs.map(|(start, end)| [start, end]),
         }
     }
 }
@@ -103,6 +109,11 @@ impl From<&CuesJson> for Cues {
         Self {
             main_cue_secs: j.main_cue_secs,
             hot_cues,
+            // A loop whose end is not past its start would trap the playhead, so drop it.
+            loop_secs: j
+                .loop_secs
+                .map(|[start, end]| (start, end))
+                .filter(|(start, end)| end > start),
         }
     }
 }

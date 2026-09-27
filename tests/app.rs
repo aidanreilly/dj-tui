@@ -343,6 +343,45 @@ fn loading_a_track_forgets_the_loop_in_point_from_the_last_one() {
 }
 
 #[test]
+fn a_loop_left_running_is_saved_beside_the_file_and_comes_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("looped.wav");
+    write_wav(&path, &stereo(&[0.3; 480_000]), 2, RATE, Fmt::Pcm16);
+    {
+        let (mut app, mut p) = setup();
+        app.load_path(DeckId::A, path.clone());
+        wait_for_load(&mut app, &mut p, DeckId::A);
+        app.on_key(KeyEvent::press(Key::Char('i')));
+        app.seek_to_fraction(DeckId::A, 0.25);
+        process(&mut p, 16);
+        app.on_key(KeyEvent::press(Key::Char('I')));
+        process(&mut p, 16);
+        assert!(app.snapshot().decks[0].loop_span.is_some());
+        // Saving happens on the next tick, from the background thread.
+        let start = Instant::now();
+        while loader::sidecar::Sidecar::read(&path)
+            .and_then(|s| s.cues.loop_secs)
+            .is_none()
+        {
+            app.tick();
+            process(&mut p, 16);
+            assert!(start.elapsed() < Duration::from_secs(10), "save timed out");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    process(&mut p, 16);
+    let (start, end) = app.snapshot().decks[0]
+        .loop_span
+        .expect("the loop came back with the track");
+    assert_eq!(start, 0.0);
+    assert!((end - 120_000.0).abs() < 1.0, "quarter of the way in");
+}
+
+#[test]
 fn quantize_reports_itself_and_shows_in_the_deck_view() {
     let (mut app, _p) = setup();
     app.on_key(KeyEvent::press(Key::Char('q')));

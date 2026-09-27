@@ -165,6 +165,9 @@ impl App {
                 self.send(Command::SetHotCue(deck, n, Some(secs * rate)));
             }
         }
+        if let Some((start, end)) = cues.loop_secs {
+            self.send(Command::SetLoop(deck, Some((start * rate, end * rate))));
+        }
         let after_frames = self.handle.snapshot().frames_processed;
         self.persisted[deck.index()] = Some(Persisted {
             path,
@@ -187,6 +190,7 @@ impl App {
                 // A main cue at the very start is the default, not a choice worth saving.
                 main_cue_secs: (d.cue_point > 0.0).then(|| d.cue_point / rate),
                 hot_cues: d.hot_cues.map(|c| c.map(|f| f / rate)),
+                loop_secs: d.loop_span.map(|(start, end)| (start / rate, end / rate)),
             };
             if now != p.cues {
                 self.loader.save_cues(p.path.clone(), now.clone());

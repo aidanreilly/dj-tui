@@ -187,3 +187,34 @@ fn an_unwritable_sidecar_does_not_stop_loading() {
     );
     assert!(loaded.grid.is_some());
 }
+
+#[test]
+fn a_loop_is_saved_with_the_cues_and_comes_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = track(&dir);
+    load_file(&audio, RATE).unwrap();
+    let cues = Cues {
+        main_cue_secs: Some(1.5),
+        loop_secs: Some((4.0, 8.0)),
+        ..Default::default()
+    };
+    save_cues(&audio, &cues).unwrap();
+    assert_eq!(
+        json(&audio)["cues"]["loop_secs"],
+        serde_json::json!([4.0, 8.0])
+    );
+    assert_eq!(load_file(&audio, RATE).unwrap().cues, cues);
+}
+
+#[test]
+fn a_sidecar_written_before_loops_existed_still_reads() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = track(&dir);
+    load_file(&audio, RATE).unwrap();
+    let mut j = json(&audio);
+    j["cues"].as_object_mut().unwrap().remove("loop_secs");
+    std::fs::write(sidecar_path(&audio), serde_json::to_string(&j).unwrap()).unwrap();
+    let loaded = load_file(&audio, RATE).unwrap();
+    assert!(loaded.from_sidecar, "the file is still valid");
+    assert_eq!(loaded.cues.loop_secs, None);
+}

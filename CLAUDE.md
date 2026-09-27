@@ -3,7 +3,7 @@
 Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
 detection in `crates/analysis`, running on load. From M5 there are loops, beat jump and quantize, and
 cues persist through the track sidecar rather than the SQLite store the spec describes. Still
-missing: loops in the sidecar, M4's GiantSteps evaluation script, and M6 onwards.
+missing: M4's GiantSteps evaluation script, and M6 onwards.
 
 ## Rules
 
@@ -42,7 +42,8 @@ the playhead, which also sets the length the halve and double keys work from.
 
 ## Track sidecar
 
-Analysis, the overview waveform and cues live in `<file name>.dj-tui.json` beside the audio,
+Analysis, the overview waveform, cues and the running loop live in `<file name>.dj-tui.json`
+beside the audio,
 written by `loader::sidecar`, so a library keeps its data when it moves between machines. An
 `AudioId` of file size plus an FNV-1a hash of the first megabyte tells the loader when the
 audio changed and the stored data no longer applies. Bump `SIDECAR_VERSION` when the meaning
