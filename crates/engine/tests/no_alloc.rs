@@ -25,6 +25,7 @@ fn process_with_commands_does_not_allocate_or_free() {
         .unwrap();
     h.send(Command::SetFilter(A, -0.6)).unwrap();
     h.send(Command::SetTrim(A, 3.0)).unwrap();
+    h.send(Command::SetLoop(A, Some((100.0, 5_000.0)))).unwrap();
     assert_no_alloc(|| p.process(&mut master, &mut cue));
 
     // Replacing a track must not free the old one on this thread.

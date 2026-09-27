@@ -14,6 +14,8 @@ pub struct Deck {
     previewing: bool,
     cue_point: f64,
     hot_cues: [Option<f64>; HOT_CUES],
+    /// Active loop as (start, end) in frames. The end is the frame the playhead wraps at.
+    loop_span: Option<(f64, f64)>,
 }
 
 impl Deck {
@@ -36,6 +38,20 @@ impl Deck {
         );
         self.track = Some(track);
         old.track
+    }
+
+    /// Set the active loop, or clear it with `None`. Ends are clamped to the track, and a span
+    /// with nothing in it clears the loop instead of trapping the playhead.
+    pub fn set_loop(&mut self, span: Option<(f64, f64)>) {
+        let len = self.len();
+        self.loop_span = span.and_then(|(start, end)| {
+            let (start, end) = (start.clamp(0.0, len), end.clamp(0.0, len));
+            (end > start).then_some((start, end))
+        });
+    }
+
+    pub fn loop_span(&self) -> Option<(f64, f64)> {
+        self.loop_span
     }
 
     pub fn cue_is_previewing(&self) -> bool {
@@ -100,7 +116,13 @@ impl Deck {
             let (l, r) = track.frame_at(self.pos);
             frame[0] = l;
             frame[1] = r;
-            self.pos += self.rate;
+            let next = self.pos + self.rate;
+            // Wrapping only on the step that crosses the end leaves a jump out of the loop
+            // playing on from where it landed, the way a hot cue out of a loop does on a CDJ.
+            self.pos = match self.loop_span {
+                Some((start, end)) if self.pos < end && next >= end => start + (next - end),
+                _ => next,
+            };
         }
     }
 

@@ -32,6 +32,8 @@ pub enum Command {
     SetCuePoint(DeckId, f64),
     /// Place or clear hot cue `n` at a frame without moving the playhead.
     SetHotCue(DeckId, usize, Option<f64>),
+    /// Loop between two frames, or clear the loop with `None`.
+    SetLoop(DeckId, Option<(f64, f64)>),
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -42,6 +44,8 @@ pub struct DeckSnapshot {
     pub cue_point: f64,
     pub hot_cues: [Option<f64>; HOT_CUES],
     pub track_frames: usize,
+    /// Active loop as (start, end) in frames.
+    pub loop_span: Option<(f64, f64)>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -84,6 +88,9 @@ struct SharedDeck {
     cue_point: F64,
     /// NaN encodes an empty slot.
     hot_cues: [F64; HOT_CUES],
+    /// Both NaN when no loop is active. The pair can be read a frame apart from the position
+    /// above, which only moves a loop marker in the UI by one frame.
+    loop_span: [F64; 2],
     track_frames: AtomicUsize,
     fader: F32,
     headphone_cue: AtomicBool,
@@ -164,6 +171,10 @@ impl EngineHandle {
                 cue_point: d.cue_point.get(),
                 hot_cues,
                 track_frames: d.track_frames.load(Relaxed),
+                loop_span: {
+                    let (start, end) = (d.loop_span[0].get(), d.loop_span[1].get());
+                    (!start.is_nan() && !end.is_nan()).then_some((start, end))
+                },
             }
         };
         Snapshot {
@@ -240,6 +251,9 @@ impl EngineProcessor {
             for (i, slot) in out.hot_cues.iter().enumerate() {
                 slot.set(deck.hot_cue_position(i).unwrap_or(f64::NAN));
             }
+            let span = deck.loop_span();
+            out.loop_span[0].set(span.map_or(f64::NAN, |(start, _)| start));
+            out.loop_span[1].set(span.map_or(f64::NAN, |(_, end)| end));
             out.track_frames
                 .store(deck.track().map_or(0, |t| t.frames()), Relaxed);
             out.fader.set(self.engine.channel_fader(id));
