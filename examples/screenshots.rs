@@ -142,6 +142,9 @@ fn main() {
                 beat: Some([(22, 3), (54, 1)][i]),
                 cue_secs: Some([15.0, 7.5][i]),
                 hot_cue_secs: hot_cue_secs[i],
+                // Deck A shows a four bar loop around its playhead.
+                loop_secs: (i == 0).then_some((28.0, 43.0)),
+                quantize: i == 0,
                 end_warning: i == 1,
             }),
             mixer: MixerView {

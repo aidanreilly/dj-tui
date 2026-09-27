@@ -21,6 +21,22 @@ fn run(state: &mut ControlState, snap: &Snapshot, action: Action) -> Option<Comm
     apply(state, &ctl(), snap, action)
 }
 
+/// The span of a `SetLoop` for `deck`, panicking on anything else. `Command` holds an `Arc`
+/// and so has no `PartialEq`, which is why these tests unwrap the command they expect.
+fn loop_span(cmd: Option<Command>, deck: engine::DeckId) -> Option<(f64, f64)> {
+    match cmd {
+        Some(Command::SetLoop(d, span)) if d == deck => span,
+        other => panic!("expected a loop for deck {deck:?}, got {other:?}"),
+    }
+}
+
+fn seek_frame(cmd: Option<Command>, deck: engine::DeckId) -> f64 {
+    match cmd {
+        Some(Command::Seek(d, frame)) if d == deck => frame,
+        other => panic!("expected a seek on deck {deck:?}, got {other:?}"),
+    }
+}
+
 #[test]
 fn transport_actions_become_matching_commands() {
     let mut st = ControlState::default();
@@ -107,6 +123,127 @@ fn seek_tenth_uses_the_loaded_track_length() {
         matches!(run(&mut st, &s, Action::SeekTenth(A, 5)), Some(Command::Seek(A, f)) if f == 500.0)
     );
     assert!(run(&mut st, &s, Action::SeekTenth(B, 5)).is_none());
+}
+
+/// A deck with a track and a known beat length, so loops land on predictable frames.
+fn snap_with_beats(frames: usize) -> (ControlState, Snapshot) {
+    let mut st = ControlState::default();
+    st.beat_frames[0] = Some(24_000.0);
+    (st, snap_with_frames(frames, 0))
+}
+
+#[test]
+fn loop_toggles_a_four_beat_loop_from_the_playhead_and_off_again() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    s.decks[0].position = 96_000.0;
+    let cmd = run(&mut st, &s, Action::LoopToggle(A));
+    assert_eq!(
+        loop_span(cmd, A),
+        Some((96_000.0, 96_000.0 + 4.0 * 24_000.0))
+    );
+
+    // With the loop running, the same key clears it.
+    s.decks[0].loop_span = Some((96_000.0, 192_000.0));
+    assert_eq!(loop_span(run(&mut st, &s, Action::LoopToggle(A)), A), None);
+}
+
+#[test]
+fn a_loop_needs_a_beat_grid() {
+    let mut st = ControlState::default();
+    let s = snap_with_frames(480_000, 0);
+    assert!(run(&mut st, &s, Action::LoopToggle(A)).is_none());
+    assert!(run(&mut st, &s, Action::BeatJump(A, Dir::Up)).is_none());
+}
+
+#[test]
+fn halving_and_doubling_keep_the_loop_in_point() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    s.decks[0].position = 24_000.0;
+    run(&mut st, &s, Action::LoopToggle(A));
+    s.decks[0].loop_span = Some((24_000.0, 24_000.0 + 96_000.0));
+
+    assert_eq!(
+        loop_span(run(&mut st, &s, Action::LoopHalve(A)), A),
+        Some((24_000.0, 24_000.0 + 48_000.0)),
+        "two beats from the same in point"
+    );
+    s.decks[0].loop_span = Some((24_000.0, 24_000.0 + 48_000.0));
+    assert_eq!(
+        loop_span(run(&mut st, &s, Action::LoopDouble(A)), A),
+        Some((24_000.0, 24_000.0 + 96_000.0))
+    );
+}
+
+#[test]
+fn halving_and_doubling_without_a_loop_only_set_the_length_for_the_next_one() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    assert!(run(&mut st, &s, Action::LoopDouble(A)).is_none());
+    assert_eq!(st.loop_beats[0], 8.0);
+    s.decks[0].position = 0.0;
+    assert_eq!(
+        loop_span(run(&mut st, &s, Action::LoopToggle(A)), A),
+        Some((0.0, 8.0 * 24_000.0))
+    );
+}
+
+#[test]
+fn loop_length_stops_at_an_eighth_of_a_beat_and_at_thirty_two() {
+    let (mut st, s) = snap_with_beats(480_000);
+    for _ in 0..8 {
+        run(&mut st, &s, Action::LoopHalve(A));
+    }
+    assert_eq!(st.loop_beats[0], 0.125);
+    for _ in 0..10 {
+        run(&mut st, &s, Action::LoopDouble(A));
+    }
+    assert_eq!(st.loop_beats[0], 32.0);
+}
+
+#[test]
+fn beat_jump_moves_by_the_loop_length_and_stays_in_the_track() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    s.decks[0].position = 240_000.0;
+    assert_eq!(
+        seek_frame(run(&mut st, &s, Action::BeatJump(A, Dir::Up)), A),
+        240_000.0 + 96_000.0
+    );
+    assert_eq!(
+        seek_frame(run(&mut st, &s, Action::BeatJump(A, Dir::Down)), A),
+        240_000.0 - 96_000.0
+    );
+    s.decks[0].position = 10_000.0;
+    assert_eq!(
+        seek_frame(run(&mut st, &s, Action::BeatJump(A, Dir::Down)), A),
+        0.0,
+        "a jump back past the start lands on the start"
+    );
+}
+
+#[test]
+fn quantize_snaps_loops_and_jumps_to_the_nearest_beat() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    // The grid's first beat sits 1000 frames in, so beats fall on 1000, 25_000, 49_000 …
+    st.first_beat_frames[0] = 1_000.0;
+    st.quantize[0] = true;
+    s.decks[0].position = 26_000.0;
+    assert_eq!(
+        loop_span(run(&mut st, &s, Action::LoopToggle(A)), A),
+        Some((25_000.0, 25_000.0 + 96_000.0)),
+        "the loop in point snaps back to the beat at 25_000"
+    );
+    assert_eq!(
+        seek_frame(run(&mut st, &s, Action::BeatJump(A, Dir::Up)), A),
+        25_000.0 + 96_000.0
+    );
+}
+
+#[test]
+fn quantize_toggles_without_sending_a_command() {
+    let (mut st, s) = snap_with_beats(480_000);
+    assert!(run(&mut st, &s, Action::Quantize(A)).is_none());
+    assert!(st.quantize[0]);
+    assert!(run(&mut st, &s, Action::Quantize(A)).is_none());
+    assert!(!st.quantize[0]);
 }
 
 #[test]

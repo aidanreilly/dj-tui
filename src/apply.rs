@@ -5,7 +5,7 @@
 //! Actions for features not built yet produce no command.
 
 use engine::dsp::{EqBand, EQ_MAX_DB, TRIM_RANGE_DB};
-use engine::{Command, Snapshot};
+use engine::{Command, DeckId, Snapshot};
 use input::{Action, Dir};
 
 /// Step sizes and limits for keyboard controls.
@@ -39,6 +39,13 @@ pub struct ControlState {
     pub headphone_cue: [bool; 2],
     pub rates: [f64; 2],
     pub strips: [StripState; 2],
+    /// Frames per beat from each deck's beat grid, `None` until a track is analysed.
+    pub beat_frames: [Option<f64>; 2],
+    /// Frame of the first beat, the anchor quantized positions snap to.
+    pub first_beat_frames: [f64; 2],
+    /// Length of the next loop, and of a beat jump, in beats.
+    pub loop_beats: [f64; 2],
+    pub quantize: [bool; 2],
 }
 
 /// Trim, EQ and filter for one channel. Arrays are indexed by `EqBand as usize`.
@@ -55,6 +62,10 @@ pub const EQ_STEP_DB: f32 = 2.0;
 /// Lowest EQ knob position short of a kill.
 pub const EQ_FLOOR_DB: f32 = -26.0;
 pub const FILTER_STEP: f32 = 0.1;
+/// A bar in 4/4, the length a CDJ's loop key reaches for.
+pub const DEFAULT_LOOP_BEATS: f64 = 4.0;
+pub const MIN_LOOP_BEATS: f64 = 0.125;
+pub const MAX_LOOP_BEATS: f64 = 32.0;
 
 fn band(b: input::Band) -> EqBand {
     match b {
@@ -77,6 +88,10 @@ impl Default for ControlState {
             headphone_cue: [false; 2],
             rates: [1.0; 2],
             strips: Default::default(),
+            beat_frames: [None; 2],
+            first_beat_frames: [0.0; 2],
+            loop_beats: [DEFAULT_LOOP_BEATS; 2],
+            quantize: [false; 2],
         }
     }
 }
@@ -86,6 +101,30 @@ fn sign(d: Dir) -> f32 {
         Dir::Up => 1.0,
         Dir::Down => -1.0,
     }
+}
+
+/// The playhead as the loop and jump keys see it: on the nearest beat when quantize is on.
+fn from_here(st: &ControlState, snap: &Snapshot, i: usize) -> f64 {
+    let pos = snap.decks[i].position;
+    let Some(beat) = st.beat_frames[i] else {
+        return pos;
+    };
+    if !st.quantize[i] {
+        return pos;
+    }
+    let anchor = st.first_beat_frames[i];
+    anchor + ((pos - anchor) / beat).round() * beat
+}
+
+/// Set the loop length in beats, halving or doubling within the range a CDJ offers.
+fn scale_loop(st: &mut ControlState, snap: &Snapshot, d: DeckId, by: f64) -> Option<Command> {
+    let i = d.index();
+    let beats = (st.loop_beats[i] * by).clamp(MIN_LOOP_BEATS, MAX_LOOP_BEATS);
+    st.loop_beats[i] = beats;
+    // A running loop keeps its in point and changes length under the playhead.
+    let (start, _) = snap.decks[i].loop_span?;
+    let beat = st.beat_frames[i]?;
+    Some(Command::SetLoop(d, Some((start, start + beats * beat))))
 }
 
 pub fn apply(
@@ -165,6 +204,30 @@ pub fn apply(
                 *f = 0.0;
             }
             Command::SetFilter(d, *f)
+        }
+        LoopToggle(d) => {
+            let i = d.index();
+            if snap.decks[i].loop_span.is_some() {
+                Command::SetLoop(d, None)
+            } else {
+                let beat = st.beat_frames[i]?;
+                let start = from_here(st, snap, i);
+                Command::SetLoop(d, Some((start, start + st.loop_beats[i] * beat)))
+            }
+        }
+        LoopHalve(d) => return scale_loop(st, snap, d, 0.5),
+        LoopDouble(d) => return scale_loop(st, snap, d, 2.0),
+        BeatJump(d, dir) => {
+            let i = d.index();
+            let beat = st.beat_frames[i]?;
+            let by = st.loop_beats[i] * beat * sign(dir) as f64;
+            let frames = snap.decks[i].track_frames as f64;
+            Command::Seek(d, (from_here(st, snap, i) + by).clamp(0.0, frames))
+        }
+        Quantize(d) => {
+            let q = &mut st.quantize[d.index()];
+            *q = !*q;
+            return None;
         }
         _ => return None,
     })

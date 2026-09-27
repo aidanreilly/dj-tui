@@ -44,6 +44,10 @@ pub struct DeckView {
     pub beat: Option<(i64, i64)>,
     pub cue_secs: Option<f64>,
     pub hot_cue_secs: [Option<f64>; 8],
+    /// Active loop as (start, end) in seconds, drawn over the overview.
+    pub loop_secs: Option<(f64, f64)>,
+    /// True while cues, loops and jumps snap to the beat grid.
+    pub quantize: bool,
     /// Flash phase of the end-of-track warning: true while the unplayed part shows red.
     pub end_warning: bool,
 }

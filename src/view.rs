@@ -51,6 +51,11 @@ fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &Dec
             .map(|g| g.bar_and_beat(d.position / rate)),
         cue_secs: loaded.then(|| d.cue_point / rate),
         hot_cue_secs: d.hot_cues.map(|c| c.filter(|_| loaded).map(|f| f / rate)),
+        loop_secs: d
+            .loop_span
+            .filter(|_| loaded)
+            .map(|(start, end)| (start / rate, end / rate)),
+        quantize: false,
         end_warning: false,
     }
 }

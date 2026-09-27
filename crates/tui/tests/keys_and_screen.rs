@@ -95,6 +95,8 @@ fn deck(id: DeckId, focused: bool) -> DeckView {
         beat: None,
         cue_secs: None,
         hot_cue_secs: [None; 8],
+        loop_secs: None,
+        quantize: false,
         end_warning: false,
     }
 }

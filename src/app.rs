@@ -81,7 +81,12 @@ impl App {
 
     /// Put an already decoded track on a deck (demo mode, tests).
     pub fn load_track(&mut self, deck: DeckId, track: engine::Track, meta: DeckMeta) {
-        self.metas[deck.index()] = DeckMeta {
+        let i = deck.index();
+        let rate = self.sample_rate as f64;
+        // The loop and jump keys work in beats, so they need the grid in frames.
+        self.state.beat_frames[i] = meta.grid.map(|g| g.beat_secs() * rate);
+        self.state.first_beat_frames[i] = meta.grid.map_or(0.0, |g| g.first_beat_secs * rate);
+        self.metas[i] = DeckMeta {
             loading: false,
             ..meta
         };
@@ -189,6 +194,36 @@ impl App {
         }
     }
 
+    /// Report what the loop, loop length and quantize keys did. Their effect is otherwise
+    /// invisible until the next frame, and a loop key on an unanalysed track does nothing.
+    fn note_loop_keys(&mut self, action: Action, cmd: Option<&Command>) {
+        let (Action::LoopToggle(d)
+        | Action::LoopHalve(d)
+        | Action::LoopDouble(d)
+        | Action::Quantize(d)) = action
+        else {
+            return;
+        };
+        let letter = deck_letter(d);
+        let beats = beats_label(self.state.loop_beats[d.index()]);
+        self.message = match (action, cmd) {
+            (Action::Quantize(_), _) => {
+                let on = if self.state.quantize[d.index()] {
+                    "on"
+                } else {
+                    "off"
+                };
+                format!("Quantize {on} on deck {letter}")
+            }
+            (_, None) => format!("Deck {letter} has no beat grid, so loops have no length"),
+            (Action::LoopToggle(_), Some(Command::SetLoop(_, None))) => {
+                format!("Loop off on deck {letter}")
+            }
+            (Action::LoopToggle(_), _) => format!("Loop: {beats} on deck {letter}"),
+            _ => format!("Loop length: {beats} on deck {letter}"),
+        };
+    }
+
     /// Handle one key event. Returns true when the user asked to quit.
     pub fn on_key(&mut self, key: KeyEvent) -> bool {
         let Some(action) = self.keymap.handle(key) else {
@@ -207,7 +242,9 @@ impl App {
             }
             _ => {
                 let snap = self.handle.snapshot();
-                if let Some(cmd) = apply(&mut self.state, &self.controls, &snap, action) {
+                let cmd = apply(&mut self.state, &self.controls, &snap, action);
+                self.note_loop_keys(action, cmd.as_ref());
+                if let Some(cmd) = cmd {
                     self.send(cmd);
                 }
             }
@@ -245,8 +282,9 @@ impl App {
         );
         v.message = self.message.clone();
         let elapsed = self.started.elapsed().as_secs_f64();
-        for d in &mut v.decks {
+        for (i, d) in v.decks.iter_mut().enumerate() {
             d.waveform_mode = self.waveform_mode;
+            d.quantize = self.state.quantize[i];
             d.end_warning = crate::view::end_warning(
                 d.duration_secs - d.position_secs,
                 d.playing,
@@ -285,6 +323,20 @@ fn mode_name(m: WaveformMode) -> &'static str {
         WaveformMode::ThreeBand => "3-Band",
         WaveformMode::Rgb => "RGB",
         WaveformMode::Blue => "Blue",
+    }
+}
+
+/// Loop lengths read as beats above one and as a fraction of a beat below it.
+fn beats_label(beats: f64) -> String {
+    if beats >= 1.0 {
+        let whole = beats.round();
+        if (beats - whole).abs() < 1e-9 && whole == 1.0 {
+            "1 beat".into()
+        } else {
+            format!("{} beats", (beats * 100.0).round() / 100.0)
+        }
+    } else {
+        format!("1/{} beat", (1.0 / beats).round())
     }
 }
 

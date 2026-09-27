@@ -217,6 +217,78 @@ fn analysis_results_reach_the_deck_view() {
     assert!(v.decks[0].beat.is_some(), "bar and beat counter available");
 }
 
+/// A click every beat, which the tempo detector locks onto.
+fn click_track(bpm: f64, secs: f64) -> Vec<f32> {
+    let beat = 60.0 / bpm as f32;
+    (0..(secs as f32 * RATE as f32) as usize)
+        .map(|i| {
+            let tb = (i as f32 / RATE as f32) % beat;
+            if tb < 0.02 {
+                (-tb / 0.004).exp() * (std::f32::consts::TAU * 1500.0 * tb).sin()
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn the_loop_key_loops_four_beats_and_the_length_keys_change_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("loop.wav");
+    write_wav(
+        &path,
+        &stereo(&click_track(120.0, 20.0)),
+        2,
+        RATE,
+        Fmt::Float32,
+    );
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+
+    app.on_key(KeyEvent::press(Key::Char('l')));
+    process(&mut p, 16);
+    let (start, end) = app.snapshot().decks[0]
+        .loop_span
+        .expect("a loop is running");
+    let beats = (end - start) / (60.0 / 120.0 * RATE as f64);
+    assert!((beats - 4.0).abs() < 0.05, "four beats long, got {beats}");
+    assert!(app.message().contains("4 beats"), "{}", app.message());
+    assert_eq!(
+        app.view(String::new()).decks[0].loop_secs,
+        Some((start / RATE as f64, end / RATE as f64)),
+        "the view carries the loop so the waveform can draw it"
+    );
+
+    app.on_key(KeyEvent::press(Key::Char('[')));
+    process(&mut p, 16);
+    let (halved_start, halved_end) = app.snapshot().decks[0].loop_span.unwrap();
+    assert_eq!(halved_start, start, "halving keeps the in point");
+    assert!(
+        ((halved_end - halved_start) / (end - start) - 0.5).abs() < 1e-6,
+        "half as long"
+    );
+    assert!(app.message().contains("2 beats"), "{}", app.message());
+
+    app.on_key(KeyEvent::press(Key::Char('l')));
+    process(&mut p, 16);
+    assert_eq!(app.snapshot().decks[0].loop_span, None);
+    assert!(app.view(String::new()).decks[0].loop_secs.is_none());
+    assert!(app.message().contains("Loop off"), "{}", app.message());
+}
+
+#[test]
+fn quantize_reports_itself_and_shows_in_the_deck_view() {
+    let (mut app, _p) = setup();
+    app.on_key(KeyEvent::press(Key::Char('q')));
+    assert!(app.message().contains("Quantize on"), "{}", app.message());
+    assert!(app.view(String::new()).decks[0].quantize);
+    app.on_key(KeyEvent::press(Key::Char('q')));
+    assert!(app.message().contains("Quantize off"), "{}", app.message());
+    assert!(!app.view(String::new()).decks[0].quantize);
+}
+
 #[test]
 fn end_of_track_warning_flashes_in_the_last_stretch_while_playing() {
     use dj_tui::view::end_warning;

@@ -34,6 +34,8 @@ fn loaded_view(focused: bool) -> DeckView {
         beat: None,
         cue_secs: None,
         hot_cue_secs: [None; 8],
+        loop_secs: None,
+        quantize: false,
         end_warning: false,
     }
 }
@@ -107,6 +109,8 @@ fn empty_deck_says_so() {
         beat: None,
         cue_secs: None,
         hot_cue_secs: [None; 8],
+        loop_secs: None,
+        quantize: false,
         end_warning: false,
         ..loaded_view(false)
     };
