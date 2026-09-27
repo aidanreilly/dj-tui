@@ -102,6 +102,28 @@ fn main() {
         (WaveformMode::Rgb, "rgb"),
         (WaveformMode::Blue, "blue"),
     ] {
+        let hot_cue_secs: [[Option<f64>; 8]; 2] = [
+            [
+                Some(15.0),
+                Some(45.0),
+                None,
+                Some(75.0),
+                None,
+                None,
+                None,
+                None,
+            ],
+            [
+                Some(7.5),
+                None,
+                Some(52.5),
+                None,
+                None,
+                None,
+                Some(97.5),
+                None,
+            ],
+        ];
         let view = ScreenView {
             decks: [0, 1].map(|i| DeckView {
                 id: [DeckId::A, DeckId::B][i],
@@ -113,13 +135,13 @@ fn main() {
                 duration_secs: decks[i].secs,
                 loading: false,
                 playing: true,
-                hot_cues: [true, true, false, true, false, false, false, false],
+                hot_cues: hot_cue_secs[i].map(|c| c.is_some()),
                 waveform: decks[i].ranges.clone(),
                 bands: decks[i].bands.clone(),
                 waveform_mode: mode,
                 beat: Some([(22, 3), (54, 1)][i]),
                 cue_secs: Some([15.0, 7.5][i]),
-                hot_cue_secs: [[Some(15.0), Some(45.0), None, Some(75.0), None, None, None, None], [Some(7.5), None, Some(52.5), None, None, None, Some(97.5), None]][i],
+                hot_cue_secs: hot_cue_secs[i],
                 end_warning: i == 1,
             }),
             mixer: MixerView {
