@@ -33,6 +33,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88
       - run: cargo test --workspace --locked
 
+  # Detector accuracy against the GiantSteps sets (spec 6). The datasets are far too big to
+  # check in, so this runs only where the repository variable points at a copy of them.
+  accuracy:
+    runs-on: ubuntu-24.04
+    if: vars.GIANTSTEPS_DIR != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo run --release --locked --example giantsteps -- "${{ vars.GIANTSTEPS_DIR }}"
+
   licences:
     runs-on: ubuntu-24.04
     steps:

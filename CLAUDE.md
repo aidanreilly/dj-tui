@@ -3,8 +3,7 @@
 Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
 detection in `crates/analysis`, running on load. From M5 there are loops, beat jump and quantize, and
 cues persist through the track sidecar rather than the SQLite store the spec describes. M6 has all four effects
-with their keys and knobs, and M7 has sync, nudge and key lock. Still missing: M4's GiantSteps
-evaluation script, and M8 onwards.
+with their keys and knobs, and M7 has sync, nudge and key lock. Still missing: M8 onwards.
 
 ## Rules
 
@@ -76,6 +75,14 @@ written by `loader::sidecar`, so a library keeps its data when it moves between 
 audio changed and the stored data no longer applies. Bump `SIDECAR_VERSION` when the meaning
 of a stored field changes. Cue edits are saved from a background thread, never from the audio
 thread.
+
+## Detector accuracy
+
+`analysis::eval` scores tempo and key against reference annotations, and
+`cargo run --release --example giantsteps -- <dataset dir>` runs it over a dataset, reading
+annotations beside each file or under `annotations/tempo` and `annotations/key`. It exits
+non-zero below the spec's targets of 90 % tempo within ±2 % and 65 % exact key. CI runs it
+only when the `GIANTSTEPS_DIR` repository variable points at a copy of the datasets.
 
 ## Commands
 
