@@ -1,0 +1,3 @@
+//! Offline track analysis: tempo, beat grid and key (spec 3.5). Runs on the loader thread.
+pub mod key;
+pub mod tempo;
