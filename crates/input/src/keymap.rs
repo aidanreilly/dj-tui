@@ -9,6 +9,7 @@ pub enum Key {
     Space,
     Enter,
     Esc,
+    Backspace,
     Left,
     Right,
     Up,
@@ -129,7 +130,7 @@ impl Keymap {
             Key::Right => Some(Action::Crossfader(Dir::Up, e.shift)),
             Key::Up => Some(Action::BrowserMove(Dir::Up)),
             Key::Down => Some(Action::BrowserMove(Dir::Down)),
-            Key::Esc => None,
+            Key::Esc | Key::Backspace => None,
             Key::Char(c) => self.char_action(c, e.alt, target),
         }
     }
@@ -193,6 +194,7 @@ impl Keymap {
             'v' | 'V' => Fader(d, dir(c == 'V')),
             '/' => Search,
             'b' => BrowserFullscreen,
+            'S' => BrowserSort(alt),
             'w' | 'W' => CycleWaveformMode,
             '?' => Help,
             _ => return None,

@@ -149,8 +149,35 @@ Echo and reverb keep ringing after you switch them off, rather than cutting dead
 | `` ` `` | Send the next key to the other deck |
 | `w` | Waveform colour mode: 3-Band, RGB, Blue |
 | Left click on a waveform | Seek there |
+| `↑` / `↓` | Move through the browser |
+| `Enter` | Load the selected track onto the focused deck |
+| `/` | Search the browser |
+| `b` | Browser full screen |
+| `S` / `Alt+S` | Sort column, and the direction |
 | `?` | Key list |
 | `Ctrl+Q` | Quit |
+
+## The browser
+
+Point dj-tui at your music and the bottom panel lists it:
+
+```toml
+[library]
+folders = ["~/Music", "/mnt/crates"]
+```
+
+`↑` and `↓` move through the list, `Enter` loads the selected track onto the focused deck,
+and `b` gives the browser the whole screen. `S` cycles the column it is sorted by, name, BPM,
+key and length, and `Alt+S` turns the order around. Tracks with no analysis yet are dimmed,
+and a track whose key would mix with whatever is playing has its key in green.
+
+`/` starts a search. Type and the list narrows as you go, matching letters in order without
+needing them next to each other, so `whte` finds `Warehouse Tool`. `Enter` keeps the results,
+`Esc` puts the whole list back, and `Backspace` edits. While the prompt is open every key is
+a letter, so a track called `wave` types without cycling the waveform colours.
+
+Everything the list shows comes out of the JSON sidecars beside your files, so it costs
+nothing to display, and a track that has never been played still lists under its own name.
 
 ## Waveforms
 

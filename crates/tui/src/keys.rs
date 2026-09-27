@@ -9,6 +9,7 @@ pub fn convert_key(e: CtKey) -> Option<KeyEvent> {
         KeyCode::Tab | KeyCode::BackTab => Key::Tab,
         KeyCode::Enter => Key::Enter,
         KeyCode::Esc => Key::Esc,
+        KeyCode::Backspace => Key::Backspace,
         KeyCode::Left => Key::Left,
         KeyCode::Right => Key::Right,
         KeyCode::Up => Key::Up,

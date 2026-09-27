@@ -205,6 +205,10 @@ fn main() -> ExitCode {
     for (path, deck) in args.files.into_iter().zip([DeckId::A, DeckId::B]) {
         app.load_path(deck, path);
     }
+    let folders = config.library.paths(std::env::var("HOME").ok().as_deref());
+    if !folders.is_empty() {
+        app.scan_library(&folders);
+    }
 
     // Controllers: mappings come from `mappings/` beside the config file.
     let mapping_dir = config_path(

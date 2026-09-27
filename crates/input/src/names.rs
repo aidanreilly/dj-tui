@@ -75,6 +75,7 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["load", d] => Action::Load(deck(d)?),
         ["search"] => Action::Search,
         ["browser-fullscreen"] => Action::BrowserFullscreen,
+        ["browser-sort"] => Action::BrowserSort(false),
         ["help"] => Action::Help,
         ["quit"] => Action::Quit,
         _ => return None,

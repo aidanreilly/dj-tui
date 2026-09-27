@@ -63,6 +63,7 @@ fn view(pos_a: f64, b_loaded: bool) -> ScreenView {
         message: String::new(),
         phase: None,
         help: false,
+        browser: Default::default(),
     }
 }
 

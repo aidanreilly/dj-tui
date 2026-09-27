@@ -92,6 +92,17 @@ warnings, and the xrun count at the end. `App::take_log` hands over what happene
 last frame, so anything worth keeping is pushed there rather than only shown in the message
 line. Nothing logs from the audio thread.
 
+## Browser
+
+`crates/library` is the data layer and has no database behind it: `scan` walks the configured
+folders and every column comes from the sidecar beside each file, so a track that has never
+been played still lists. `src/browser.rs` holds what changes as keys are pressed, and
+`tui::BrowserPanel` draws it.
+
+While the search prompt is open `App::on_key` takes the keyboard before the keymap sees it,
+so letters are letters. Playlists are m3u. Key highlighting compares each row against the key
+of whichever deck is playing, deck A first.
+
 ## Master limiter
 
 `dsp::Limiter` is the last thing on the master bus, and the cue bus blends in what it puts

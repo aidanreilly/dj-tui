@@ -391,6 +391,7 @@ dependencies = [
  "backend",
  "engine",
  "input",
+ "library",
  "loader",
  "midi",
  "ratatui",

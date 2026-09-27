@@ -5,7 +5,7 @@ use crate::apply::{apply, ControlState, Controls};
 use crate::config::Config;
 use crate::view::{screen_view, DeckMeta};
 use engine::{Command, DeckId, EngineHandle, Snapshot};
-use input::{Action, KeyEvent, Keymap};
+use input::{Action, Key, KeyEvent, Keymap};
 use loader::sidecar::Cues;
 use loader::Loader;
 use std::path::PathBuf;
@@ -36,6 +36,7 @@ pub struct App {
     help: bool,
     /// Events worth keeping: failures and warnings, not every message on screen.
     log: Vec<String>,
+    browser: crate::browser::Browser,
 }
 
 struct Persisted {
@@ -64,6 +65,7 @@ impl App {
             persisted: [None, None],
             help: false,
             log: Vec::new(),
+            browser: crate::browser::Browser::new(),
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -326,10 +328,35 @@ impl App {
 
     /// Handle one key event. Returns true when the user asked to quit.
     pub fn on_key(&mut self, key: KeyEvent) -> bool {
+        // While the search prompt is open the keyboard belongs to it, so a track called
+        // "wave" can be typed without cycling the waveform colours.
+        if self.browser.typing() {
+            match key.key {
+                Key::Char(c) => self.browser.type_char(c),
+                Key::Space => self.browser.type_char(' '),
+                Key::Backspace => self.browser.backspace(),
+                Key::Enter => self.browser.accept_search(),
+                Key::Esc => self.browser.cancel_search(),
+                Key::Up => self.browser.move_selection(input::Dir::Up),
+                Key::Down => self.browser.move_selection(input::Dir::Down),
+                _ => {}
+            }
+            return false;
+        }
         let Some(action) = self.keymap.handle(key) else {
             return false;
         };
         self.on_action(action)
+    }
+
+    /// Read `roots` into the browser.
+    pub fn scan_library(&mut self, roots: &[PathBuf]) {
+        self.browser.scan(roots);
+        let count = self.browser.entries().len();
+        self.message = match count {
+            0 => "No music found. Set [library] folders in the config.".into(),
+            n => format!("Library: {n} tracks"),
+        };
     }
 
     /// Put a control where a MIDI fader or knob says it is.
@@ -386,11 +413,17 @@ impl App {
                 self.waveform_mode = self.waveform_mode.next();
                 self.message = format!("Waveform: {}", mode_name(self.waveform_mode));
             }
-            Action::Load(_) => {
-                self.message =
-                    "The library browser arrives in M8; pass files on the command line for now"
-                        .into();
-            }
+            Action::Load(deck) => match self.browser.selected_path() {
+                Some(path) => {
+                    let path = path.to_path_buf();
+                    self.load_path(deck, path);
+                }
+                None => self.message = "Nothing selected in the browser".into(),
+            },
+            Action::BrowserMove(dir) => self.browser.move_selection(dir),
+            Action::BrowserSort(reverse) => self.browser.sort_by(reverse),
+            Action::BrowserFullscreen => self.browser.fullscreen = !self.browser.fullscreen,
+            Action::Search => self.browser.start_search(),
             _ => {
                 let snap = self.handle.snapshot();
                 let cmd = apply(&mut self.state, &self.controls, &snap, action);
@@ -447,6 +480,14 @@ impl App {
         );
         v.message = self.message.clone();
         v.help = self.help;
+        // Highlight against whichever deck is playing; deck A wins when both are.
+        let snapshot = self.handle.snapshot();
+        let playing = [0, 1]
+            .iter()
+            .find(|&&i| snapshot.decks[i].playing)
+            .and_then(|&i| self.metas[i].key.as_deref())
+            .and_then(analysis::key::Key::from_camelot);
+        v.browser = self.browser.view(playing);
         let elapsed = self.started.elapsed().as_secs_f64();
         for (i, d) in v.decks.iter_mut().enumerate() {
             d.waveform_mode = self.waveform_mode;

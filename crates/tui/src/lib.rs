@@ -1,5 +1,6 @@
 //! Terminal UI: layout, widgets and waveform rasterising. Pure rendering, driven by view structs.
 
+mod browser;
 mod deck;
 mod graphics;
 mod keys;
@@ -8,6 +9,7 @@ pub mod pixel;
 mod screen;
 pub mod waveform;
 
+pub use browser::{BrowserPanel, BrowserRow, BrowserView};
 pub use deck::{
     waveform_area, DeckPanel, DeckView, END_WARNING_COLOUR, HOT_CUE_COLOURS, LOOP_COLOUR,
     MAIN_CUE_COLOUR, WAVEFORM_ROWS,

@@ -85,6 +85,7 @@ pub fn screen_view(
         status,
         message: String::new(),
         help: false,
+        browser: Default::default(),
         phase: match (&metas[0].grid, &metas[1].grid) {
             (Some(a), Some(b))
                 if snap.decks[0].track_frames > 0 && snap.decks[1].track_frames > 0 =>

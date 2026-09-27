@@ -1,4 +1,4 @@
-use crate::{screen_layout, DeckPanel, DeckView};
+use crate::{screen_layout, BrowserPanel, BrowserView, DeckPanel, DeckView};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -49,6 +49,7 @@ pub struct ScreenView {
     pub phase: Option<f64>,
     /// Draw the key list over everything else.
     pub help: bool,
+    pub browser: BrowserView,
 }
 
 /// What `?` puts on screen: the keys, in the order the spec's control table has them.
@@ -309,19 +310,27 @@ fn render_phase(f: &mut Frame, area: Rect, phase: Option<f64>) {
 
 pub fn render_screen(f: &mut Frame, v: &ScreenView) {
     let l = screen_layout(f.area());
-    f.render_widget(DeckPanel::new(&v.decks[0]), l.deck_a);
-    render_phase(f, l.phase, v.phase);
-    f.render_widget(DeckPanel::new(&v.decks[1]), l.deck_b);
-    render_mixer(f, l.mixer, &v.mixer);
-
-    let browser = Block::bordered().title(" BROWSER ");
-    let inner = browser.inner(l.browser);
-    f.render_widget(browser, l.browser);
-    f.render_widget(
-        Paragraph::new("Library browser arrives in M8.")
-            .style(Style::new().add_modifier(Modifier::DIM)),
-        inner,
-    );
+    // Full screen gives the browser everything but the two lines at the foot.
+    let browser_area = if v.browser.fullscreen {
+        let area = f.area();
+        Rect {
+            height: area.height,
+            ..area
+        }
+    } else {
+        f.render_widget(DeckPanel::new(&v.decks[0]), l.deck_a);
+        render_phase(f, l.phase, v.phase);
+        f.render_widget(DeckPanel::new(&v.decks[1]), l.deck_b);
+        render_mixer(f, l.mixer, &v.mixer);
+        l.browser
+    };
+    let browser = Block::bordered();
+    let inner = browser.inner(browser_area);
+    let list_area = Rect {
+        height: inner.height.saturating_sub(2),
+        ..browser_area
+    };
+    f.render_widget(BrowserPanel::new(&v.browser), list_area);
     if inner.height > 0 {
         let status = Rect {
             y: inner.bottom() - 1,

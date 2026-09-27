@@ -55,6 +55,8 @@ pub enum Action {
     Load(DeckId),
     Search,
     BrowserFullscreen,
+    /// Cycle the column the browser is sorted by, or with `true` turn the order around.
+    BrowserSort(bool),
     CycleWaveformMode,
     Help,
     Quit,

@@ -43,6 +43,27 @@ pub struct Config {
     pub deck: Deck,
     pub mixer: Mixer,
     pub midi: Midi,
+    pub library: Library,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Library {
+    /// Folders the browser lists, searched all the way down. A leading `~` is your home.
+    pub folders: Vec<String>,
+}
+
+impl Library {
+    /// The folders as paths, with `~` expanded against `home`.
+    pub fn paths(&self, home: Option<&str>) -> Vec<PathBuf> {
+        self.folders
+            .iter()
+            .map(|folder| match (folder.strip_prefix("~/"), home) {
+                (Some(rest), Some(home)) => PathBuf::from(home).join(rest),
+                _ => PathBuf::from(folder),
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

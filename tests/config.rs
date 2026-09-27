@@ -157,3 +157,14 @@ fn midi_defaults_to_on_with_soft_takeover() {
         "typos are caught"
     );
 }
+
+#[test]
+fn library_folders_expand_a_leading_tilde() {
+    use std::path::PathBuf;
+    let c = Config::from_toml("[library]\nfolders = [\"~/Music\", \"/mnt/dj\"]").unwrap();
+    assert_eq!(
+        c.library.paths(Some("/home/dj")),
+        vec![PathBuf::from("/home/dj/Music"), PathBuf::from("/mnt/dj")]
+    );
+    assert!(Config::default().library.folders.is_empty());
+}
