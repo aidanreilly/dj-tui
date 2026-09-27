@@ -1,5 +1,6 @@
 //! Real-time audio engine. No I/O lives here, so every block can be driven offline in tests.
 
+pub mod dsp;
 mod deck;
 mod mixer;
 mod rt;

@@ -1,3 +1,4 @@
+#![allow(dead_code)] // shared by several test binaries; each uses only part
 //! Minimal WAV writer for fixtures, so tests don't depend on binary files in the repo.
 
 use std::io::Write;
