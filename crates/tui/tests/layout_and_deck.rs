@@ -28,13 +28,13 @@ fn loaded_view(focused: bool) -> DeckView {
         loading: false,
         playing: true,
         hot_cues: [true, false, true, false, false, false, false, false],
-        waveform: vec![
-            wave::WavePoint {
-                range: [-1.0, 1.0],
-                bands: [1.0, 0.5, 0.2],
-            };
-            200
-        ],
+        waveform: vec![[-1.0, 1.0]; 200],
+        bands: vec![],
+        waveform_mode: Default::default(),
+        beat: None,
+        cue_secs: None,
+        hot_cue_secs: [None; 8],
+        end_warning: false,
     }
 }
 
@@ -102,6 +102,12 @@ fn empty_deck_says_so() {
     let view = DeckView {
         title: None,
         waveform: vec![],
+        bands: vec![],
+        waveform_mode: Default::default(),
+        beat: None,
+        cue_secs: None,
+        hot_cue_secs: [None; 8],
+        end_warning: false,
         ..loaded_view(false)
     };
     let text = buffer_text(&render(&view, 80, DECK_HEIGHT));
@@ -133,4 +139,97 @@ fn every_waveform_row_is_drawn() {
     for y in 2..(2 + WAVEFORM_ROWS) {
         assert_eq!(buf[(3, y)].symbol(), "▌", "row {y} empty");
     }
+}
+
+#[test]
+fn glyph_waveform_uses_mode_colours() {
+    use ratatui::style::Color;
+    let mut view = loaded_view(true);
+    view.waveform = vec![[-0.9, 0.9]; 200];
+    view.bands = vec![[0.9, 0.0, 0.0]; 200];
+    view.waveform_mode = tui::pixel::WaveformMode::Rgb;
+    view.position_secs = 0.0;
+    let buf = render(&view, 80, 13);
+    // Centre row of the waveform, away from the playhead.
+    let cell = &buf[(40, 2 + tui::WAVEFORM_ROWS / 2 - 1)];
+    match cell.fg {
+        Color::Rgb(r, g, b) => assert!(r >= 200 && g <= 40 && b <= 40, "{:?}", cell.fg),
+        other => panic!("expected an RGB colour, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_trace_of_treble_does_not_paint_a_vocal_white_in_3_band() {
+    use ratatui::style::Color;
+    let pal = tui::pixel::Palette::default();
+    let mut view = loaded_view(true);
+    view.waveform = vec![[-0.8, 0.8]; 200];
+    view.bands = vec![[0.02, 0.8, 0.03]; 200];
+    view.waveform_mode = tui::pixel::WaveformMode::ThreeBand;
+    view.position_secs = 0.0;
+    let buf = render(&view, 80, 13);
+    let cell = &buf[(40, 2 + tui::WAVEFORM_ROWS / 2)];
+    let [r, g, b, _] = pal.three_band[1].0;
+    assert_eq!(
+        cell.fg,
+        Color::Rgb(r, g, b),
+        "centre of a vocal should be amber"
+    );
+}
+
+// --- CDJ-style overlays (spec 3.2) ---
+
+fn with_cues() -> DeckView {
+    let mut v = loaded_view(false);
+    v.position_secs = 3.0;
+    v.duration_secs = 30.0;
+    v.cue_secs = Some(0.0);
+    v.hot_cue_secs = [Some(15.0), None, Some(27.0), None, None, None, None, None];
+    v
+}
+
+#[test]
+fn hot_cues_are_marked_under_the_waveform_in_their_colours() {
+    use ratatui::style::Color;
+    let buf = render(&with_cues(), 80, 13);
+    let marker_y = 2 + tui::WAVEFORM_ROWS;
+    // Inner width 78; 15 of 30 s is column 1 + 39.
+    let cell = &buf[(40, marker_y)];
+    assert_eq!(cell.symbol(), "▲");
+    let [r, g, b] = tui::HOT_CUE_COLOURS[0];
+    assert_eq!(cell.fg, Color::Rgb(r, g, b));
+    assert_eq!(buf[(41, marker_y)].symbol(), "1");
+    let [r, g, b] = tui::HOT_CUE_COLOURS[2];
+    assert_eq!(buf[(1 + 70, marker_y)].fg, Color::Rgb(r, g, b));
+}
+
+#[test]
+fn main_cue_is_an_orange_marker() {
+    use ratatui::style::Color;
+    let buf = render(&with_cues(), 80, 13);
+    let cell = &buf[(1, 2 + tui::WAVEFORM_ROWS)];
+    assert_eq!(cell.symbol(), "▲");
+    let [r, g, b] = tui::MAIN_CUE_COLOUR;
+    assert_eq!(cell.fg, Color::Rgb(r, g, b));
+}
+
+#[test]
+fn status_row_counts_bars_and_beats() {
+    let mut v = with_cues();
+    v.beat = Some((17, 3));
+    let text = buffer_text(&render(&v, 80, 13));
+    assert!(text.contains("BAR 17.3"), "{text}");
+}
+
+#[test]
+fn end_warning_turns_the_unplayed_waveform_red() {
+    use ratatui::style::Color;
+    let mut v = loaded_view(true);
+    v.waveform = vec![[-0.9, 0.9]; 200];
+    v.position_secs = 25.0;
+    v.end_warning = true;
+    let buf = render(&v, 80, 13);
+    let cell = &buf[(75, 2 + tui::WAVEFORM_ROWS / 2)];
+    let [r, g, b] = tui::END_WARNING_COLOUR;
+    assert_eq!(cell.fg, Color::Rgb(r, g, b));
 }

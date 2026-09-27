@@ -28,15 +28,18 @@ fn deck(id: DeckId, loaded: bool, position_secs: f64) -> DeckView {
             (0..512)
                 .map(|i| {
                     let p = 0.2 + 0.7 * ((i % 37) as f32 / 37.0);
-                    wave::WavePoint {
-                        range: [-p, p],
-                        bands: [p, p * 0.5, p * 0.2],
-                    }
+                    [-p, p]
                 })
                 .collect()
         } else {
             vec![]
         },
+        bands: vec![],
+        waveform_mode: Default::default(),
+        beat: None,
+        cue_secs: None,
+        hot_cue_secs: [None; 8],
+        end_warning: false,
     }
 }
 
@@ -50,10 +53,11 @@ fn view(pos_a: f64, b_loaded: bool) -> ScreenView {
             crossfader: 0.0,
             faders: [1.0, 1.0],
             headphone_cue: [false, false],
+            ..Default::default()
         },
         status: String::new(),
         message: String::new(),
-        waveform_mode: wave::WaveformMode::default(),
+        phase: None,
     }
 }
 

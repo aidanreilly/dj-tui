@@ -126,6 +126,18 @@ impl Deck {
         }
     }
 
+    pub fn set_cue_point(&mut self, frame: f64) {
+        self.cue_point = frame.clamp(0.0, self.len());
+    }
+
+    /// Put hot cue `n` at `frame`, or clear it with `None`. Out of range pads are ignored.
+    pub fn set_hot_cue(&mut self, n: usize, frame: Option<f64>) {
+        let len = self.len();
+        if let Some(slot) = self.hot_cues.get_mut(n) {
+            *slot = frame.map(|f| f.clamp(0.0, len));
+        }
+    }
+
     pub fn cue_point(&self) -> f64 {
         self.cue_point
     }

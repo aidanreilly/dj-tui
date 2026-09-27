@@ -1,7 +1,7 @@
 //! Draws pixel waveforms over the glyph ones on terminals with a bitmap protocol.
 //! Created only when detection found one; everything else keeps the glyph renderer.
 
-use crate::pixel::{playhead_x, Palette, PixelWaveform};
+use crate::pixel::{playhead_x, Palette, PixelWaveform, Wave};
 use crate::{screen_layout, waveform_area, ScreenView};
 use image::DynamicImage;
 use ratatui::{layout::Size, Frame};
@@ -40,9 +40,6 @@ impl Graphics {
 
     /// Call right after `render_screen` with the same view.
     pub fn render(&mut self, frame: &mut Frame, view: &ScreenView) {
-        if self.palette.mode != view.waveform_mode {
-            self.palette = Palette::for_mode(view.waveform_mode);
-        }
         let layout = screen_layout(frame.area());
         let font = self.picker.font_size();
         for (i, panel) in [layout.deck_a, layout.deck_b].into_iter().enumerate() {
@@ -52,14 +49,20 @@ impl Graphics {
                 area.width as u32 * font.width as u32,
                 area.height as u32 * font.height as u32,
             );
-            let points: &[wave::WavePoint] = if dv.title.is_some() {
+            let ranges: &[[f32; 2]] = if dv.title.is_some() {
                 &dv.waveform
             } else {
                 &[]
             };
             let playhead = playhead_x(dv.position_secs, dv.duration_secs, px.0);
             let deck = &mut self.decks[i];
-            match deck.pixel.update(points, px, playhead, &self.palette) {
+            let wave = Wave {
+                ranges,
+                bands: &dv.bands,
+                mode: dv.waveform_mode,
+                warning: dv.end_warning,
+            };
+            match deck.pixel.update(&wave, px, playhead, &self.palette) {
                 Some(img) => {
                     let size = Size::new(area.width, area.height);
                     deck.protocol = make_protocol(

@@ -90,6 +90,12 @@ fn deck(id: DeckId, focused: bool) -> DeckView {
         playing: false,
         hot_cues: [false; 8],
         waveform: vec![],
+        bands: vec![],
+        waveform_mode: Default::default(),
+        beat: None,
+        cue_secs: None,
+        hot_cue_secs: [None; 8],
+        end_warning: false,
     }
 }
 
@@ -101,10 +107,11 @@ fn whole_screen_shows_every_section() {
             crossfader: -1.0,
             faders: [1.0, 0.5],
             headphone_cue: [false, true],
+            ..Default::default()
         },
         status: "keyboard: kitty protocol".into(),
         message: "Loaded Some Track on deck A".into(),
-        waveform_mode: wave::WaveformMode::default(),
+        phase: None,
     };
     let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -129,7 +136,12 @@ fn whole_screen_shows_every_section() {
         assert!(text.contains(needle), "missing {needle}\n{text}");
     }
     // Headphone cue lit on B only.
-    assert!(text.contains("CUE ○") && text.contains("● "), "{text}");
+    let cue_row = text.lines().find(|l| l.contains("CUE")).expect("cue row");
+    let (a, b) = (
+        cue_row.find('○').expect("A unlit"),
+        cue_row.find('●').expect("B lit"),
+    );
+    assert!(a < b, "{cue_row}");
 }
 
 #[test]
@@ -140,10 +152,11 @@ fn long_status_does_not_hide_the_message() {
             crossfader: 0.0,
             faders: [1.0, 1.0],
             headphone_cue: [false, false],
+            ..Default::default()
         },
         status: "x".repeat(300),
         message: "Could not load a.flac".into(),
-        waveform_mode: wave::WaveformMode::default(),
+        phase: None,
     };
     let mut term = Terminal::new(TestBackend::new(100, 40)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -159,70 +172,92 @@ fn long_status_does_not_hide_the_message() {
     assert!(text.contains("Could not load a.flac"), "{text}");
 }
 
-#[test]
-fn the_waveform_mode_reaches_the_glyph_renderer() {
-    use ratatui::style::Color;
-    use wave::{WavePoint, WaveformMode};
+fn mixer_text(m: MixerView, w: u16, h: u16) -> String {
+    let view = ScreenView {
+        decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
+        mixer: m,
+        status: String::new(),
+        message: String::new(),
+        phase: None,
+    };
+    let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+    term.draw(|f| render_screen(f, &view)).unwrap();
+    let buf = term.backend().buffer();
+    (0..h)
+        .map(|y| {
+            (0..w)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+                + "\n"
+        })
+        .collect()
+}
 
-    // A loaded deck whose bass dominates: 3band paints it blue, rgb paints it red.
-    fn view(mode: WaveformMode) -> ScreenView {
-        let mut d = deck(DeckId::A, true);
-        d.title = Some("Track".into());
-        d.duration_secs = 100.0;
-        d.waveform = vec![
-            WavePoint {
-                range: [-1.0, 1.0],
-                bands: [1.0, 0.0, 0.0],
-            };
-            200
-        ];
-        ScreenView {
-            decks: [d, deck(DeckId::B, false)],
-            mixer: MixerView {
-                crossfader: 0.0,
-                faders: [1.0, 1.0],
-                headphone_cue: [false, false],
-            },
+#[test]
+fn mixer_strip_shows_trim_eq_filter_and_meters() {
+    let text = mixer_text(MixerView::default(), 120, 44);
+    for label in ["TRIM", "HI", "MID", "LOW", "FLT", "PK", "VOL", "CUE"] {
+        assert!(text.contains(label), "missing {label}\n{text}");
+    }
+}
+
+#[test]
+fn killed_bands_say_kill() {
+    let mut m = MixerView::default();
+    m.strips[1].kills = [false, false, true];
+    let text = mixer_text(m, 120, 44);
+    assert!(text.contains("KILL"), "{text}");
+}
+
+#[test]
+fn meters_fill_with_level() {
+    let lit = |level: f32| {
+        let mut m = MixerView::default();
+        m.strips[0].meter = level;
+        let text = mixer_text(m, 120, 44);
+        let row = text.lines().find(|l| l.contains("PK")).unwrap().to_string();
+        row.matches('▮').count()
+    };
+    assert_eq!(lit(0.0), 0);
+    assert!(
+        lit(0.1) > 0 && lit(0.1) < lit(1.0),
+        "{} {}",
+        lit(0.1),
+        lit(1.0)
+    );
+}
+
+#[test]
+fn narrow_mixer_bar_still_shows_volume_and_crossfader() {
+    let text = mixer_text(MixerView::default(), 100, 44);
+    assert!(text.contains("VOL") && text.contains("╋"), "{text}");
+}
+
+#[test]
+fn phase_meter_shows_the_offset_between_decks() {
+    let render_phase = |phase: Option<f64>| {
+        let view = ScreenView {
+            decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
+            mixer: MixerView::default(),
             status: String::new(),
             message: String::new(),
-            waveform_mode: mode,
-        }
-    }
-
-    fn waveform_colours(mode: WaveformMode) -> Vec<Color> {
+            phase,
+        };
         let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
-        let v = view(mode);
-        term.draw(|f| render_screen(f, &v)).unwrap();
+        term.draw(|f| render_screen(f, &view)).unwrap();
+        let l = tui::screen_layout(ratatui::layout::Rect::new(0, 0, 120, 44));
         let buf = term.backend().buffer();
-        (0..44)
-            .flat_map(|y| (0..120).map(move |x| (x, y)))
-            .filter(|&(x, y)| buf[(x, y)].symbol() == "▌")
-            .map(|(x, y)| buf[(x, y)].fg)
-            .collect()
-    }
-
-    /// The distinct colours drawn, so a failure prints a census rather than every cell.
-    fn distinct(colours: &[Color]) -> Vec<Color> {
-        let mut v: Vec<Color> = Vec::new();
-        for c in colours {
-            if !v.contains(c) {
-                v.push(*c);
-            }
-        }
-        v
-    }
-
-    let three = waveform_colours(WaveformMode::ThreeBand);
-    let rgb = waveform_colours(WaveformMode::Rgb);
-    assert!(!three.is_empty(), "no waveform bars were drawn");
+        (l.phase.x..l.phase.right())
+            .map(|x| buf[(x, l.phase.y)].symbol().to_string())
+            .collect::<String>()
+    };
+    let none = render_phase(None);
     assert!(
-        three.contains(&Color::Rgb(36, 82, 200)),
-        "3band should paint bass-heavy columns blue, saw {:?}",
-        distinct(&three)
+        none.contains("PHASE") && none.contains("no beat grid"),
+        "{none}"
     );
-    assert!(
-        rgb.contains(&Color::Rgb(255, 0, 0)),
-        "rgb should paint bass-heavy columns red, saw {:?}",
-        distinct(&rgb)
-    );
+    let centred = render_phase(Some(0.0));
+    let ahead = render_phase(Some(0.25));
+    let pos = |s: &str| s.chars().position(|c| c == '█').expect("marker");
+    assert!(pos(&ahead) > pos(&centred), "{centred}\n{ahead}");
 }

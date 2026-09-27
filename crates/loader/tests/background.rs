@@ -23,7 +23,7 @@ fn loads_happen_off_thread_and_report_the_deck() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("bg.wav");
     write_wav(&path, &stereo(&[0.2; 480]), 2, 48_000, Fmt::Pcm16);
-    let loader = Loader::spawn(48_000, None);
+    let loader = Loader::spawn(48_000);
     assert!(loader.try_recv().is_none());
     loader.request(DeckId::B, path.clone());
     let r = wait(&loader);
@@ -34,7 +34,7 @@ fn loads_happen_off_thread_and_report_the_deck() {
 
 #[test]
 fn failures_are_reported_not_panicked() {
-    let loader = Loader::spawn(48_000, None);
+    let loader = Loader::spawn(48_000);
     loader.request(DeckId::A, "/nope.flac".into());
     assert!(wait(&loader).result.is_err());
 }

@@ -1,9 +1,5 @@
 //! Signed waveform rasterising for the deck overview.
 
-use crate::pixel::{band_half_steps, Palette};
-use ratatui::style::Color;
-use wave::WavePoint;
-
 // Compatibility rasteriser for magnitude-only envelopes.
 const FULL: char = '▌';
 const DOWN: char = '▖';
@@ -31,8 +27,8 @@ pub fn amplitude_rows(ranges: &[[f32; 2]], rows: usize) -> Vec<String> {
         let max = peak;
         let top = (((1.0 - max) * 0.5) * last).round() as usize;
         let bottom = (((1.0 - min) * 0.5) * last).round() as usize;
-        for row in top.min(height - 1)..=bottom.min(height - 1) {
-            pixels[row][col] = true;
+        for row in &mut pixels[top.min(height - 1)..=bottom.min(height - 1)] {
+            row[col] = true;
         }
     }
 
@@ -52,56 +48,36 @@ pub fn amplitude_rows(ranges: &[[f32; 2]], rows: usize) -> Vec<String> {
         .collect()
 }
 
-/// Resample points to exactly `n` columns, averaging within each column.
-///
-/// Averaging rather than taking the peak keeps a long track from turning into solid
-/// full-height bars when one column spans several seconds of audio.
-pub fn downsample_points(src: &[WavePoint], n: usize) -> Vec<WavePoint> {
+/// Resample signed ranges to exactly `n` columns as a centered average-peak envelope.
+/// Averaging the source peaks in each screen column keeps long tracks from turning into
+/// solid full-height bars when a column spans several seconds of audio.
+pub fn downsample_ranges(src: &[[f32; 2]], n: usize) -> Vec<[f32; 2]> {
     if n == 0 {
         return Vec::new();
     }
     if src.is_empty() {
-        return vec![WavePoint::default(); n];
+        return vec![[0.0, 0.0]; n];
     }
     let len = src.len();
     (0..n)
         .map(|j| {
             let start = (j * len / n).min(len - 1);
             let end = ((j + 1) * len / n).clamp(start + 1, len);
-            let bucket = &src[start..end];
-            let count = bucket.len() as f32;
-            let peak = bucket
+            let peak = src[start..end]
                 .iter()
-                .map(|p| p.range[0].abs().max(p.range[1].abs()))
+                .map(|[min, max]| min.abs().max(max.abs()))
                 .sum::<f32>()
-                / count;
-            let mut bands = [0.0f32; 3];
-            for p in bucket {
-                for (acc, v) in bands.iter_mut().zip(p.bands) {
-                    *acc += v;
-                }
-            }
-            for b in &mut bands {
-                *b /= count;
-            }
-            WavePoint {
-                range: [-peak, peak],
-                bands,
-            }
+                / (end - start) as f32;
+            [-peak, peak]
         })
         .collect()
-}
-
-/// The signed pairs alone, for the glyph rasteriser.
-pub fn ranges(points: &[WavePoint]) -> Vec<[f32; 2]> {
-    points.iter().map(|p| p.range).collect()
 }
 
 /// Rasterise a magnitude-only `envelope` (one value in 0..=1 per column) into bars.
 /// `rows` must be even and at least 2.
 pub fn bar_rows(envelope: &[f32], rows: usize) -> Vec<String> {
     assert!(
-        rows >= 2 && rows % 2 == 0,
+        rows >= 2 && rows.is_multiple_of(2),
         "waveform rows must be even, got {rows}"
     );
     let half_cells = rows / 2;
@@ -143,49 +119,21 @@ pub fn downsample_peaks(src: &[f32], n: usize) -> Vec<f32> {
         .collect()
 }
 
-/// One colour per cell, matching the geometry `amplitude_rows` draws.
-///
-/// A cell holds one foreground colour and two half-block pixels, so the band is chosen
-/// from the cell's outer pixel: the topmost band reaching that far out wins, which puts
-/// bass at the edges and highs near the centre line.
-pub fn band_colors(points: &[WavePoint], rows: usize, palette: &Palette) -> Vec<Vec<Color>> {
-    if rows == 0 {
-        return Vec::new();
+/// Reduce per-band peaks to `n` columns by averaging each bucket, the same way
+/// [`downsample_ranges`] does, so band heights stay comparable with the waveform.
+pub fn downsample_bands(src: &[[f32; 3]], n: usize) -> Vec<[f32; 3]> {
+    if src.is_empty() {
+        return vec![[0.0; 3]; n];
     }
-    let height = rows * 2;
-    let centre = (height - 1) as f32 * 0.5;
-    let low = rgba_to_color(palette.bands[0]);
-
-    (0..rows)
-        .map(|row| {
-            // The cell's two half-block pixels. A band counts for this cell when it
-            // reaches into either of them, which is what docs/spec.md:75 asks for: a
-            // quiet band spanning only the pixels beside the centre line still colours
-            // the two centre cells.
-            let (first, last_pixel) = (row * 2, row * 2 + 1);
-            points
-                .iter()
-                .map(|p| {
-                    let mut colour = low;
-                    for band in 0..3 {
-                        let frac = band_half_steps(p.bands[band], band);
-                        if frac <= 0.0 {
-                            continue;
-                        }
-                        let half = frac * centre;
-                        let top = (centre - half).round() as usize;
-                        let bottom = (centre + half).round() as usize;
-                        if first <= bottom && last_pixel >= top {
-                            colour = rgba_to_color(palette.bands[band]);
-                        }
-                    }
-                    colour
-                })
-                .collect()
+    let len = src.len();
+    (0..n)
+        .map(|j| {
+            let start = (j * len / n).min(len - 1);
+            let end = ((j + 1) * len / n).clamp(start + 1, len);
+            let n = (end - start) as f32;
+            src[start..end].iter().fold([0.0f32; 3], |acc, b| {
+                [acc[0] + b[0] / n, acc[1] + b[1] / n, acc[2] + b[2] / n]
+            })
         })
         .collect()
-}
-
-fn rgba_to_color(c: image::Rgba<u8>) -> Color {
-    Color::Rgb(c[0], c[1], c[2])
 }

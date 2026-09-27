@@ -19,6 +19,12 @@ fn process_with_commands_does_not_allocate_or_free() {
     h.send(Command::PlayPause(A)).unwrap();
     h.send(Command::HotCue(A, 0)).unwrap();
     h.send(Command::SetHeadphoneCue(A, true)).unwrap();
+    h.send(Command::SetEq(A, engine::dsp::EqBand::Mid, -6.0))
+        .unwrap();
+    h.send(Command::SetEqKill(A, engine::dsp::EqBand::Low, true))
+        .unwrap();
+    h.send(Command::SetFilter(A, -0.6)).unwrap();
+    h.send(Command::SetTrim(A, 3.0)).unwrap();
     assert_no_alloc(|| p.process(&mut master, &mut cue));
 
     // Replacing a track must not free the old one on this thread.

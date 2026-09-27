@@ -6,19 +6,19 @@ use dj_tui::{
     cli::{parse_args, USAGE},
     clock::NullClock,
     config::{config_path, Backend, Config},
-    demo::{click_track, planar},
+    demo::{click_track, waveform_envelope},
     view::DeckMeta,
 };
 use engine::{channel, DeckId, Engine, EngineProcessor};
+use loader::ENVELOPE_POINTS;
 use ratatui::crossterm::{
     event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyboardEnhancementFlags,
-        MouseButton, MouseEventKind, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+        self, Event, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
+        PushKeyboardEnhancementFlags,
     },
     execute,
     terminal::supports_keyboard_enhancement,
 };
-use ratatui::layout::Rect;
 use std::{
     io::stdout,
     process::ExitCode,
@@ -43,6 +43,7 @@ fn load_config() -> Result<Config, String> {
 }
 
 /// Where audio goes: a live JACK client, or a silent clock we drive from the UI loop.
+#[allow(clippy::large_enum_variant)] // one value for the whole run; boxing buys nothing
 enum Audio {
     Jack(backend::Running),
     Silent(NullClock, EngineProcessor),
@@ -80,23 +81,23 @@ fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<Strin
             }
         }
     };
-    let (handle, processor) = channel(Engine::new(), COMMAND_QUEUE);
+    // The engine's filters need the real session rate, which JACK decides.
+    let rate = jack
+        .as_ref()
+        .map_or(config.audio.sample_rate, JackBackend::sample_rate);
+    let (handle, processor) = channel(Engine::with_sample_rate(rate), COMMAND_QUEUE);
     Ok(match jack {
         Some(jack) => {
-            let rate = jack.sample_rate();
             let app = App::new(handle, config, rate);
             let running = jack.activate(processor, &routing)?;
             notes.extend(running.warnings().iter().cloned());
             (app, Audio::Jack(running), notes)
         }
-        None => {
-            let rate = config.audio.sample_rate;
-            (
-                App::new(handle, config, rate),
-                Audio::Silent(NullClock::new(rate), processor),
-                notes,
-            )
-        }
+        None => (
+            App::new(handle, config, rate),
+            Audio::Silent(NullClock::new(rate), processor),
+            notes,
+        ),
     })
 }
 
@@ -134,9 +135,14 @@ fn main() -> ExitCode {
     if args.demo && args.files.is_empty() {
         for (id, bpm) in [(DeckId::A, 124.0), (DeckId::B, 126.0)] {
             let track = click_track(bpm, 180.0, app.sample_rate());
-            let [l, r] = planar(&track);
-            let waveform = wave::analyse(&l, &r, app.sample_rate());
+            let waveform = waveform_envelope(&track, ENVELOPE_POINTS);
+            let bands = loader::band_envelope(&track, ENVELOPE_POINTS);
             let meta = DeckMeta {
+                bands,
+                grid: Some(analysis::tempo::BeatGrid {
+                    bpm,
+                    first_beat_secs: 0.0,
+                }),
                 title: Some(format!("Demo click {bpm:.0}")),
                 bpm: Some(bpm),
                 key: None,
@@ -151,7 +157,6 @@ fn main() -> ExitCode {
     }
 
     let mut terminal = ratatui::init();
-    let mouse_capture = execute!(stdout(), EnableMouseCapture).is_ok();
     let key_release = supports_keyboard_enhancement().unwrap_or(false)
         && execute!(
             stdout(),
@@ -178,39 +183,10 @@ fn main() -> ExitCode {
     let result = (|| -> std::io::Result<()> {
         loop {
             if event::poll(FRAME)? {
-                match event::read()? {
-                    Event::Key(k) => {
-                        if tui::convert_key(k).is_some_and(|k| app.on_key(k)) {
-                            return Ok(());
-                        }
+                if let Event::Key(k) = event::read()? {
+                    if tui::convert_key(k).is_some_and(|k| app.on_key(k)) {
+                        return Ok(());
                     }
-                    Event::Mouse(mouse)
-                        if mouse.kind == MouseEventKind::Down(MouseButton::Left) =>
-                    {
-                        let size = terminal.size()?;
-                        let layout = tui::screen_layout(Rect::new(0, 0, size.width, size.height));
-                        for (deck, panel) in
-                            [(DeckId::A, layout.deck_a), (DeckId::B, layout.deck_b)]
-                        {
-                            let area = tui::waveform_area(panel);
-                            if mouse.column >= area.x
-                                && mouse.column < area.right()
-                                && mouse.row >= area.y
-                                && mouse.row < area.bottom()
-                            {
-                                let column = mouse.column - area.x;
-                                let last = area.width.saturating_sub(1);
-                                let fraction = if last == 0 {
-                                    0.0
-                                } else {
-                                    column as f64 / last as f64
-                                };
-                                app.seek_to_fraction(deck, fraction);
-                                break;
-                            }
-                        }
-                    }
-                    _ => {}
                 }
             }
             app.tick();
@@ -227,7 +203,7 @@ fn main() -> ExitCode {
             let status = match &note {
                 Some(n) => format!("{}  |  {n}", audio.status()),
                 None => format!(
-                    "{}  |  {keys}  |  click waveform to seek  |  {}  |  ? help  Ctrl+Q quit",
+                    "{}  |  {keys}  |  {}  |  ? help  Ctrl+Q quit",
                     audio.status(),
                     if graphics.is_some() {
                         "pixel waveforms"
@@ -248,9 +224,6 @@ fn main() -> ExitCode {
 
     if key_release {
         let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
-    }
-    if mouse_capture {
-        let _ = execute!(stdout(), DisableMouseCapture);
     }
     ratatui::restore();
     if let Audio::Jack(running) = audio {

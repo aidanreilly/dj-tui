@@ -16,7 +16,11 @@ pub fn click_track(bpm: f64, secs: f64, sample_rate: u32) -> Track {
     for n in 0..frames {
         let beat_index = (n as f64 / beat).floor();
         let t = (n as f64 - beat_index * beat) / rate;
-        let accent = if beat_index as u64 % 4 == 0 { 1.0 } else { 0.7 };
+        let accent = if (beat_index as u64).is_multiple_of(4) {
+            1.0
+        } else {
+            0.7
+        };
         let s = if t < CLICK_GATE_SECS {
             accent * (-t / CLICK_DECAY_SECS).exp() * (TAU * tone_hz * t).cos()
         } else {
@@ -28,17 +32,4 @@ pub fn click_track(bpm: f64, secs: f64, sample_rate: u32) -> Track {
     Track::from_interleaved(data, sample_rate)
 }
 
-pub use loader::peak_envelope;
-
-/// Planar copies of a track's channels, for analysing synthetic material.
-pub fn planar(track: &Track) -> [Vec<f32>; 2] {
-    let n = track.frames();
-    let mut left = Vec::with_capacity(n);
-    let mut right = Vec::with_capacity(n);
-    for i in 0..n {
-        let (l, r) = track.frame_at(i as f64);
-        left.push(l);
-        right.push(r);
-    }
-    [left, right]
-}
+pub use loader::{peak_envelope, waveform_envelope};

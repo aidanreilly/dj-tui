@@ -135,3 +135,9 @@ fn graphics_defaults_to_auto_and_can_be_turned_off() {
     );
     assert!(Config::from_toml("[ui]\ngraphics = \"sometimes\"").is_err());
 }
+
+#[test]
+fn split_routing_mode() {
+    let c = Config::from_toml("[audio]\nrouting = \"split\"").unwrap();
+    assert_eq!(c.routing().unwrap(), backend::Routing::Split);
+}

@@ -1,7 +1,7 @@
 # Working on dj-tui
 
-Spec and milestone plan: `docs/spec.md`. M0 and M1 are done; M2 (mixer EQ, filter, trim,
-meters, split-mono routing) is next.
+Spec and milestone plan: `docs/spec.md`. M0, M1 and M2 are done, plus pixel waveforms from M3. Next is the rest of M3: 3-band
+colour waveforms (needs per-band envelopes from the loader), CDJ overlays and the phase meter.
 
 ## Rules
 
@@ -22,13 +22,6 @@ the kitty graphics protocol when `detect_graphics()` finds it (Ghostty, kitty, W
 deck keeps a fixed kitty image id and only resends when the playhead reaches a new pixel
 column. The glyph renderer in `tui::waveform` stays as the fallback and always draws first.
 `[ui] graphics = "off"` forces glyphs.
-
-`crates/wave` owns the `WavePoint` type, the biquad filter bank that produces low, mid and
-high RMS per bucket at 20 points a second, and the per-track analysis cache under
-`$XDG_CACHE_HOME/dj-tui/analysis`. Bump `cache::ANALYSIS_VERSION` whenever filter corners,
-normalisation or `POINTS_PER_SECOND` change. Analysis runs before resampling, so one cache
-file serves every session rate. Band display gains live in `tui::pixel::BAND_GAIN`, so
-retuning the look never invalidates a cache file. `W` cycles `3band`, `rgb` and `blue`.
 
 ## Commands
 

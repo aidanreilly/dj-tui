@@ -57,3 +57,40 @@ fn reserve_grows_capacity() {
     r.render(&mut p, [a, b, c, d]);
     assert_eq!(r.frames_rendered(), 32);
 }
+
+#[test]
+fn split_mono_sends_mono_master_left_and_mono_cue_right() {
+    let (mut h, mut p) = channel(Engine::new(), 8);
+    let mut data = Vec::new();
+    for _ in 0..1000 {
+        data.extend_from_slice(&[0.6, 0.2]);
+    }
+    for c in [
+        Command::Load(A, Arc::new(Track::from_interleaved(data, 48_000))),
+        Command::PlayPause(A),
+        Command::SetCrossfader(-1.0),
+        Command::SetHeadphoneCue(A, true),
+        Command::SetCueMix(0.0),
+        Command::SetChannelFader(A, 0.5),
+    ] {
+        h.send(c).unwrap();
+    }
+    let mut r = PlanarRenderer::new(64).split_mono(true);
+    let mut bufs: Vec<Vec<f32>> = (0..4).map(|_| vec![9.0; 64]).collect();
+    let [ml, mr, cl, cr] = &mut bufs[..] else {
+        unreachable!()
+    };
+    r.render(&mut p, [ml, mr, cl, cr]);
+    // Master is (0.6 + 0.2) / 2 at half fader; cue is pre-fader.
+    assert!(
+        bufs[0].iter().all(|&s| (s - 0.2).abs() < 1e-6),
+        "{}",
+        bufs[0][0]
+    );
+    assert!(
+        bufs[1].iter().all(|&s| (s - 0.4).abs() < 1e-6),
+        "{}",
+        bufs[1][0]
+    );
+    assert!(bufs[2].iter().chain(&bufs[3]).all(|&s| s == 0.0));
+}

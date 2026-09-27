@@ -72,7 +72,7 @@ impl JackBackend {
     }
 
     pub fn sample_rate(&self) -> u32 {
-        self.client.sample_rate() as u32
+        self.client.sample_rate()
     }
 
     pub fn activate(
@@ -93,14 +93,14 @@ impl JackBackend {
             reg(OUTPUT_PORTS[3])?,
         ];
         let frames = (client.buffer_size() as usize).max(INITIAL_FRAMES);
-        let sample_rate = client.sample_rate() as u32;
+        let sample_rate = client.sample_rate();
         let buffer_size = client.buffer_size();
         let name = client.name().to_string();
         let xruns = Arc::new(AtomicU64::new(0));
 
         let process = Process {
             ports,
-            renderer: PlanarRenderer::new(frames),
+            renderer: PlanarRenderer::new(frames).split_mono(*routing == Routing::Split),
             processor,
         };
         let active = client

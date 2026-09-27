@@ -173,7 +173,7 @@ fn global_keys() {
     assert_eq!(press(&mut km, Key::Up), Some(Action::BrowserMove(Dir::Up)));
     assert_eq!(press(&mut km, ch('/')), Some(Action::Search));
     assert_eq!(press(&mut km, ch('b')), Some(Action::BrowserFullscreen));
-    assert_eq!(press(&mut km, ch('w')), Some(Action::CycleWaveformMode));
+    assert_eq!(press(&mut km, ch('W')), Some(Action::CycleWaveformMode));
     assert_eq!(press(&mut km, ch('?')), Some(Action::Help));
     assert_eq!(
         km.handle(KeyEvent::press(ch('q')).ctrl()),

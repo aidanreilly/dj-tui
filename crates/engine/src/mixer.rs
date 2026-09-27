@@ -1,3 +1,4 @@
+use crate::dsp::{DjFilter, Isolator, Trim};
 use crate::{Deck, Track};
 use std::f32::consts::FRAC_PI_2;
 use std::sync::Arc;
@@ -52,19 +53,34 @@ pub fn crossfader_gains(x: f32, curve: CrossfaderCurve) -> (f32, f32) {
     }
 }
 
-#[derive(Clone, Copy)]
+/// One mixer channel: trim, isolator EQ and filter ahead of the fader.
 struct Channel {
     fader: f32,
     headphone_cue: bool,
+    trim: Trim,
+    eq: Isolator,
+    filter: DjFilter,
 }
 
-impl Default for Channel {
-    fn default() -> Self {
+impl Channel {
+    fn new(fs: f32) -> Self {
         Self {
             fader: 1.0,
             headphone_cue: false,
+            trim: Trim::new(fs),
+            eq: Isolator::new(fs),
+            filter: DjFilter::new(fs),
         }
     }
+}
+
+/// Peak levels since the last call to `Engine::take_peaks`.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Meters {
+    /// Per channel, after EQ and filter, before the fader.
+    pub channels: [f32; 2],
+    /// Master bus.
+    pub master: f32,
 }
 
 /// Two decks feeding a DJ mixer with a master bus and a headphone cue bus.
@@ -76,6 +92,7 @@ pub struct Engine {
     /// 0 is cue bus only, 1 is master only.
     cue_mix: f32,
     scratch: [Vec<f32>; 2],
+    peaks: Meters,
 }
 
 impl Default for Engine {
@@ -85,10 +102,17 @@ impl Default for Engine {
 }
 
 impl Engine {
+    /// An engine at 48 kHz. Use [`Engine::with_sample_rate`] for anything else.
     pub fn new() -> Self {
+        Self::with_sample_rate(48_000)
+    }
+
+    pub fn with_sample_rate(sample_rate: u32) -> Self {
+        let fs = sample_rate as f32;
         Self {
             decks: [Deck::new(), Deck::new()],
-            channels: [Channel::default(); 2],
+            channels: [Channel::new(fs), Channel::new(fs)],
+            peaks: Meters::default(),
             crossfader: 0.0,
             curve: CrossfaderCurve::default(),
             cue_mix: 0.5,
@@ -147,6 +171,11 @@ impl Engine {
         self.cue_mix
     }
 
+    /// Peaks since the previous call, then reset.
+    pub fn take_peaks(&mut self) -> Meters {
+        std::mem::take(&mut self.peaks)
+    }
+
     /// Apply a command. A replaced track is returned so it can be freed off the audio thread.
     pub fn apply(&mut self, cmd: crate::Command) -> Option<Arc<Track>> {
         use crate::Command::*;
@@ -164,6 +193,12 @@ impl Engine {
             SetCrossfaderCurve(c) => self.set_crossfader_curve(c),
             SetHeadphoneCue(d, on) => self.set_headphone_cue(d, on),
             SetCueMix(v) => self.set_cue_mix(v),
+            SetTrim(d, db) => self.channels[d.index()].trim.set_db(db),
+            SetEq(d, band, db) => self.channels[d.index()].eq.set_gain_db(band, db),
+            SetEqKill(d, band, kill) => self.channels[d.index()].eq.set_kill(band, kill),
+            SetFilter(d, v) => self.channels[d.index()].filter.set(v),
+            SetCuePoint(d, f) => self.deck_mut(d).set_cue_point(f),
+            SetHotCue(d, n, f) => self.deck_mut(d).set_hot_cue(n, f),
         }
         None
     }
@@ -178,8 +213,18 @@ impl Engine {
             .zip(cue.chunks_mut(MAX_BLOCK_FRAMES * 2))
         {
             let n = m_block.len();
-            for (deck, buf) in self.decks.iter_mut().zip(self.scratch.iter_mut()) {
-                deck.render(&mut buf[..n]);
+            for ((deck, ch), (buf, peak)) in self
+                .decks
+                .iter_mut()
+                .zip(self.channels.iter_mut())
+                .zip(self.scratch.iter_mut().zip(self.peaks.channels.iter_mut()))
+            {
+                let buf = &mut buf[..n];
+                deck.render(buf);
+                ch.trim.process(buf);
+                ch.eq.process(buf);
+                ch.filter.process(buf);
+                *peak = buf.iter().fold(*peak, |m, s| m.max(s.abs()));
             }
             let post = [
                 self.channels[0].fader * xf[0],
@@ -194,6 +239,7 @@ impl Engine {
                 let m = a[i] * post[0] + b[i] * post[1];
                 let c = a[i] * pfl[0] + b[i] * pfl[1];
                 m_block[i] = m;
+                self.peaks.master = self.peaks.master.max(m.abs());
                 c_block[i] = c * (1.0 - self.cue_mix) + m * self.cue_mix;
             }
         }

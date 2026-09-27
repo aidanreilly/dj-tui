@@ -143,16 +143,74 @@ fn actions_flow_end_to_end_through_the_realtime_channel() {
     assert!((s.decks[0].position - (1000.0 + 10.0 * 1.005)).abs() < 1e-6);
 }
 
+// --- Channel strip (M2) ---
+
+use engine::dsp::EqBand;
+use input::Band;
+
 #[test]
-fn w_cycles_the_waveform_mode_and_sends_no_command() {
-    use dj_tui::config::WaveformMode;
+fn trim_steps_one_db_within_plus_minus_twelve() {
     let mut st = ControlState::default();
-    let snap = Snapshot::default();
-    assert_eq!(st.waveform_mode, WaveformMode::ThreeBand);
-    assert!(run(&mut st, &snap, Action::CycleWaveformMode).is_none());
-    assert_eq!(st.waveform_mode, WaveformMode::Rgb);
-    run(&mut st, &snap, Action::CycleWaveformMode);
-    assert_eq!(st.waveform_mode, WaveformMode::Blue);
-    run(&mut st, &snap, Action::CycleWaveformMode);
-    assert_eq!(st.waveform_mode, WaveformMode::ThreeBand);
+    let s = Snapshot::default();
+    assert!(
+        matches!(run(&mut st, &s, Action::Trim(A, Dir::Up)), Some(Command::SetTrim(A, v)) if v == 1.0)
+    );
+    for _ in 0..30 {
+        run(&mut st, &s, Action::Trim(A, Dir::Up));
+    }
+    assert_eq!(st.strips[0].trim_db, 12.0);
+    for _ in 0..30 {
+        run(&mut st, &s, Action::Trim(A, Dir::Down));
+    }
+    assert_eq!(st.strips[0].trim_db, -12.0);
+}
+
+#[test]
+fn eq_steps_two_db_from_kill_range_up_to_plus_six() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    let cmd = run(&mut st, &s, Action::Eq(B, Band::Low, Dir::Down));
+    assert!(matches!(cmd, Some(Command::SetEq(B, EqBand::Low, v)) if v == -2.0));
+    for _ in 0..10 {
+        run(&mut st, &s, Action::Eq(B, Band::High, Dir::Up));
+    }
+    assert_eq!(st.strips[1].eq_db[EqBand::High as usize], 6.0);
+    for _ in 0..40 {
+        run(&mut st, &s, Action::Eq(B, Band::Mid, Dir::Down));
+    }
+    assert_eq!(st.strips[1].eq_db[EqBand::Mid as usize], -26.0);
+}
+
+#[test]
+fn eq_kill_toggles() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    assert!(matches!(
+        run(&mut st, &s, Action::EqKill(A, Band::Mid)),
+        Some(Command::SetEqKill(A, EqBand::Mid, true))
+    ));
+    assert!(matches!(
+        run(&mut st, &s, Action::EqKill(A, Band::Mid)),
+        Some(Command::SetEqKill(A, EqBand::Mid, false))
+    ));
+}
+
+#[test]
+fn filter_steps_and_returns_exactly_to_centre() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    for _ in 0..3 {
+        run(&mut st, &s, Action::Filter(A, Dir::Down));
+    }
+    assert!((st.strips[0].filter + 0.3).abs() < 1e-6);
+    for _ in 0..3 {
+        run(&mut st, &s, Action::Filter(A, Dir::Up));
+    }
+    assert_eq!(st.strips[0].filter, 0.0);
+    for _ in 0..30 {
+        run(&mut st, &s, Action::Filter(A, Dir::Up));
+    }
+    assert!(
+        matches!(run(&mut st, &s, Action::Filter(A, Dir::Up)), Some(Command::SetFilter(A, v)) if v == 1.0)
+    );
 }

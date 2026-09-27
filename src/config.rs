@@ -3,7 +3,6 @@
 use engine::CrossfaderCurve;
 use serde::{Deserialize, Deserializer};
 use std::path::PathBuf;
-pub use wave::WaveformMode;
 
 const TEMPO_RANGES: [u8; 3] = [8, 16, 50];
 
@@ -13,6 +12,27 @@ pub enum Backend {
     #[default]
     Jack,
     Alsa,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+pub enum WaveformMode {
+    #[default]
+    #[serde(rename = "3band")]
+    ThreeBand,
+    #[serde(rename = "rgb")]
+    Rgb,
+    #[serde(rename = "blue")]
+    Blue,
+}
+
+impl WaveformMode {
+    pub fn next(self) -> Self {
+        match self {
+            Self::ThreeBand => Self::Rgb,
+            Self::Rgb => Self::Blue,
+            Self::Blue => Self::ThreeBand,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Deserialize)]
@@ -43,6 +63,7 @@ pub enum RoutingMode {
     #[default]
     Auto,
     Off,
+    Split,
     Explicit,
 }
 
@@ -141,6 +162,7 @@ impl Config {
         Ok(match self.audio.routing {
             RoutingMode::Auto => backend::Routing::Auto,
             RoutingMode::Off => backend::Routing::Off,
+            RoutingMode::Split => backend::Routing::Split,
             RoutingMode::Explicit => backend::Routing::Explicit {
                 master: pair(&self.audio.master_ports, "master_ports")?,
                 cue: if self.audio.cue_ports.is_empty() {

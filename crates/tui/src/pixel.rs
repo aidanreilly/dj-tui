@@ -7,10 +7,9 @@
 //! The anti-aliased span drawing follows `draw_vspan_aa` in tui-wave
 //! (<https://github.com/biomassa/tui-wave>, MIT, Copyright (c) 2026 biomassa).
 
-use crate::waveform::downsample_points;
+use crate::waveform::{downsample_bands, downsample_ranges};
 use image::{Rgba, RgbaImage};
 use std::hash::{Hash, Hasher};
-use wave::{WavePoint, WaveformMode};
 
 /// Width of the playhead line in pixels.
 pub const PLAYHEAD_WIDTH: u32 = 2;
@@ -23,170 +22,125 @@ fn shape(peak: f32) -> f32 {
     peak.clamp(0.0, 1.0).powf(1.5)
 }
 
-/// Per-band display gain, applied at draw time and never stored in a cache.
-///
-/// The three bands share one divisor, and music puts far more absolute energy into bass
-/// than into cymbals, so an ungained high band would sit near 0.1 and all but vanish
-/// once `shape` raises it to the power of 1.5.
-pub const BAND_GAIN: [f32; 3] = [1.0, 1.3, 1.6];
-
-/// How far `rgb` measures each band against its own loudest column rather than against
-/// the track's overall peak. At 0 a bass-led track is red end to end; at 1 every band is
-/// stretched to its own full range and almost every column lands mid-ramp. In between
-/// keeps the spectral tilt while still reaching the blue end on treble-led passages.
-const RGB_LEVELLING: f32 = 0.5;
-
-/// Colour at the top of the `blue` mode's tint.
-const WHITE: Rgba<u8> = Rgba([240, 244, 255, 255]);
-
+/// Colour scheme for the waveform modes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Palette {
-    /// Low, mid and high colours. In `rgb` these are the pure channels.
-    pub bands: [Rgba<u8>; 3],
+    /// 3-Band colours, indexed low, mid, high: blue, amber, white as on the CDJ-3000.
+    pub three_band: [Rgba<u8>; 3],
+    /// Blue mode: bass-heavy passages are this deep blue...
+    pub blue_dark: Rgba<u8>,
+    /// ...and bright, treble-heavy passages approach this.
+    pub blue_bright: Rgba<u8>,
     pub centre_line: Rgba<u8>,
     pub playhead: Rgba<u8>,
-    pub mode: WaveformMode,
-}
-
-impl Palette {
-    pub fn for_mode(mode: WaveformMode) -> Self {
-        let bands = match mode {
-            WaveformMode::ThreeBand | WaveformMode::Blue => [
-                Rgba([36, 82, 200, 255]),
-                Rgba([235, 150, 40, 255]),
-                Rgba([238, 240, 248, 255]),
-            ],
-            WaveformMode::Rgb => [
-                Rgba([255, 0, 0, 255]),
-                Rgba([0, 255, 0, 255]),
-                Rgba([0, 0, 255, 255]),
-            ],
-        };
-        Self {
-            bands,
-            centre_line: Rgba([58, 50, 84, 255]),
-            playhead: Rgba([236, 232, 210, 255]),
-            mode,
-        }
-    }
+    pub warning: Rgba<u8>,
 }
 
 impl Default for Palette {
     fn default() -> Self {
-        Self::for_mode(WaveformMode::default())
+        Self {
+            three_band: [
+                Rgba([24, 72, 255, 255]),
+                Rgba([255, 160, 16, 255]),
+                Rgba([246, 246, 246, 255]),
+            ],
+            blue_dark: Rgba([34, 40, 170, 255]),
+            blue_bright: Rgba([190, 232, 255, 255]),
+            centre_line: Rgba([58, 50, 84, 255]),
+            playhead: Rgba([236, 232, 210, 255]),
+            warning: Rgba([230, 30, 30, 255]),
+        }
     }
 }
 
-/// Fully saturated colour for a spectral position: 0 is red, 0.5 green, 1 blue,
-/// passing through yellow and cyan. Used by `rgb`, whose hue carries the frequency
-/// balance while height carries the level.
-fn spectrum(position: f32) -> Rgba<u8> {
-    let h = position.clamp(0.0, 1.0) * 4.0;
-    let i = h.floor();
-    let f = h - i;
-    let (r, g, b) = match i as u32 {
-        0 => (1.0, f, 0.0),
-        1 => (1.0 - f, 1.0, 0.0),
-        2 => (0.0, 1.0, f),
-        3 => (0.0, 1.0 - f, 1.0),
-        _ => (0.0, 0.0, 1.0),
-    };
-    Rgba([
-        (r * 255.0).round() as u8,
-        (g * 255.0).round() as u8,
-        (b * 255.0).round() as u8,
-        255,
-    ])
+/// How the waveform is coloured. Names follow rekordbox and the CDJ-3000.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum WaveformMode {
+    /// Separate layered shapes: blue lows, amber mids, white highs.
+    #[default]
+    ThreeBand,
+    /// One blended colour per column: red lows, green mids, blue highs.
+    Rgb,
+    /// Single blue waveform that brightens toward white as the highs rise.
+    Blue,
 }
 
-/// A band's height as a fraction of the half panel, with its gain and the contrast
-/// curve applied. Shared with the glyph renderer so both modes read alike.
-pub fn band_half_steps(value: f32, band: usize) -> f32 {
-    shape((value * BAND_GAIN[band]).min(1.0))
+impl WaveformMode {
+    pub fn next(self) -> Self {
+        match self {
+            Self::ThreeBand => Self::Rgb,
+            Self::Rgb => Self::Blue,
+            Self::Blue => Self::ThreeBand,
+        }
+    }
 }
 
-fn band_half(value: f32, band: usize, mid: f32) -> f32 {
-    band_half_steps(value, band) * mid
+/// Everything needed to draw one deck's overview.
+#[derive(Debug, Clone, Copy)]
+pub struct Wave<'a> {
+    /// Signed `[min, max]` per overview position.
+    pub ranges: &'a [[f32; 2]],
+    /// Peak `[low, mid, high]` per overview position; may be empty.
+    pub bands: &'a [[f32; 3]],
+    pub mode: WaveformMode,
+    /// End-of-track warning flash: tint the unplayed part red.
+    pub warning: bool,
 }
 
-/// Paint one column, in whichever scheme the palette names.
-fn draw_column(
-    img: &mut RgbaImage,
-    x: u32,
-    mid: f32,
-    p: &WavePoint,
+/// Exponent that pushes weaker bands toward zero in RGB mode, so hues stay clear
+/// instead of washing out toward grey.
+const RGB_SATURATION: f32 = 2.2;
+
+/// How far the waveform reaches from the centre, as a fraction of half the height.
+pub fn extent(mode: WaveformMode, peak: f32, bands: [f32; 3]) -> f32 {
+    let band_max = bands.iter().copied().fold(0.0, f32::max);
+    match mode {
+        WaveformMode::ThreeBand if band_max > 0.0 => shape(band_max),
+        _ => shape(peak),
+    }
+}
+
+/// Colour of the waveform at `distance` from the centre line (0 centre, 1 edge), or
+/// `None` where the waveform doesn't reach. `peak` is the column's full-band peak.
+pub fn colour_at(
+    mode: WaveformMode,
+    peak: f32,
+    bands: [f32; 3],
+    distance: f32,
     palette: &Palette,
-    reference: [f32; 3],
-) {
-    match palette.mode {
+) -> Option<Rgba<u8>> {
+    if distance > extent(mode, peak, bands) {
+        return None;
+    }
+    let band_max = bands.iter().copied().fold(0.0, f32::max);
+    Some(match mode {
         WaveformMode::ThreeBand => {
-            let mut drew = false;
-            // Low first, then mid, then high, so the highest band present wins where
-            // they overlap. Bass reaches furthest, which leaves a white core at the
-            // centre line.
-            for band in 0..3 {
-                let half = band_half(p.bands[band], band, mid);
-                if half <= 0.0 {
-                    continue;
-                }
-                drew = true;
-                let colour = palette.bands[band];
-                let half = half.max(0.5);
-                span(img, x, mid - half, mid + half, |_| colour);
+            if band_max <= 0.0 {
+                return Some(palette.three_band[0]);
             }
-            if !drew {
-                // Every band at zero with a real range: draw the shape in the low colour
-                // rather than dropping the column.
-                let half = shape(p.range[0].abs().max(p.range[1].abs())) * mid;
-                if half > 0.0 {
-                    let colour = palette.bands[0];
-                    span(img, x, mid - half.max(0.5), mid + half.max(0.5), |_| colour);
-                }
-            }
+            // Topmost layer first: highs, then mids, then lows.
+            (0..3)
+                .rev()
+                .find(|&i| distance <= shape(bands[i]))
+                .map_or(palette.three_band[0], |i| palette.three_band[i])
         }
         WaveformMode::Rgb => {
-            // One colour per column: the three bands summed onto their own channels,
-            // so a full-spectrum column trends toward white.
-            let half = shape(p.range[0].abs().max(p.range[1].abs())) * mid;
-            if half <= 0.0 {
-                return;
+            if band_max <= 0.0 {
+                return Some(Rgba([200, 200, 200, 255]));
             }
-            // Hue follows where the energy sits, which is what makes a whole track
-            // readable: red for a bass-led column, green through the mids, blue for a
-            // treble-led one. Squaring turns amplitude into energy so the leading band
-            // pulls the hue decisively instead of every column averaging to grey.
-            let mut energy = [0.0f32; 3];
-            for (e, (v, r)) in energy.iter_mut().zip(p.bands.iter().zip(reference)) {
-                let scaled = if r > 0.0 {
-                    v / r.powf(RGB_LEVELLING)
-                } else {
-                    0.0
-                };
-                *e = scaled * scaled;
-            }
-            let total: f32 = energy.iter().sum();
-            let colour = if total <= 0.0 {
-                palette.bands[0]
-            } else {
-                spectrum((0.5 * energy[1] + energy[2]) / total)
-            };
-            let half = half.max(0.5);
-            span(img, x, mid - half, mid + half, |_| colour);
+            let c = |v: f32| ((v / band_max).powf(RGB_SATURATION) * 255.0).round() as u8;
+            Rgba([c(bands[0]), c(bands[1]), c(bands[2]), 255])
         }
         WaveformMode::Blue => {
-            // Height from the three bands combined, tinting toward white as the high
-            // band's share rises.
-            let power: f32 = p.bands.iter().map(|b| b * b).sum();
-            let half = shape(power.sqrt().min(1.0)) * mid;
-            if half <= 0.0 {
-                return;
-            }
-            let tint = (p.bands[2] * BAND_GAIN[2]).min(1.0);
-            let colour = lerp(palette.bands[0], WHITE, tint);
-            let half = half.max(0.5);
-            span(img, x, mid - half, mid + half, |_| colour);
+            let total: f32 = bands.iter().sum();
+            let t = if total > 0.0 {
+                (bands[2] + 0.4 * bands[1]) / total
+            } else {
+                0.0
+            };
+            lerp(palette.blue_dark, palette.blue_bright, t)
         }
-    }
+    })
 }
 
 fn lerp(a: Rgba<u8>, b: Rgba<u8>, t: f32) -> Rgba<u8> {
@@ -237,26 +191,32 @@ pub struct WaveformBitmaps {
 }
 
 impl WaveformBitmaps {
-    pub fn rasterize(points: &[WavePoint], width: u32, height: u32, palette: &Palette) -> Self {
+    pub fn rasterize(wave: &Wave, width: u32, height: u32, palette: &Palette) -> Self {
         let mut normal = RgbaImage::new(width, height);
         let mid = height as f32 / 2.0;
-        let columns = downsample_points(points, width as usize);
-        // Each band's own loudest column. `rgb` measures a band against this rather than
-        // against the track's overall peak, so a hi-hat section reads as treble-led even
-        // though hats never approach a kick in absolute level.
-        let mut reference = [0.0f32; 3];
-        for p in &columns {
-            for (r, v) in reference.iter_mut().zip(p.bands) {
-                *r = r.max(v);
+        let columns = downsample_ranges(wave.ranges, width as usize);
+        let bands = downsample_bands(wave.bands, width as usize);
+        for (x, (&[min, max], &b)) in columns.iter().zip(&bands).enumerate() {
+            let x = x as u32;
+            let peak = min.abs().max(max.abs());
+            let reach = extent(wave.mode, peak, b);
+            if reach <= 0.0 {
+                continue;
             }
-        }
-        for (x, p) in columns.iter().enumerate() {
-            draw_column(&mut normal, x as u32, mid, p, palette, reference);
+            // Keep very quiet passages visible: at least one pixel, centred.
+            let half = (reach * mid).max(0.5);
+            span(&mut normal, x, mid - half, mid + half, |y| {
+                // Sample colour at the row's centre; the caller clamps to the reach so partial
+                // edge rows keep the outermost band's colour. Sampling the inner edge instead
+                // made any trace of treble paint the centre rows white.
+                let d = (y as f32 + 0.5 - mid).abs() / mid;
+                colour_at(wave.mode, peak, b, d.min(reach), palette)
+                    .unwrap_or(palette.three_band[0])
+            });
         }
         // The centre line fills whatever the bars left empty, straddling the middle.
         for x in 0..width {
-            // saturating: a zero-height area during a resize leaves `mid` at 0.
-            for y in [(mid.ceil() as u32).saturating_sub(1), mid as u32] {
+            for y in [mid.ceil() as u32 - 1, mid as u32] {
                 if y < height && normal.get_pixel(x, y)[3] == 0 {
                     normal.put_pixel(x, y, palette.centre_line);
                 }
@@ -281,7 +241,31 @@ impl WaveformBitmaps {
 
     /// The image to show: played part dimmed, then the playhead line.
     pub fn compose(&self, playhead: Option<u32>, palette: &Palette) -> RgbaImage {
+        self.compose_with(playhead, false, palette)
+    }
+
+    /// Like [`compose`](Self::compose), with the end-of-track warning tint on the unplayed part.
+    pub fn compose_with(
+        &self,
+        playhead: Option<u32>,
+        warning: bool,
+        palette: &Palette,
+    ) -> RgbaImage {
         let mut img = self.normal.clone();
+        if warning {
+            let start = playhead.map_or(0, |p| p + PLAYHEAD_WIDTH);
+            let (w, h) = img.dimensions();
+            for y in 0..h {
+                for x in start.min(w)..w {
+                    let p = img.get_pixel_mut(x, y);
+                    if p[3] > 0 {
+                        let a = p[3];
+                        *p = lerp(*p, palette.warning, 0.75);
+                        p[3] = a;
+                    }
+                }
+            }
+        }
         let Some(px) = playhead else { return img };
         let (w, h) = img.dimensions();
         for y in 0..h {
@@ -305,13 +289,17 @@ pub fn playhead_x(position_secs: f64, duration_secs: f64, width: u32) -> Option<
     Some(((frac * width as f64) as u32).min(width.saturating_sub(PLAYHEAD_WIDTH)))
 }
 
-fn fingerprint(points: &[WavePoint]) -> u64 {
+fn fingerprint(wave: &Wave) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    points.len().hash(&mut h);
-    for p in points {
-        for v in [p.range[0], p.range[1], p.bands[0], p.bands[1], p.bands[2]] {
-            v.to_bits().hash(&mut h);
-        }
+    wave.mode.hash(&mut h);
+    wave.ranges.len().hash(&mut h);
+    for v in wave
+        .ranges
+        .iter()
+        .flatten()
+        .chain(wave.bands.iter().flatten())
+    {
+        v.to_bits().hash(&mut h);
     }
     h.finish()
 }
@@ -320,9 +308,9 @@ fn fingerprint(points: &[WavePoint]) -> u64 {
 /// crosses into a new pixel column, and otherwise reports that nothing changed.
 #[derive(Default)]
 pub struct PixelWaveform {
-    source: Option<(u64, (u32, u32), WaveformMode)>,
+    source: Option<(u64, (u32, u32))>,
     bitmaps: Option<WaveformBitmaps>,
-    shown_playhead: Option<Option<u32>>,
+    shown: Option<(Option<u32>, bool)>,
     rasterizations: u64,
 }
 
@@ -330,30 +318,32 @@ impl PixelWaveform {
     /// Returns an image when the terminal needs a new one.
     pub fn update(
         &mut self,
-        points: &[WavePoint],
+        wave: &Wave,
         size: (u32, u32),
         playhead: Option<u32>,
         palette: &Palette,
     ) -> Option<RgbaImage> {
-        if points.is_empty() || size.0 == 0 || size.1 == 0 {
+        if wave.ranges.is_empty() || size.0 == 0 || size.1 == 0 {
             *self = Self {
                 rasterizations: self.rasterizations,
                 ..Default::default()
             };
             return None;
         }
-        let source = (fingerprint(points), size, palette.mode);
+        let source = (fingerprint(wave), size);
         if self.source != Some(source) || self.bitmaps.is_none() {
-            self.bitmaps = Some(WaveformBitmaps::rasterize(points, size.0, size.1, palette));
+            self.bitmaps = Some(WaveformBitmaps::rasterize(wave, size.0, size.1, palette));
             self.source = Some(source);
-            self.shown_playhead = None;
+            self.shown = None;
             self.rasterizations += 1;
         }
-        if self.shown_playhead == Some(playhead) {
+        if self.shown == Some((playhead, wave.warning)) {
             return None;
         }
-        self.shown_playhead = Some(playhead);
-        self.bitmaps.as_ref().map(|b| b.compose(playhead, palette))
+        self.shown = Some((playhead, wave.warning));
+        self.bitmaps
+            .as_ref()
+            .map(|b| b.compose_with(playhead, wave.warning, palette))
     }
 
     pub fn has_image(&self) -> bool {

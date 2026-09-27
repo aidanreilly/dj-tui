@@ -90,3 +90,23 @@ fn snapshot_reports_track_length() {
     assert_eq!(s.decks[0].track_frames, 777);
     assert_eq!(s.decks[1].track_frames, 0);
 }
+
+#[test]
+fn restored_cues_are_placed_directly() {
+    let (mut h, mut p) = channel(Engine::new(), 16);
+    h.send(Command::Load(A, track(1000))).unwrap();
+    h.send(Command::SetCuePoint(A, 120.0)).unwrap();
+    h.send(Command::SetHotCue(A, 3, Some(640.0))).unwrap();
+    h.send(Command::SetHotCue(A, 9, Some(1.0))).unwrap();
+    run(&mut p, 1);
+    let s = h.snapshot();
+    assert_eq!(s.decks[0].cue_point, 120.0);
+    assert_eq!(s.decks[0].hot_cues[3], Some(640.0));
+    assert_eq!(
+        s.decks[0].position, 0.0,
+        "placing cues doesn't move the playhead"
+    );
+    h.send(Command::SetHotCue(A, 3, None)).unwrap();
+    run(&mut p, 1);
+    assert_eq!(h.snapshot().decks[0].hot_cues[3], None);
+}

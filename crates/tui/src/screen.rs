@@ -1,20 +1,35 @@
-use crate::pixel::Palette;
 use crate::{screen_layout, DeckPanel, DeckView};
 use ratatui::{
     layout::Rect,
-    style::{Modifier, Style},
-    text::Line,
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Paragraph},
     Frame,
 };
-use wave::WaveformMode;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MixerView {
     /// -1 is fully deck A, 1 is fully deck B.
     pub crossfader: f32,
     pub faders: [f32; 2],
     pub headphone_cue: [bool; 2],
+    pub strips: [StripView; 2],
+    /// Master bus peak, linear.
+    pub master_meter: f32,
+}
+
+/// One channel's controls above the fader.
+#[derive(Debug, Clone, Default)]
+pub struct StripView {
+    pub trim_db: f32,
+    /// Indexed low, mid, high.
+    pub eq_db: [f32; 3],
+    /// Indexed low, mid, high.
+    pub kills: [bool; 3],
+    /// -1 full low-pass, 0 off, 1 full high-pass.
+    pub filter: f32,
+    /// Channel peak, linear, pre-fader.
+    pub meter: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -24,7 +39,8 @@ pub struct ScreenView {
     pub status: String,
     /// Latest event for the user (load results, errors). Shown above the status line.
     pub message: String,
-    pub waveform_mode: WaveformMode,
+    /// Deck B's beat phase relative to deck A, -0.5..0.5 beats; `None` without two grids.
+    pub phase: Option<f64>,
 }
 
 const XFADE_WIDTH: usize = 13;
@@ -52,32 +68,187 @@ fn fader_bar(v: f32) -> String {
         .collect()
 }
 
+const BAR: usize = 7;
+const METER_FLOOR_DB: f32 = -48.0;
+
+fn level_bar(fraction: f32) -> String {
+    let filled = (fraction.clamp(0.0, 1.0) * BAR as f32).round() as usize;
+    (0..BAR)
+        .map(|i| if i < filled { '█' } else { '▯' })
+        .collect()
+}
+
+fn eq_cell(db: f32, kill: bool) -> String {
+    if kill {
+        format!("{:^w$}", "KILL", w = BAR)
+    } else {
+        level_bar((db + 26.0) / 32.0)
+    }
+}
+
+fn filter_cell(v: f32) -> String {
+    let pos = (((v.clamp(-1.0, 1.0) + 1.0) / 2.0) * (BAR - 1) as f32).round() as usize;
+    (0..BAR)
+        .map(|i| {
+            if i == pos {
+                if v.abs() < 0.05 {
+                    '┼'
+                } else {
+                    '●'
+                }
+            } else {
+                '─'
+            }
+        })
+        .collect()
+}
+
+fn meter_spans(level: f32) -> Vec<Span<'static>> {
+    let lit = if level <= 0.0 {
+        0
+    } else {
+        let db = 20.0 * level.log10();
+        (((db - METER_FLOOR_DB) / -METER_FLOOR_DB) * BAR as f32)
+            .ceil()
+            .clamp(0.0, BAR as f32) as usize
+    };
+    (0..BAR)
+        .map(|i| {
+            let color = match i {
+                i if i + 1 == BAR => Color::Red,
+                i if i + 3 >= BAR => Color::Yellow,
+                _ => Color::Green,
+            };
+            if i < lit {
+                Span::styled("▮", Style::new().fg(color))
+            } else {
+                Span::styled("▯", Style::new().add_modifier(Modifier::DIM))
+            }
+        })
+        .collect()
+}
+
+fn row(label: &str, a: String, b: String) -> Line<'static> {
+    Line::from(format!("{label:<5}{a} {b}"))
+}
+
+fn meter_row(label: &str, a: f32, b: f32) -> Line<'static> {
+    let mut spans = vec![Span::raw(format!("{label:<5}"))];
+    spans.extend(meter_spans(a));
+    spans.push(Span::raw(" "));
+    spans.extend(meter_spans(b));
+    Line::from(spans)
+}
+
 fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
-    let lines = vec![
-        Line::from(format!("VOL A {}", fader_bar(m.faders[0]))),
-        Line::from(format!("VOL B {}", fader_bar(m.faders[1]))),
-        Line::from(format!(
-            "CUE {}   {} ",
-            dot(m.headphone_cue[0]),
-            dot(m.headphone_cue[1])
+    let block = Block::bordered().title(" MIXER ");
+    let inner = block.inner(area);
+    let [a, b] = &m.strips;
+    let lines = if inner.height >= 12 {
+        vec![
+            Line::from(format!("{:<5}{:^w$} {:^w$}", "", "A", "B", w = BAR)),
+            row(
+                "TRIM",
+                level_bar((a.trim_db + 12.0) / 24.0),
+                level_bar((b.trim_db + 12.0) / 24.0),
+            ),
+            row(
+                "HI",
+                eq_cell(a.eq_db[2], a.kills[2]),
+                eq_cell(b.eq_db[2], b.kills[2]),
+            ),
+            row(
+                "MID",
+                eq_cell(a.eq_db[1], a.kills[1]),
+                eq_cell(b.eq_db[1], b.kills[1]),
+            ),
+            row(
+                "LOW",
+                eq_cell(a.eq_db[0], a.kills[0]),
+                eq_cell(b.eq_db[0], b.kills[0]),
+            ),
+            row("FLT", filter_cell(a.filter), filter_cell(b.filter)),
+            Line::from(""),
+            meter_row("PK", a.meter, b.meter),
+            row("VOL", level_bar(m.faders[0]), level_bar(m.faders[1])),
+            Line::from(format!(
+                "{:<5}{:^w$} {:^w$}",
+                "CUE",
+                dot(m.headphone_cue[0]),
+                dot(m.headphone_cue[1]),
+                w = BAR
+            )),
+            Line::from(""),
+            Line::from(format!("A {} B", crossfader_bar(m.crossfader))),
+            {
+                let mut spans = vec![Span::raw(format!("{:<5}", "MSTR"))];
+                spans.extend(meter_spans(m.master_meter));
+                Line::from(spans)
+            },
+        ]
+    } else {
+        let mut pk = vec![Span::raw("PK ")];
+        pk.extend(meter_spans(a.meter));
+        pk.push(Span::raw(" "));
+        pk.extend(meter_spans(b.meter));
+        vec![
+            Line::from(format!(
+                "VOL {} {}  CUE {}{}  A {} B",
+                fader_bar(m.faders[0]),
+                fader_bar(m.faders[1]),
+                dot(m.headphone_cue[0]),
+                dot(m.headphone_cue[1]),
+                crossfader_bar(m.crossfader)
+            )),
+            Line::from(pk),
+        ]
+    };
+    f.render_widget(Paragraph::new(lines).block(block), area);
+}
+
+const PHASE_WIDTH: usize = 33;
+
+fn render_phase(f: &mut Frame, area: Rect, phase: Option<f64>) {
+    let line = match phase {
+        None => Line::from(Span::styled(
+            " PHASE  no beat grid on both decks",
+            Style::new().add_modifier(Modifier::DIM),
         )),
-        Line::from(format!("A {} B", crossfader_bar(m.crossfader))),
-    ];
-    f.render_widget(
-        Paragraph::new(lines).block(Block::bordered().title(" MIXER ")),
-        area,
-    );
+        Some(p) => {
+            let centre = PHASE_WIDTH / 2;
+            let pos = (((p.clamp(-0.5, 0.5) + 0.5) * (PHASE_WIDTH - 1) as f64).round()) as usize;
+            let bar: String = (0..PHASE_WIDTH)
+                .map(|i| {
+                    if i == pos {
+                        '█'
+                    } else if i == centre {
+                        '│'
+                    } else {
+                        '░'
+                    }
+                })
+                .collect();
+            let aligned = p.abs() < 0.02;
+            let style = if aligned {
+                Style::new().fg(Color::Green)
+            } else {
+                Style::new().fg(Color::Yellow)
+            };
+            Line::from(vec![
+                Span::raw(" PHASE  B "),
+                Span::styled(bar, style),
+                Span::raw(format!(" {:+.2} beat", p)),
+            ])
+        }
+    };
+    f.render_widget(Paragraph::new(line), area);
 }
 
 pub fn render_screen(f: &mut Frame, v: &ScreenView) {
     let l = screen_layout(f.area());
-    let palette = Palette::for_mode(v.waveform_mode);
-    f.render_widget(DeckPanel::with_palette(&v.decks[0], &palette), l.deck_a);
-    f.render_widget(
-        Paragraph::new(" PHASE ").style(Style::new().add_modifier(Modifier::DIM)),
-        l.phase,
-    );
-    f.render_widget(DeckPanel::with_palette(&v.decks[1], &palette), l.deck_b);
+    f.render_widget(DeckPanel::new(&v.decks[0]), l.deck_a);
+    render_phase(f, l.phase, v.phase);
+    f.render_widget(DeckPanel::new(&v.decks[1]), l.deck_b);
     render_mixer(f, l.mixer, &v.mixer);
 
     let browser = Block::bordered().title(" BROWSER ");
