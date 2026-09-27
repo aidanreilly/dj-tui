@@ -37,6 +37,9 @@ pub struct App {
     /// Events worth keeping: failures and warnings, not every message on screen.
     log: Vec<String>,
     browser: crate::browser::Browser,
+    /// Files waiting for background analysis, and how many the run started with.
+    analysing: std::collections::VecDeque<PathBuf>,
+    analysis_total: usize,
 }
 
 struct Persisted {
@@ -66,6 +69,8 @@ impl App {
             help: false,
             log: Vec::new(),
             browser: crate::browser::Browser::new(),
+            analysing: std::collections::VecDeque::new(),
+            analysis_total: 0,
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -122,6 +127,26 @@ impl App {
             *held = new.max(*held * METER_FALL_PER_TICK);
             if *held < 1e-4 {
                 *held = 0.0;
+            }
+        }
+        while let Some(done) = self.loader.try_recv_analysed() {
+            self.analysing.pop_front();
+            match done.error {
+                Some(e) => {
+                    let line = format!("Could not analyse {}: {e}", done.path.display());
+                    self.log.push(line.clone());
+                    self.message = line;
+                }
+                None => self.browser.refresh(&done.path),
+            }
+            if self.analysing.is_empty() {
+                if self.analysis_total > 0 {
+                    self.message = format!("Analysed {} tracks", self.analysis_total);
+                }
+                self.analysis_total = 0;
+                self.browser.set_note(None);
+            } else {
+                self.next_analysis();
             }
         }
         while let Some(done) = self.loader.try_recv() {
@@ -349,6 +374,40 @@ impl App {
         self.on_action(action)
     }
 
+    /// Analyse everything in the browser that has no sidecar yet, one file at a time so the
+    /// machine stays usable while it runs.
+    fn start_analysis(&mut self) {
+        if !self.analysing.is_empty() {
+            self.analysing.clear();
+            self.analysis_total = 0;
+            self.browser.set_note(None);
+            self.message = "Analysis stopped".into();
+            return;
+        }
+        self.analysing = self.browser.unanalysed().into();
+        self.analysis_total = self.analysing.len();
+        match self.analysis_total {
+            0 => self.message = "Every track is already analysed".into(),
+            n => {
+                self.message = format!("Analysing {n} tracks. A again stops it.");
+                self.next_analysis();
+            }
+        }
+    }
+
+    /// Send the next file to the loader and say how far along the run is.
+    fn next_analysis(&mut self) {
+        let Some(path) = self.analysing.front().cloned() else {
+            self.browser.set_note(None);
+            self.analysis_total = 0;
+            return;
+        };
+        let done = self.analysis_total - self.analysing.len() + 1;
+        self.browser
+            .set_note(Some(format!("analysing {done} of {}", self.analysis_total)));
+        self.loader.analyse(path);
+    }
+
     /// Read `roots` into the browser.
     pub fn scan_library(&mut self, roots: &[PathBuf]) {
         self.browser.scan(roots);
@@ -424,6 +483,7 @@ impl App {
             Action::BrowserSort(reverse) => self.browser.sort_by(reverse),
             Action::BrowserFullscreen => self.browser.fullscreen = !self.browser.fullscreen,
             Action::Search => self.browser.start_search(),
+            Action::AnalyseLibrary => self.start_analysis(),
             _ => {
                 let snap = self.handle.snapshot();
                 let cmd = apply(&mut self.state, &self.controls, &snap, action);

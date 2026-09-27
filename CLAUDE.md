@@ -6,7 +6,7 @@ track sidecar rather than the SQLite store the spec describes. M6 has all four e
 their keys and knobs, M7 has sync, nudge and key lock, and M9 has mappings, soft takeover, LED
 feedback and hotplug through JACK MIDI.
 
-Still missing: M8, and M10's raw ALSA backend and device setup screen. Out of scope, so not
+Still missing: M10's raw ALSA backend and device setup screen. Out of scope, so not
 worth proposing again: jog scratching, two-card output, SysEx handshakes in mappings, and the
 hour-long stress run.
 
@@ -102,6 +102,9 @@ been played still lists. `src/browser.rs` holds what changes as keys are pressed
 While the search prompt is open `App::on_key` takes the keyboard before the keymap sees it,
 so letters are letters. Playlists are m3u. Key highlighting compares each row against the key
 of whichever deck is playing, deck A first.
+
+`A` analyses everything with no sidecar yet, one file at a time through the loader thread so
+the machine stays usable, with progress in the panel title. Pressing it again stops the run.
 
 ## Master limiter
 

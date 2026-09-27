@@ -51,6 +51,22 @@ impl Browser {
         &self.entries
     }
 
+    /// Paths in the list that have never been analysed.
+    pub fn unanalysed(&self) -> Vec<PathBuf> {
+        self.entries
+            .iter()
+            .filter(|e| !e.analysed())
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    }
+
+    /// Re-read one file's sidecar, for a track that has just been analysed.
+    pub fn refresh(&mut self, path: &Path) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.path() == path) {
+            *entry = Entry::read(path);
+        }
+    }
+
     /// Say what the browser is busy with, or `None` to go back to counting tracks.
     pub fn set_note(&mut self, note: Option<String>) {
         self.note = note;

@@ -57,6 +57,8 @@ pub enum Action {
     BrowserFullscreen,
     /// Cycle the column the browser is sorted by, or with `true` turn the order around.
     BrowserSort(bool),
+    /// Analyse every track in the browser that has no sidecar yet.
+    AnalyseLibrary,
     CycleWaveformMode,
     Help,
     Quit,

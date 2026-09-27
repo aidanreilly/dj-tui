@@ -238,6 +238,16 @@ pub struct LoadResult {
 enum Request {
     Load(DeckId, PathBuf),
     SaveCues(PathBuf, sidecar::Cues),
+    /// Analyse a file for the library, keeping only what lands in the sidecar.
+    Analyse(PathBuf),
+}
+
+/// One file the background analysis has finished with.
+#[derive(Debug, Clone)]
+pub struct Analysed {
+    pub path: PathBuf,
+    /// Why it could not be analysed, if it could not.
+    pub error: Option<String>,
 }
 
 /// A background thread that loads files and saves cue changes, so the UI never waits on
@@ -246,6 +256,7 @@ pub struct Loader {
     requests: Sender<Request>,
     results: Receiver<LoadResult>,
     notes: Receiver<String>,
+    analysed: Receiver<Analysed>,
 }
 
 impl Loader {
@@ -253,6 +264,7 @@ impl Loader {
         let (req_tx, req_rx) = channel::<Request>();
         let (res_tx, res_rx) = channel();
         let (note_tx, note_rx) = channel();
+        let (analysed_tx, analysed_rx) = channel();
         std::thread::Builder::new()
             .name("dj-tui-loader".into())
             .spawn(move || {
@@ -261,6 +273,13 @@ impl Loader {
                         Request::Load(deck, path) => {
                             let result = load_file(&path, session_rate);
                             if res_tx.send(LoadResult { deck, path, result }).is_err() {
+                                break;
+                            }
+                        }
+                        Request::Analyse(path) => {
+                            // The decoded audio is dropped; the sidecar is the point.
+                            let error = load_file(&path, session_rate).err().map(|e| e.to_string());
+                            if analysed_tx.send(Analysed { path, error }).is_err() {
                                 break;
                             }
                         }
@@ -280,12 +299,23 @@ impl Loader {
             requests: req_tx,
             results: res_rx,
             notes: note_rx,
+            analysed: analysed_rx,
         }
     }
 
     pub fn request(&self, deck: DeckId, path: PathBuf) {
         // The thread only exits once `self` is gone, so this cannot fail while we exist.
         let _ = self.requests.send(Request::Load(deck, path));
+    }
+
+    /// Analyse `path` in the background, writing the results into its sidecar.
+    pub fn analyse(&self, path: PathBuf) {
+        let _ = self.requests.send(Request::Analyse(path));
+    }
+
+    /// A file the background analysis has finished with, if one is ready.
+    pub fn try_recv_analysed(&self) -> Option<Analysed> {
+        self.analysed.try_recv().ok()
     }
 
     /// Write `cues` into the sidecar beside `path`, in the background.

@@ -154,6 +154,7 @@ Echo and reverb keep ringing after you switch them off, rather than cutting dead
 | `/` | Search the browser |
 | `b` | Browser full screen |
 | `S` / `Alt+S` | Sort column, and the direction |
+| `A` | Analyse every track in the list that has none |
 | `?` | Key list |
 | `Ctrl+Q` | Quit |
 
@@ -178,6 +179,10 @@ a letter, so a track called `wave` types without cycling the waveform colours.
 
 Everything the list shows comes out of the JSON sidecars beside your files, so it costs
 nothing to display, and a track that has never been played still lists under its own name.
+
+`A` analyses everything that has no sidecar yet, filling in the BPM and key columns for the
+whole folder. It works through one file at a time in the background, so you can carry on
+mixing while it runs, and pressing `A` again stops it.
 
 ## Waveforms
 

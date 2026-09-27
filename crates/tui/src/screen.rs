@@ -80,6 +80,10 @@ const HELP: &[(&str, &str)] = &[
     ("arrows", "crossfader, Shift snaps to the end"),
     ("w", "waveform colour mode"),
     ("click", "seek on the waveform"),
+    ("↑ ↓  Enter", "move in the browser, load the selection"),
+    ("/  b", "search the browser, full screen"),
+    ("S  Alt+S", "sort column, and the direction"),
+    ("A", "analyse everything not analysed yet"),
     ("?", "this list"),
     ("Ctrl+Q", "quit"),
 ];

@@ -207,3 +207,73 @@ fn a_track_that_would_mix_with_the_playing_deck_is_marked() {
         .iter()
         .all(|r| !r.compatible));
 }
+
+#[test]
+fn a_analyses_everything_in_the_list_that_has_no_sidecar_yet() {
+    let dir = tempfile::tempdir().unwrap();
+    music(dir.path(), &["One.wav", "Two.wav"]);
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    assert!(
+        app.view(String::new())
+            .browser
+            .rows
+            .iter()
+            .all(|r| !r.analysed),
+        "nothing has been analysed"
+    );
+
+    press(&mut app, Key::Char('A'));
+    assert!(
+        app.view(String::new()).browser.status.contains("nalys"),
+        "the panel says what it is doing: {}",
+        app.view(String::new()).browser.status
+    );
+
+    let start = Instant::now();
+    while !app
+        .view(String::new())
+        .browser
+        .rows
+        .iter()
+        .all(|r| r.analysed)
+    {
+        app.tick();
+        process(&mut p, 16);
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "{}",
+            app.message()
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let status = app.view(String::new()).browser.status;
+    assert!(status.contains("2 tracks"), "back to counting: {status}");
+    assert!(app.message().contains("Analysed"), "{}", app.message());
+}
+
+#[test]
+fn analysis_leaves_tracks_that_already_have_a_sidecar_alone() {
+    let dir = tempfile::tempdir().unwrap();
+    music(dir.path(), &["One.wav"]);
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('A'));
+    let start = Instant::now();
+    while app.view(String::new()).browser.status.contains("nalys") {
+        app.tick();
+        process(&mut p, 16);
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "first pass timed out"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    press(&mut app, Key::Char('A'));
+    assert!(
+        app.message().contains("already"),
+        "there is nothing left to do: {}",
+        app.message()
+    );
+}

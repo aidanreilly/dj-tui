@@ -195,6 +195,7 @@ impl Keymap {
             '/' => Search,
             'b' => BrowserFullscreen,
             'S' => BrowserSort(alt),
+            'A' => AnalyseLibrary,
             'w' | 'W' => CycleWaveformMode,
             '?' => Help,
             _ => return None,

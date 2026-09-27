@@ -38,3 +38,47 @@ fn failures_are_reported_not_panicked() {
     loader.request(DeckId::A, "/nope.flac".into());
     assert!(wait(&loader).result.is_err());
 }
+
+#[test]
+fn analysing_in_the_background_writes_the_sidecar_and_says_when_it_is_done() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("analyse me.wav");
+    write_wav(&path, &stereo(&[0.3; 48_000]), 2, 48_000, Fmt::Pcm16);
+    let loader = Loader::spawn(48_000);
+    loader.analyse(path.clone());
+
+    let start = Instant::now();
+    let done = loop {
+        if let Some(done) = loader.try_recv_analysed() {
+            break done;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(20),
+            "analysis timed out"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert_eq!(done.path, path);
+    assert!(done.error.is_none(), "{:?}", done.error);
+    assert!(
+        loader::sidecar::Sidecar::read(&path)
+            .and_then(|s| s.analysis)
+            .is_some(),
+        "the analysis is saved beside the file"
+    );
+}
+
+#[test]
+fn a_file_that_cannot_be_analysed_comes_back_with_the_reason() {
+    let loader = Loader::spawn(48_000);
+    loader.analyse("/definitely/missing.flac".into());
+    let start = Instant::now();
+    let done = loop {
+        if let Some(done) = loader.try_recv_analysed() {
+            break done;
+        }
+        assert!(start.elapsed() < Duration::from_secs(20), "timed out");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert!(done.error.is_some());
+}
