@@ -3,7 +3,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Paragraph},
+    widgets::{Block, Clear, Paragraph},
     Frame,
 };
 
@@ -45,7 +45,40 @@ pub struct ScreenView {
     pub message: String,
     /// Deck B's beat phase relative to deck A, -0.5..0.5 beats; `None` without two grids.
     pub phase: Option<f64>,
+    /// Draw the key list over everything else.
+    pub help: bool,
 }
+
+/// What `?` puts on screen: the keys, in the order the spec's control table has them.
+const HELP: &[(&str, &str)] = &[
+    ("Space", "play or pause the focused deck"),
+    ("c", "cue, held to preview"),
+    ("1-8", "hot cue: trigger, or set an empty one"),
+    ("Alt+1-8", "clear a hot cue"),
+    ("Tab", "switch focused deck"),
+    ("`", "send the next key to the other deck"),
+    ("g then 0-9", "seek to a tenth of the track"),
+    ("- / +", "tempo down and up, Alt for a fine step"),
+    (", / .", "nudge back and forward"),
+    ("s / q / k", "sync, quantize, key lock"),
+    ("l", "loop four beats on and off"),
+    ("i / I", "loop in and out by hand"),
+    ("[ / ]", "halve and double the loop"),
+    ("< / >", "beat jump back and forward"),
+    ("f / F", "effect on and off, next effect"),
+    ("9 / 0", "effect wet down and up"),
+    ("p / P  d / D", "the effect's two knobs"),
+    ("r / R", "trim"),
+    ("t / T  y / Y  u / U", "EQ high, mid, low (Alt to kill)"),
+    ("o / O", "filter toward low-pass and high-pass"),
+    ("v / V", "channel fader"),
+    ("m", "headphone cue"),
+    ("arrows", "crossfader, Shift snaps to the end"),
+    ("w", "waveform colour mode"),
+    ("click", "seek on the waveform"),
+    ("?", "this list"),
+    ("Ctrl+Q", "quit"),
+];
 
 const XFADE_WIDTH: usize = 13;
 const FADER_WIDTH: usize = 8;
@@ -304,4 +337,44 @@ pub fn render_screen(f: &mut Frame, v: &ScreenView) {
         };
         f.render_widget(Paragraph::new(v.message.as_str()), message);
     }
+    if v.help {
+        render_help(f);
+    }
+}
+
+/// The key list, centred over whatever is behind it.
+fn render_help(f: &mut Frame) {
+    let area = f.area();
+    let widest = HELP
+        .iter()
+        .map(|(keys, what)| keys.len() + what.len() + 3)
+        .max()
+        .unwrap_or(40);
+    let width = (widest as u16 + 4).min(area.width);
+    let height = (HELP.len() as u16 + 2).min(area.height);
+    let box_area = Rect {
+        x: area.x + (area.width - width) / 2,
+        y: area.y + (area.height - height) / 2,
+        width,
+        height,
+    };
+    let block = Block::bordered().title(" HELP ");
+    let inner = block.inner(box_area);
+    f.render_widget(Clear, box_area);
+    f.render_widget(block, box_area);
+    let key_width = HELP.iter().map(|(keys, _)| keys.len()).max().unwrap_or(0);
+    let lines: Vec<Line> = HELP
+        .iter()
+        .take(inner.height as usize)
+        .map(|(keys, what)| {
+            Line::from(vec![
+                Span::styled(
+                    format!("{keys:<key_width$}  "),
+                    Style::new().add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(*what),
+            ])
+        })
+        .collect();
+    f.render_widget(Paragraph::new(lines), inner);
 }

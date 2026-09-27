@@ -116,6 +116,7 @@ fn whole_screen_shows_every_section() {
         status: "keyboard: kitty protocol".into(),
         message: "Loaded Some Track on deck A".into(),
         phase: None,
+        help: false,
     };
     let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -161,6 +162,7 @@ fn long_status_does_not_hide_the_message() {
         status: "x".repeat(300),
         message: "Could not load a.flac".into(),
         phase: None,
+        help: false,
     };
     let mut term = Terminal::new(TestBackend::new(100, 40)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -183,6 +185,7 @@ fn mixer_text(m: MixerView, w: u16, h: u16) -> String {
         status: String::new(),
         message: String::new(),
         phase: None,
+        help: false,
     };
     let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
     term.draw(|f| render_screen(f, &view)).unwrap();
@@ -246,6 +249,7 @@ fn phase_meter_shows_the_offset_between_decks() {
             status: String::new(),
             message: String::new(),
             phase,
+            help: false,
         };
         let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
         term.draw(|f| render_screen(f, &view)).unwrap();
@@ -301,6 +305,7 @@ fn an_effect_that_is_off_is_dimmed() {
             status: String::new(),
             message: String::new(),
             phase: None,
+            help: false,
         };
         let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
         term.draw(|f| render_screen(f, &screen)).unwrap();
@@ -314,4 +319,54 @@ fn an_effect_that_is_off_is_dimmed() {
     };
     assert!(view(false), "an effect that is not running is dimmed");
     assert!(!view(true), "and stands out once it is");
+}
+
+#[test]
+fn the_help_overlay_lists_the_keys_over_the_screen() {
+    let mut view = ScreenView {
+        decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
+        mixer: MixerView::default(),
+        status: String::new(),
+        message: String::new(),
+        phase: None,
+        help: false,
+    };
+    let text = |view: &ScreenView| {
+        let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
+        term.draw(|f| render_screen(f, view)).unwrap();
+        let buf = term.backend().buffer().clone();
+        (0..buf.area.height)
+            .map(|y| {
+                (0..buf.area.width)
+                    .map(|x| buf[(x, y)].symbol().to_string())
+                    .collect::<String>()
+                    + "\n"
+            })
+            .collect::<String>()
+    };
+    assert!(!text(&view).contains("HELP"), "hidden until asked for");
+
+    view.help = true;
+    let shown = text(&view);
+    assert!(shown.contains("HELP"), "{shown}");
+    for label in ["Space", "Tab", "hot cue", "loop", "Ctrl+Q"] {
+        assert!(shown.contains(label), "missing {label}\n{shown}");
+    }
+}
+
+#[test]
+fn the_help_overlay_fits_a_small_terminal() {
+    let view = ScreenView {
+        decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
+        mixer: MixerView::default(),
+        status: String::new(),
+        message: String::new(),
+        phase: None,
+        help: true,
+    };
+    // Nothing here should panic or write outside the buffer.
+    for (w, h) in [(40, 12), (60, 20), (200, 60)] {
+        let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+        term.draw(|f| render_screen(f, &view)).unwrap();
+    }
 }

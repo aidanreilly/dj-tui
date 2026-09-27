@@ -44,3 +44,10 @@ fn double_dash_ends_flag_parsing() {
     let a = parse(&["--", "--weird-name.wav"]).unwrap();
     assert_eq!(a.files, vec![PathBuf::from("--weird-name.wav")]);
 }
+
+#[test]
+fn midi_learn_is_its_own_mode() {
+    assert!(parse(&["--midi-learn"]).unwrap().midi_learn);
+    assert!(!parse(&[]).unwrap().midi_learn);
+    assert!(dj_tui::cli::USAGE.contains("--midi-learn"));
+}

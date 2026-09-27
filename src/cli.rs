@@ -10,6 +10,7 @@ Loads FILE_A on deck A and FILE_B on deck B.
 options:
   --demo       use supplied files, or 124/126 BPM click tracks if no files are given
   --no-audio   run without a sound server (silent clock)
+  --midi-learn print what a connected controller sends, for writing a mapping
   -h, --help   show this help
   --version    show the version";
 
@@ -18,6 +19,8 @@ pub struct Args {
     pub files: Vec<PathBuf>,
     pub demo: bool,
     pub no_audio: bool,
+    /// Print what a controller sends instead of starting the app.
+    pub midi_learn: bool,
     pub help: bool,
     pub version: bool,
 }
@@ -31,6 +34,7 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<Args, String> {
                 "--" => flags_done = true,
                 "--demo" => out.demo = true,
                 "--no-audio" => out.no_audio = true,
+                "--midi-learn" => out.midi_learn = true,
                 "-h" | "--help" => out.help = true,
                 "--version" => out.version = true,
                 other => return Err(format!("unknown option {other}\n\n{USAGE}")),

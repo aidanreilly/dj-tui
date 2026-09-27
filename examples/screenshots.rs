@@ -165,6 +165,7 @@ fn main() {
             status: "JACK dj-tui @ 48000 Hz / 256 frames, xruns 0  |  hold-cue on  |  pixel waveforms  |  ? help".into(),
             message: format!("Waveform: {}", match mode { WaveformMode::ThreeBand => "3-Band", WaveformMode::Rgb => "RGB", WaveformMode::Blue => "Blue" }),
             phase: Some(0.12),
+            help: false,
         };
         let mut term = Terminal::new(TestBackend::new(COLS, ROWS)).unwrap();
         term.draw(|f| render_screen(f, &view)).unwrap();

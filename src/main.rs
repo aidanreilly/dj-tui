@@ -45,6 +45,49 @@ fn load_config() -> Result<Config, String> {
     }
 }
 
+/// Print what a controller sends, so its numbers can go into a mapping file. Runs until
+/// Ctrl+C, since there is no way to know when the user has finished pressing things.
+fn midi_learn() -> ExitCode {
+    let backend = match backend::JackBackend::open("dj-tui-learn") {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("MIDI learn needs a running JACK or PipeWire server: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let (_, processor) = engine::channel(Engine::new(), COMMAND_QUEUE);
+    let mut running = match backend.activate(processor, &backend::Routing::Auto) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("Listening for controllers. Press a control to see what it sends; Ctrl+C to stop.");
+    println!("Paste the lines into a mapping file under mappings/, changing the action to suit.");
+    let mut last = None;
+    loop {
+        for port in running.connect_midi(&[]) {
+            println!("connected {port}");
+        }
+        for bytes in running.take_midi() {
+            let Some(message) = midi::Message::from_bytes(&bytes) else {
+                continue;
+            };
+            let address = message.address();
+            // A knob sends a stream of values; only its first message is worth printing.
+            if last.as_deref() == Some(address.as_str()) {
+                continue;
+            }
+            last = Some(address.clone());
+            println!();
+            println!("{address}");
+            print!("{}", midi::learn_line(message, "play a"));
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
 /// Where audio goes: a live JACK client, or a silent clock we drive from the UI loop.
 #[allow(clippy::large_enum_variant)] // one value for the whole run; boxing buys nothing
 enum Audio {
@@ -119,6 +162,9 @@ fn main() -> ExitCode {
     if args.version {
         println!("dj-tui {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
+    }
+    if args.midi_learn {
+        return midi_learn();
     }
     let config = match load_config() {
         Ok(c) => c,

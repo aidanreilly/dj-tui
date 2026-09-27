@@ -32,6 +32,8 @@ pub struct App {
     started: std::time::Instant,
     /// Where each deck's track came from, and the cues last saved beside it.
     persisted: [Option<Persisted>; 2],
+    /// The key list is up.
+    help: bool,
 }
 
 struct Persisted {
@@ -58,6 +60,7 @@ impl App {
             end_warning_secs: config.ui.end_warning_secs,
             started: std::time::Instant::now(),
             persisted: [None, None],
+            help: false,
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -355,7 +358,13 @@ impl App {
 
     /// Handle one action, whichever input produced it. Returns true when the user asked to quit.
     pub fn on_action(&mut self, action: Action) -> bool {
+        // Any key closes the help overlay; `?` is the only one that opens it.
+        let was_help = std::mem::take(&mut self.help);
         match action {
+            Action::Help => {
+                self.help = !was_help;
+                return false;
+            }
             Action::Quit => return true,
             Action::CycleWaveformMode => {
                 self.waveform_mode = self.waveform_mode.next();
@@ -415,6 +424,7 @@ impl App {
             status,
         );
         v.message = self.message.clone();
+        v.help = self.help;
         let elapsed = self.started.elapsed().as_secs_f64();
         for (i, d) in v.decks.iter_mut().enumerate() {
             d.waveform_mode = self.waveform_mode;

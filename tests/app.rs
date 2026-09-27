@@ -464,6 +464,26 @@ fn a_controller_drives_the_same_actions_the_keys_do() {
 }
 
 #[test]
+fn the_question_mark_shows_the_key_list_and_any_key_puts_it_away() {
+    let (mut app, _p) = setup();
+    assert!(!app.view(String::new()).help);
+    app.on_key(KeyEvent::press(Key::Char('?')));
+    assert!(app.view(String::new()).help, "the list is up");
+    app.on_key(KeyEvent::press(Key::Char('?')));
+    assert!(
+        !app.view(String::new()).help,
+        "and the same key puts it away"
+    );
+
+    app.on_key(KeyEvent::press(Key::Char('?')));
+    app.on_key(KeyEvent::press(Key::Space));
+    assert!(
+        !app.view(String::new()).help,
+        "so does getting on with something else"
+    );
+}
+
+#[test]
 fn key_lock_reports_itself_and_shows_in_the_deck_view() {
     let (mut app, _p) = setup();
     app.on_key(KeyEvent::press(Key::Char('k')));
