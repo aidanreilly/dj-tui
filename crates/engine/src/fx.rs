@@ -14,6 +14,22 @@ pub const ECHO_FEEDBACK: f64 = 0.5;
 const MAX_ECHO_SECS: f32 = 4.0;
 /// Below this the tail counts as silence and the slot stops reporting that it rings.
 const RING_FLOOR: f32 = 1e-4;
+/// Length of one flanger sweep, in beats.
+pub const FLANGER_BEATS: f64 = 4.0;
+/// Shortest and longest flanger delay, in milliseconds.
+const FLANGER_MIN_MS: f32 = 0.5;
+const FLANGER_MAX_MS: f32 = 6.0;
+/// How much of the flanged signal feeds back, which sharpens the comb.
+const FLANGER_FEEDBACK: f32 = 0.35;
+/// Freeverb comb delays in frames at 44.1 kHz, scaled to the session rate.
+const REVERB_COMBS: [usize; 8] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
+/// Freeverb all-pass delays, same reference rate.
+const REVERB_ALLPASS: [usize; 4] = [556, 441, 341, 225];
+/// Frames the right channel is offset by, which is what spreads the room.
+const REVERB_SPREAD: usize = 23;
+const REVERB_ALLPASS_FEEDBACK: f32 = 0.5;
+/// Level the whole reverb is scaled to, so a full wet mix sits beside the dry.
+const REVERB_GAIN: f32 = 0.6;
 /// Bit depth the crusher quantises to.
 const CRUSH_BITS: u32 = 5;
 /// Sample rate reduction: one sample is held for this many frames.
@@ -25,6 +41,10 @@ pub enum FxKind {
     /// Tape-style feedback delay, timed in beats.
     #[default]
     Echo,
+    /// Sweeping comb filter, its sweep timed in beats.
+    Flanger,
+    /// Freeverb-style room with size and damping.
+    Reverb,
     /// Sample rate and bit depth reduction.
     Bitcrusher,
 }
@@ -32,7 +52,9 @@ pub enum FxKind {
 impl FxKind {
     pub fn next(self) -> Self {
         match self {
-            Self::Echo => Self::Bitcrusher,
+            Self::Echo => Self::Flanger,
+            Self::Flanger => Self::Reverb,
+            Self::Reverb => Self::Bitcrusher,
             Self::Bitcrusher => Self::Echo,
         }
     }
@@ -40,6 +62,8 @@ impl FxKind {
     pub fn name(self) -> &'static str {
         match self {
             Self::Echo => "Echo",
+            Self::Flanger => "Flanger",
+            Self::Reverb => "Reverb",
             Self::Bitcrusher => "Bitcrusher",
         }
     }
@@ -136,6 +160,203 @@ impl Echo {
     }
 }
 
+/// Comb filter whose delay sweeps between two short times, once per `FLANGER_BEATS`.
+struct Flanger {
+    line: Vec<f32>,
+    write: usize,
+    /// Sweep position, 0 to 1 over one period.
+    phase: f32,
+    min_frames: f32,
+    max_frames: f32,
+}
+
+impl Flanger {
+    fn new(fs: f32) -> Self {
+        let max = fs * FLANGER_MAX_MS / 1000.0;
+        Self {
+            line: vec![0.0; (max.ceil() as usize + 2) * 2],
+            write: 0,
+            phase: 0.0,
+            min_frames: fs * FLANGER_MIN_MS / 1000.0,
+            max_frames: max,
+        }
+    }
+
+    /// Linear read between the two samples either side of a fractional delay.
+    fn read(&self, delay: f32, channel: usize) -> f32 {
+        let frames = self.line.len() / 2;
+        let back = delay.clamp(1.0, frames as f32 - 2.0);
+        let whole = back.floor();
+        let frac = back - whole;
+        let i = (self.write + frames - whole as usize) % frames;
+        let j = (i + frames - 1) % frames;
+        self.line[i * 2 + channel] * (1.0 - frac) + self.line[j * 2 + channel] * frac
+    }
+
+    fn process(&mut self, buf: &mut [f32], period_frames: f32, gate: &mut Ramp) {
+        let frames = self.line.len() / 2;
+        let step = 1.0 / period_frames.max(1.0);
+        let span = self.max_frames - self.min_frames;
+        for frame in buf.as_chunks_mut::<2>().0 {
+            // Triangle sweep: down and back up, so the turn at each end is not a jump.
+            let tri = 1.0 - (self.phase * 2.0 - 1.0).abs();
+            let delay = self.min_frames + span * tri;
+            let gate = gate.next();
+            for (ch, sample) in frame.iter_mut().enumerate() {
+                let delayed = self.read(delay, ch);
+                self.line[self.write * 2 + ch] = *sample * gate + delayed * FLANGER_FEEDBACK;
+                *sample += delayed * gate;
+            }
+            self.write = (self.write + 1) % frames;
+            self.phase = (self.phase + step).fract();
+        }
+    }
+
+    fn clear(&mut self) {
+        self.line.fill(0.0);
+        self.phase = 0.0;
+        self.write = 0;
+    }
+}
+
+/// One damped comb: a delay whose feedback runs through a one-pole low-pass, which is
+/// what makes a Freeverb tail lose its highs as it decays.
+struct Comb {
+    line: Vec<f32>,
+    index: usize,
+    store: f32,
+}
+
+impl Comb {
+    fn new(frames: usize) -> Self {
+        Self {
+            line: vec![0.0; frames.max(1)],
+            index: 0,
+            store: 0.0,
+        }
+    }
+
+    fn process(&mut self, input: f32, feedback: f32, damp: f32) -> f32 {
+        let out = self.line[self.index];
+        self.store = out * (1.0 - damp) + self.store * damp;
+        self.line[self.index] = input + self.store * feedback;
+        self.index = (self.index + 1) % self.line.len();
+        out
+    }
+
+    fn clear(&mut self) {
+        self.line.fill(0.0);
+        self.store = 0.0;
+    }
+}
+
+/// Schroeder all-pass, which smears the comb output without colouring it.
+struct Allpass {
+    line: Vec<f32>,
+    index: usize,
+}
+
+impl Allpass {
+    fn new(frames: usize) -> Self {
+        Self {
+            line: vec![0.0; frames.max(1)],
+            index: 0,
+        }
+    }
+
+    fn process(&mut self, input: f32) -> f32 {
+        let buffered = self.line[self.index];
+        let out = buffered - input;
+        self.line[self.index] = input + buffered * REVERB_ALLPASS_FEEDBACK;
+        self.index = (self.index + 1) % self.line.len();
+        out
+    }
+
+    fn clear(&mut self) {
+        self.line.fill(0.0);
+    }
+}
+
+/// Freeverb: eight damped combs in parallel into four all-passes in series, per channel.
+struct Reverb {
+    combs: [[Comb; 8]; 2],
+    allpass: [[Allpass; 4]; 2],
+    size: f32,
+    damping: f32,
+    /// Peak of the last block's wet output, which is how the slot knows it still rings.
+    ring: f32,
+}
+
+impl Reverb {
+    fn new(fs: f32) -> Self {
+        let scale =
+            |frames: usize, offset: usize| ((frames + offset) as f32 * fs / 44_100.0) as usize;
+        Self {
+            combs: [
+                std::array::from_fn(|i| Comb::new(scale(REVERB_COMBS[i], 0))),
+                std::array::from_fn(|i| Comb::new(scale(REVERB_COMBS[i], REVERB_SPREAD))),
+            ],
+            allpass: [
+                std::array::from_fn(|i| Allpass::new(scale(REVERB_ALLPASS[i], 0))),
+                std::array::from_fn(|i| Allpass::new(scale(REVERB_ALLPASS[i], REVERB_SPREAD))),
+            ],
+            size: 0.7,
+            damping: 0.4,
+            ring: 0.0,
+        }
+    }
+
+    fn set_size(&mut self, size: f32) {
+        self.size = size.clamp(0.0, 1.0);
+    }
+
+    fn set_damping(&mut self, damping: f32) {
+        self.damping = damping.clamp(0.0, 1.0);
+    }
+
+    fn process(&mut self, buf: &mut [f32], gate: &mut Ramp) {
+        let feedback = 0.7 + self.size * 0.28;
+        let damp = self.damping * 0.4;
+        let mut ring = 0.0f32;
+        for frame in buf.as_chunks_mut::<2>().0 {
+            let gate = gate.next();
+            for ((sample, combs), allpass) in frame
+                .iter_mut()
+                .zip(self.combs.iter_mut())
+                .zip(self.allpass.iter_mut())
+            {
+                let input = *sample * gate * REVERB_GAIN;
+                let mut wet = 0.0;
+                for comb in combs.iter_mut() {
+                    wet += comb.process(input, feedback, damp);
+                }
+                for ap in allpass.iter_mut() {
+                    wet = ap.process(wet);
+                }
+                ring = ring.max(wet.abs());
+                *sample = wet;
+            }
+        }
+        self.ring = ring;
+    }
+
+    fn rings(&self) -> bool {
+        self.ring > RING_FLOOR
+    }
+
+    fn clear(&mut self) {
+        for ch in 0..2 {
+            for comb in &mut self.combs[ch] {
+                comb.clear();
+            }
+            for ap in &mut self.allpass[ch] {
+                ap.clear();
+            }
+        }
+        self.ring = 0.0;
+    }
+}
+
 /// Sample rate reduction with bit depth reduction on top.
 #[derive(Default)]
 struct Bitcrusher {
@@ -176,6 +397,8 @@ pub struct FxSlot {
     feed: Ramp,
     beat_frames: f32,
     echo: Echo,
+    flanger: Flanger,
+    reverb: Reverb,
     crusher: Bitcrusher,
     /// Scratch copy of the dry signal, for the crossfade back into the block.
     dry: Vec<f32>,
@@ -191,6 +414,8 @@ impl FxSlot {
             feed: Ramp::new(smoothing_coeff(fs, SMOOTH_SECS)),
             beat_frames: fs / 2.0,
             echo: Echo::new(fs),
+            flanger: Flanger::new(fs),
+            reverb: Reverb::new(fs),
             crusher: Bitcrusher::default(),
             dry: vec![0.0; crate::MAX_BLOCK_FRAMES * 2],
         }
@@ -205,6 +430,8 @@ impl FxSlot {
     pub fn set_kind(&mut self, kind: FxKind) {
         if kind != self.kind {
             self.echo.clear();
+            self.flanger.clear();
+            self.reverb.clear();
             self.crusher.reset();
             self.kind = kind;
         }
@@ -233,9 +460,24 @@ impl FxSlot {
         }
     }
 
+    /// Room size, 0 for a small space and 1 for a long tail.
+    pub fn set_reverb_size(&mut self, size: f32) {
+        self.reverb.set_size(size);
+    }
+
+    /// How fast the tail loses its high end.
+    pub fn set_reverb_damping(&mut self, damping: f32) {
+        self.reverb.set_damping(damping);
+    }
+
     /// True while a unit still has something to play after being switched off.
     pub fn is_ringing(&self) -> bool {
-        !self.on && matches!(self.kind, FxKind::Echo) && self.echo.rings()
+        !self.on
+            && match self.kind {
+                FxKind::Echo => self.echo.rings(),
+                FxKind::Reverb => self.reverb.rings(),
+                FxKind::Flanger | FxKind::Bitcrusher => false,
+            }
     }
 
     pub fn process(&mut self, buf: &mut [f32]) {
@@ -262,6 +504,11 @@ impl FxSlot {
                 let delay = (ECHO_BEATS * self.beat_frames as f64) as usize;
                 self.echo.process(buf, delay, &mut self.feed);
             }
+            FxKind::Flanger => {
+                let period = FLANGER_BEATS as f32 * self.beat_frames;
+                self.flanger.process(buf, period, &mut self.feed);
+            }
+            FxKind::Reverb => self.reverb.process(buf, &mut self.feed),
             FxKind::Bitcrusher => self.crusher.process(buf),
         }
 

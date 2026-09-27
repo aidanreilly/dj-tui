@@ -195,3 +195,152 @@ fn the_slot_reports_what_it_is_set_to() {
     fx.set_wet(2.0);
     assert_eq!(fx.wet(), 1.0, "wet is a fraction");
 }
+
+/// A steady sine, the signal a comb filter shows up in most clearly.
+fn sine(freq: f32, frames: usize) -> Vec<f32> {
+    (0..frames)
+        .flat_map(|i| {
+            let s = 0.5 * (std::f32::consts::TAU * freq * i as f32 / FS).sin();
+            [s, s]
+        })
+        .collect()
+}
+
+#[test]
+fn the_flanger_colours_a_steady_tone() {
+    let mut fx = slot(FxKind::Flanger, 1.0);
+    settle(&mut fx);
+    let dry = sine(440.0, 4 * BEAT as usize);
+    let mut wet = dry.clone();
+    fx.process(&mut wet);
+    let diff = dry
+        .iter()
+        .zip(&wet)
+        .fold(0.0f32, |m, (a, b)| m.max((a - b).abs()));
+    assert!(diff > 0.05, "the comb is audible: {diff}");
+}
+
+#[test]
+fn the_flanger_sweep_repeats_once_every_lfo_period() {
+    use engine::fx::FLANGER_BEATS;
+    let mut fx = slot(FxKind::Flanger, 1.0);
+    settle(&mut fx);
+    let period = (FLANGER_BEATS * BEAT as f64) as usize;
+    let mut buf = sine(440.0, 3 * period);
+    fx.process(&mut buf);
+    let out = left(&buf);
+
+    // One period on, the sweep is back where it was, so the tone is coloured the same way.
+    let window = |from: usize| -> Vec<f32> { out[from..from + 2_000].to_vec() };
+    let dist = |a: &[f32], b: &[f32]| -> f32 {
+        a.iter()
+            .zip(b)
+            .fold(0.0f32, |m, (x, y)| m.max((x - y).abs()))
+    };
+    let base = window(period);
+    assert!(
+        dist(&base, &window(2 * period)) < 0.02,
+        "a period later it lines up: {}",
+        dist(&base, &window(2 * period))
+    );
+    assert!(
+        dist(&base, &window(period + period / 2)) > 0.02,
+        "half a period later it does not"
+    );
+}
+
+#[test]
+fn the_flanger_stops_when_it_is_switched_off() {
+    let mut fx = slot(FxKind::Flanger, 1.0);
+    settle(&mut fx);
+    let mut warm = sine(440.0, BEAT as usize);
+    fx.process(&mut warm);
+    fx.set_on(false);
+    assert!(!fx.is_ringing(), "a flanger has nothing to ring out");
+    settle(&mut fx);
+    let dry = sine(440.0, 2_000);
+    let mut buf = dry.clone();
+    fx.process(&mut buf);
+    assert_eq!(buf, dry);
+}
+
+/// Frames until the tail falls below an audible level, feeding silence.
+fn tail_frames(fx: &mut FxSlot) -> usize {
+    let mut frames = 0;
+    for _ in 0..200 {
+        let mut block = silence(4_800);
+        fx.process(&mut block);
+        let peak = left(&block).iter().fold(0.0f32, |m, s| m.max(s.abs()));
+        if peak < 1e-3 {
+            break;
+        }
+        frames += 4_800;
+    }
+    frames
+}
+
+#[test]
+fn the_reverb_keeps_sounding_after_the_input_stops() {
+    let mut fx = slot(FxKind::Reverb, 1.0);
+    settle(&mut fx);
+    let mut buf = impulse(4_800);
+    fx.process(&mut buf);
+    assert!(tail_frames(&mut fx) > 4_800, "a tail worth the name");
+}
+
+#[test]
+fn a_bigger_room_rings_for_longer() {
+    let measure = |size: f32| {
+        let mut fx = slot(FxKind::Reverb, 1.0);
+        fx.set_reverb_size(size);
+        settle(&mut fx);
+        let mut buf = impulse(4_800);
+        fx.process(&mut buf);
+        tail_frames(&mut fx)
+    };
+    assert!(
+        measure(0.9) > measure(0.2),
+        "size lengthens the tail: {} vs {}",
+        measure(0.9),
+        measure(0.2)
+    );
+}
+
+#[test]
+fn damping_takes_the_top_off_the_tail() {
+    let measure = |damping: f32| {
+        let mut fx = slot(FxKind::Reverb, 1.0);
+        fx.set_reverb_damping(damping);
+        settle(&mut fx);
+        let mut buf = sine(4_000.0, 4_800);
+        fx.process(&mut buf);
+        let mut tail = silence(9_600);
+        fx.process(&mut tail);
+        left(&tail).iter().fold(0.0f32, |m, s| m.max(s.abs()))
+    };
+    assert!(
+        measure(0.9) < measure(0.1),
+        "a damped room loses its highs sooner: {} vs {}",
+        measure(0.9),
+        measure(0.1)
+    );
+}
+
+#[test]
+fn the_reverb_rings_out_after_it_is_switched_off() {
+    let mut fx = slot(FxKind::Reverb, 1.0);
+    settle(&mut fx);
+    let mut buf = impulse(4_800);
+    fx.process(&mut buf);
+    fx.set_on(false);
+    assert!(fx.is_ringing());
+    // The slot stops reporting a ring once the room is quieter than the tail test's floor,
+    // which takes a little longer than the tail stays audible.
+    let mut blocks = 0;
+    while fx.is_ringing() && blocks < 400 {
+        let mut block = silence(4_800);
+        fx.process(&mut block);
+        blocks += 1;
+    }
+    assert!(!fx.is_ringing(), "quiet in the end after {blocks} blocks");
+}
