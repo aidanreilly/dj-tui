@@ -279,6 +279,70 @@ fn the_loop_key_loops_four_beats_and_the_length_keys_change_it() {
 }
 
 #[test]
+fn marking_a_loop_by_hand_reports_both_ends_and_shows_the_in_point() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("manual.wav");
+    write_wav(&path, &stereo(&[0.3; 480_000]), 2, RATE, Fmt::Pcm16);
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+
+    app.on_key(KeyEvent::press(Key::Char('i')));
+    assert!(app.message().contains("Loop in"), "{}", app.message());
+    assert_eq!(
+        app.view(String::new()).decks[0].loop_in_secs,
+        Some(0.0),
+        "the waiting in point shows under the waveform"
+    );
+
+    app.seek_to_fraction(DeckId::A, 0.5);
+    process(&mut p, 16);
+    app.on_key(KeyEvent::press(Key::Char('I')));
+    process(&mut p, 16);
+    let (start, end) = app.snapshot().decks[0]
+        .loop_span
+        .expect("a loop is running");
+    assert_eq!(start, 0.0);
+    assert!((end - 240_000.0).abs() < 1.0, "out point at the playhead");
+    assert!(app.message().contains("Loop"), "{}", app.message());
+    assert!(app.view(String::new()).decks[0].loop_in_secs.is_none());
+}
+
+#[test]
+fn the_loop_out_key_alone_says_what_is_missing() {
+    let (mut app, _p) = setup();
+    app.on_key(KeyEvent::press(Key::Char('I')));
+    assert!(
+        app.message().contains("no loop in point yet"),
+        "{}",
+        app.message()
+    );
+}
+
+#[test]
+fn loading_a_track_forgets_the_loop_in_point_from_the_last_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first.wav");
+    let second = dir.path().join("second.wav");
+    write_wav(&first, &stereo(&[0.3; 96_000]), 2, RATE, Fmt::Pcm16);
+    write_wav(&second, &stereo(&[0.2; 96_000]), 2, RATE, Fmt::Pcm16);
+    let (mut app, mut p) = setup();
+    app.load_path(DeckId::A, first);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    app.on_key(KeyEvent::press(Key::Char('i')));
+    assert!(app.view(String::new()).decks[0].loop_in_secs.is_some());
+
+    app.load_path(DeckId::A, second);
+    let start = Instant::now();
+    while app.view(String::new()).decks[0].loop_in_secs.is_some() {
+        app.tick();
+        process(&mut p, 16);
+        assert!(start.elapsed() < Duration::from_secs(10), "load timed out");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
 fn quantize_reports_itself_and_shows_in_the_deck_view() {
     let (mut app, _p) = setup();
     app.on_key(KeyEvent::press(Key::Char('q')));

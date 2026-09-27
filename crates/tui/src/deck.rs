@@ -46,6 +46,8 @@ pub struct DeckView {
     pub hot_cue_secs: [Option<f64>; 8],
     /// Active loop as (start, end) in seconds, drawn over the overview.
     pub loop_secs: Option<(f64, f64)>,
+    /// A loop in point marked by hand and still waiting for its out point, in seconds.
+    pub loop_in_secs: Option<f64>,
     /// True while cues, loops and jumps snap to the beat grid.
     pub quantize: bool,
     /// Flash phase of the end-of-track warning: true while the unplayed part shows red.
@@ -229,6 +231,16 @@ impl Widget for DeckPanel<'_> {
                 let style = Style::new().fg(rgb(LOOP_COLOUR));
                 buf.set_string(column(start), marker_y, "⟦", style);
                 buf.set_string(column(end), marker_y, "⟧", style);
+            } else if let Some(start) = v.loop_in_secs {
+                // An in point on its own, waiting for the out key.
+                buf.set_string(
+                    column(start),
+                    marker_y,
+                    "⟦",
+                    Style::new()
+                        .fg(rgb(LOOP_COLOUR))
+                        .add_modifier(Modifier::DIM),
+                );
             }
             if let Some(cue) = v.cue_secs {
                 buf.set_string(

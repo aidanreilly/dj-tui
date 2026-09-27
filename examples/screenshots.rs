@@ -144,6 +144,7 @@ fn main() {
                 hot_cue_secs: hot_cue_secs[i],
                 // Deck A shows a four bar loop around its playhead.
                 loop_secs: (i == 0).then_some((28.0, 43.0)),
+                loop_in_secs: None,
                 quantize: i == 0,
                 end_warning: i == 1,
             }),

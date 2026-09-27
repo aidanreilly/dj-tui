@@ -238,6 +238,94 @@ fn quantize_snaps_loops_and_jumps_to_the_nearest_beat() {
 }
 
 #[test]
+fn a_manual_loop_runs_from_the_in_point_to_where_the_out_key_lands() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    s.decks[0].position = 50_000.0;
+    assert!(
+        run(&mut st, &s, Action::LoopIn(A)).is_none(),
+        "the in point alone changes nothing the engine can play"
+    );
+    assert_eq!(st.loop_in[0], Some(50_000.0));
+
+    s.decks[0].position = 146_000.0;
+    assert_eq!(
+        loop_span(run(&mut st, &s, Action::LoopOut(A)), A),
+        Some((50_000.0, 146_000.0))
+    );
+    assert_eq!(st.loop_in[0], None, "the in point is used up");
+}
+
+#[test]
+fn a_manual_loop_sets_the_length_the_halve_and_double_keys_work_from() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    s.decks[0].position = 0.0;
+    run(&mut st, &s, Action::LoopIn(A));
+    s.decks[0].position = 48_000.0;
+    run(&mut st, &s, Action::LoopOut(A));
+    assert_eq!(st.loop_beats[0], 2.0, "two beats long");
+}
+
+#[test]
+fn the_out_key_needs_an_in_point_ahead_of_it() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    s.decks[0].position = 10_000.0;
+    assert!(
+        run(&mut st, &s, Action::LoopOut(A)).is_none(),
+        "no in point, no loop"
+    );
+
+    run(&mut st, &s, Action::LoopIn(A));
+    s.decks[0].position = 5_000.0;
+    assert!(
+        run(&mut st, &s, Action::LoopOut(A)).is_none(),
+        "an out point behind the in point is not a loop"
+    );
+    assert_eq!(st.loop_in[0], Some(10_000.0), "the in point is still there");
+}
+
+#[test]
+fn the_in_key_during_a_loop_drops_it_and_starts_a_new_one() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    s.decks[0].loop_span = Some((0.0, 96_000.0));
+    s.decks[0].position = 200_000.0;
+    assert_eq!(
+        loop_span(run(&mut st, &s, Action::LoopIn(A)), A),
+        None,
+        "the running loop is cleared"
+    );
+    assert_eq!(st.loop_in[0], Some(200_000.0));
+}
+
+#[test]
+fn manual_loop_points_snap_to_the_beat_when_quantize_is_on() {
+    let (mut st, mut s) = snap_with_beats(480_000);
+    st.first_beat_frames[0] = 1_000.0;
+    st.quantize[0] = true;
+    s.decks[0].position = 26_000.0;
+    run(&mut st, &s, Action::LoopIn(A));
+    assert_eq!(st.loop_in[0], Some(25_000.0));
+    s.decks[0].position = 120_000.0;
+    assert_eq!(
+        loop_span(run(&mut st, &s, Action::LoopOut(A)), A),
+        Some((25_000.0, 121_000.0))
+    );
+}
+
+#[test]
+fn a_manual_loop_works_without_a_beat_grid() {
+    let mut st = ControlState::default();
+    let mut s = snap_with_frames(480_000, 0);
+    s.decks[0].position = 1_234.0;
+    run(&mut st, &s, Action::LoopIn(A));
+    s.decks[0].position = 9_999.0;
+    assert_eq!(
+        loop_span(run(&mut st, &s, Action::LoopOut(A)), A),
+        Some((1_234.0, 9_999.0)),
+        "marking both ends by hand needs no analysis"
+    );
+}
+
+#[test]
 fn quantize_toggles_without_sending_a_command() {
     let (mut st, s) = snap_with_beats(480_000);
     assert!(run(&mut st, &s, Action::Quantize(A)).is_none());

@@ -3,7 +3,7 @@
 Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
 detection in `crates/analysis`, running on load. From M5 there are loops, beat jump and quantize, and
 cues persist through the track sidecar rather than the SQLite store the spec describes. Still
-missing: manual loop in and out points, M4's GiantSteps evaluation script, and M6 onwards.
+missing: loops in the sidecar, M4's GiantSteps evaluation script, and M6 onwards.
 
 ## Rules
 
@@ -37,7 +37,8 @@ and the UI sends absolute frame positions. The engine deck wraps only on the ste
 the loop end, which is what lets a hot cue or a seek out of a loop keep playing. Quantize is a
 UI-side snap of loop in points and jumps to the nearest beat, not something the engine knows
 about. Both renderers draw the loop green: a tint plus edge lines in `tui::pixel`, a lit
-background and brackets in `tui::deck`.
+background and brackets in `tui::deck`. `i` marks a loop in point and `I` closes the loop at
+the playhead, which also sets the length the halve and double keys work from.
 
 ## Track sidecar
 

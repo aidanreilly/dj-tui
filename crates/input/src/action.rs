@@ -28,6 +28,10 @@ pub enum Action {
     Quantize(DeckId),
     KeyLock(DeckId),
     LoopToggle(DeckId),
+    /// Set the loop in point at the playhead, leaving the loop open.
+    LoopIn(DeckId),
+    /// Close a loop that `LoopIn` opened, from the in point to the playhead.
+    LoopOut(DeckId),
     LoopHalve(DeckId),
     LoopDouble(DeckId),
     BeatJump(DeckId, Dir),

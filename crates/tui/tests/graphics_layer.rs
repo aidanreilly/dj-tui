@@ -40,6 +40,7 @@ fn deck(id: DeckId, loaded: bool, position_secs: f64) -> DeckView {
         cue_secs: None,
         hot_cue_secs: [None; 8],
         loop_secs: None,
+        loop_in_secs: None,
         quantize: false,
         end_warning: false,
     }

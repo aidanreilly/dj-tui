@@ -190,6 +190,8 @@ fn deck_toggles_and_loops() {
     assert_eq!(press(&mut km, ch('q')), Some(Action::Quantize(d)));
     assert_eq!(press(&mut km, ch('k')), Some(Action::KeyLock(d)));
     assert_eq!(press(&mut km, ch('l')), Some(Action::LoopToggle(d)));
+    assert_eq!(press(&mut km, ch('i')), Some(Action::LoopIn(d)));
+    assert_eq!(press(&mut km, ch('I')), Some(Action::LoopOut(d)));
     assert_eq!(press(&mut km, ch('[')), Some(Action::LoopHalve(d)));
     assert_eq!(press(&mut km, ch(']')), Some(Action::LoopDouble(d)));
     assert_eq!(

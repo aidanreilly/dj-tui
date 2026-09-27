@@ -86,6 +86,7 @@ impl App {
         // The loop and jump keys work in beats, so they need the grid in frames.
         self.state.beat_frames[i] = meta.grid.map(|g| g.beat_secs() * rate);
         self.state.first_beat_frames[i] = meta.grid.map_or(0.0, |g| g.first_beat_secs * rate);
+        self.state.loop_in[i] = None;
         self.metas[i] = DeckMeta {
             loading: false,
             ..meta
@@ -200,6 +201,8 @@ impl App {
         let (Action::LoopToggle(d)
         | Action::LoopHalve(d)
         | Action::LoopDouble(d)
+        | Action::LoopIn(d)
+        | Action::LoopOut(d)
         | Action::Quantize(d)) = action
         else {
             return;
@@ -215,6 +218,21 @@ impl App {
                 };
                 format!("Quantize {on} on deck {letter}")
             }
+            (Action::LoopIn(_), _) => {
+                let secs = self.state.loop_in[d.index()].unwrap_or(0.0) / self.sample_rate as f64;
+                format!(
+                    "Loop in at {} on deck {letter}, press I to close it",
+                    mmss(secs)
+                )
+            }
+            (Action::LoopOut(_), None) => {
+                if self.state.loop_in[d.index()].is_some() {
+                    format!("Deck {letter}: the loop out point is behind the loop in point")
+                } else {
+                    format!("Deck {letter} has no loop in point yet, press i first")
+                }
+            }
+            (Action::LoopOut(_), _) => format!("Loop: {beats} on deck {letter}"),
             (_, None) => format!("Deck {letter} has no beat grid, so loops have no length"),
             (Action::LoopToggle(_), Some(Command::SetLoop(_, None))) => {
                 format!("Loop off on deck {letter}")
@@ -285,6 +303,7 @@ impl App {
         for (i, d) in v.decks.iter_mut().enumerate() {
             d.waveform_mode = self.waveform_mode;
             d.quantize = self.state.quantize[i];
+            d.loop_in_secs = self.state.loop_in[i].map(|f| f / self.sample_rate as f64);
             d.end_warning = crate::view::end_warning(
                 d.duration_secs - d.position_secs,
                 d.playing,
@@ -324,6 +343,12 @@ fn mode_name(m: WaveformMode) -> &'static str {
         WaveformMode::Rgb => "RGB",
         WaveformMode::Blue => "Blue",
     }
+}
+
+/// Minutes and seconds, as the deck panel shows times.
+fn mmss(secs: f64) -> String {
+    let s = secs.max(0.0) as u64;
+    format!("{}:{:02}", s / 60, s % 60)
 }
 
 /// Loop lengths read as beats above one and as a fraction of a beat below it.

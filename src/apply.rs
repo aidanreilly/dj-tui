@@ -45,6 +45,8 @@ pub struct ControlState {
     pub first_beat_frames: [f64; 2],
     /// Length of the next loop, and of a beat jump, in beats.
     pub loop_beats: [f64; 2],
+    /// Loop in point waiting for its out point, in frames.
+    pub loop_in: [Option<f64>; 2],
     pub quantize: [bool; 2],
 }
 
@@ -91,6 +93,7 @@ impl Default for ControlState {
             beat_frames: [None; 2],
             first_beat_frames: [0.0; 2],
             loop_beats: [DEFAULT_LOOP_BEATS; 2],
+            loop_in: [None; 2],
             quantize: [false; 2],
         }
     }
@@ -214,6 +217,27 @@ pub fn apply(
                 let start = from_here(st, snap, i);
                 Command::SetLoop(d, Some((start, start + st.loop_beats[i] * beat)))
             }
+        }
+        LoopIn(d) => {
+            let i = d.index();
+            st.loop_in[i] = Some(from_here(st, snap, i));
+            // Marking a new in point leaves any running loop behind.
+            snap.decks[i].loop_span?;
+            Command::SetLoop(d, None)
+        }
+        LoopOut(d) => {
+            let i = d.index();
+            let start = st.loop_in[i]?;
+            let end = from_here(st, snap, i);
+            if end <= start {
+                return None;
+            }
+            st.loop_in[i] = None;
+            // Halving and doubling carry on from the length just marked out.
+            if let Some(beat) = st.beat_frames[i] {
+                st.loop_beats[i] = ((end - start) / beat).clamp(MIN_LOOP_BEATS, MAX_LOOP_BEATS);
+            }
+            Command::SetLoop(d, Some((start, end)))
         }
         LoopHalve(d) => return scale_loop(st, snap, d, 0.5),
         LoopDouble(d) => return scale_loop(st, snap, d, 2.0),

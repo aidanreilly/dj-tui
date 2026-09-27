@@ -55,6 +55,7 @@ fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &Dec
             .loop_span
             .filter(|_| loaded)
             .map(|(start, end)| (start / rate, end / rate)),
+        loop_in_secs: None,
         quantize: false,
         end_warning: false,
     }

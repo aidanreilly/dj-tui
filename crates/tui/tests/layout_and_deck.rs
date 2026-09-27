@@ -35,6 +35,7 @@ fn loaded_view(focused: bool) -> DeckView {
         cue_secs: None,
         hot_cue_secs: [None; 8],
         loop_secs: None,
+        loop_in_secs: None,
         quantize: false,
         end_warning: false,
     }
@@ -110,6 +111,7 @@ fn empty_deck_says_so() {
         cue_secs: None,
         hot_cue_secs: [None; 8],
         loop_secs: None,
+        loop_in_secs: None,
         quantize: false,
         end_warning: false,
         ..loaded_view(false)
@@ -270,4 +272,27 @@ fn the_status_row_shows_the_loop_and_quantize_state() {
     let quiet = buffer_text(&render(&loaded_view(true), 80, 13));
     assert!(!quiet.contains("LOOP"), "{quiet}");
     assert!(!quiet.contains("QUANT"), "{quiet}");
+}
+
+#[test]
+fn a_loop_in_point_waiting_for_its_out_point_shows_dimmed() {
+    use ratatui::style::Color;
+    let mut v = loaded_view(true);
+    v.loop_in_secs = Some(6.0);
+    let buf = render(&v, 80, 13);
+    let cell = &buf[(16, 2 + tui::WAVEFORM_ROWS)];
+    let [r, g, b] = tui::LOOP_COLOUR;
+    assert_eq!(cell.symbol(), "⟦");
+    assert_eq!(cell.fg, Color::Rgb(r, g, b));
+    assert!(
+        cell.modifier.contains(Modifier::DIM),
+        "not a closed loop yet"
+    );
+
+    // Once the loop closes, the pair of brackets replaces the lone one.
+    v.loop_secs = Some((6.0, 12.0));
+    let buf = render(&v, 80, 13);
+    assert!(!buf[(16, 2 + tui::WAVEFORM_ROWS)]
+        .modifier
+        .contains(Modifier::DIM));
 }

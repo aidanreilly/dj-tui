@@ -180,6 +180,8 @@ impl Keymap {
             'q' => Quantize(d),
             'k' => KeyLock(d),
             'l' => LoopToggle(d),
+            'i' => LoopIn(d),
+            'I' => LoopOut(d),
             'f' => FxToggle(d),
             'F' => FxNext(d),
             'm' => HeadphoneCue(d),
