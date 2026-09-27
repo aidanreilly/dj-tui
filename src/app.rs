@@ -34,6 +34,8 @@ pub struct App {
     persisted: [Option<Persisted>; 2],
     /// The key list is up.
     help: bool,
+    /// Events worth keeping: failures and warnings, not every message on screen.
+    log: Vec<String>,
 }
 
 struct Persisted {
@@ -61,6 +63,7 @@ impl App {
             started: std::time::Instant::now(),
             persisted: [None, None],
             help: false,
+            log: Vec::new(),
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -105,6 +108,7 @@ impl App {
         self.handle.collect_garbage();
         self.save_changed_cues();
         while let Some(note) = self.loader.try_recv_note() {
+            self.log.push(note.clone());
             self.message = note;
         }
         let fresh = self.handle.take_meters();
@@ -131,10 +135,14 @@ impl App {
                         None => loaded.title.clone(),
                     };
                     self.message = match &loaded.sidecar_note {
-                        Some(note) => format!(
-                            "Loaded {title} on deck {}, but {note}",
-                            deck_letter(done.deck)
-                        ),
+                        Some(note) => {
+                            let line = format!(
+                                "Loaded {title} on deck {}, but {note}",
+                                deck_letter(done.deck)
+                            );
+                            self.log.push(line.clone());
+                            line
+                        }
                         None => format!("Loaded {title} on deck {}", deck_letter(done.deck)),
                     };
                     let cues = loaded.cues.clone();
@@ -156,6 +164,7 @@ impl App {
                 Err(e) => {
                     self.metas[done.deck.index()].loading = false;
                     self.message = format!("Could not load {name}: {e}");
+                    self.log.push(self.message.clone());
                 }
             }
         }
@@ -417,6 +426,11 @@ impl App {
     /// Put a line in the message area, for something the app did not do itself.
     pub fn note(&mut self, text: String) {
         self.message = text;
+    }
+
+    /// Take everything worth writing to the log since the last call.
+    pub fn take_log(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.log)
     }
 
     pub fn message(&self) -> &str {

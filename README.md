@@ -170,6 +170,13 @@ Analysis, the waveform and your cues are saved beside the audio as `<file name>.
 so they load instantly the second time and travel with the music if you move your library.
 Editing or replacing the audio file invalidates them, and the track is analysed again.
 
+## When something goes wrong
+
+dj-tui keeps a log at `~/.local/state/dj-tui/dj-tui.log`, or under `$XDG_STATE_HOME` if you
+set one. It records each session's start, the audio device it found, tracks that failed to
+load, sidecar files it could not write, and the xrun count on the way out. Past a megabyte the
+file moves to `dj-tui.log.old` and a new one starts.
+
 ## Configuration
 
 `~/.config/dj-tui/config.toml`, every key optional:

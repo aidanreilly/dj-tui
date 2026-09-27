@@ -5,4 +5,5 @@ pub mod clock;
 pub mod config;
 pub mod controller;
 pub mod demo;
+pub mod log;
 pub mod view;

@@ -496,6 +496,34 @@ fn the_headphone_mix_key_reports_both_sides_of_the_blend() {
 }
 
 #[test]
+fn what_went_wrong_is_kept_for_the_log() {
+    let (mut app, mut p) = setup();
+    assert!(app.take_log().is_empty(), "nothing has happened yet");
+
+    app.load_path(DeckId::A, "/definitely/missing.flac".into());
+    let start = Instant::now();
+    while app.take_log().is_empty() {
+        app.tick();
+        process(&mut p, 16);
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "no log line arrived"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("fine.wav");
+    write_wav(&path, &stereo(&[0.3; 4_800]), 2, RATE, Fmt::Pcm16);
+    app.load_path(DeckId::A, path);
+    wait_for_load(&mut app, &mut p, DeckId::A);
+    assert!(
+        app.take_log().is_empty(),
+        "a load that worked is not worth a line"
+    );
+}
+
+#[test]
 fn key_lock_reports_itself_and_shows_in_the_deck_view() {
     let (mut app, _p) = setup();
     app.on_key(KeyEvent::press(Key::Char('k')));

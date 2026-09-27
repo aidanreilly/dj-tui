@@ -1,6 +1,7 @@
 //! dj-tui entry point: config, audio backend, terminal setup and the UI loop.
 
 use backend::JackBackend;
+use dj_tui::log::{log_path, Log};
 use dj_tui::{
     app::App,
     cli::{parse_args, USAGE},
@@ -229,6 +230,22 @@ fn main() -> ExitCode {
     let midi_ports: Vec<String> = controllers.iter().flat_map(|c| c.wanted_ports()).collect();
     let mut midi_scan = Instant::now();
 
+    let mut log = match log_path(
+        std::env::var("XDG_STATE_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+    ) {
+        Some(path) => Log::open(&path),
+        None => Log::none(),
+    };
+    log.line(&format!(
+        "dj-tui {} starting: {}",
+        env!("CARGO_PKG_VERSION"),
+        audio.status()
+    ));
+    for note in &notes {
+        log.line(note);
+    }
+
     let mut terminal = ratatui::init();
     let mouse_capture = execute!(stdout(), EnableMouseCapture).is_ok();
     let key_release = supports_keyboard_enhancement().unwrap_or(false)
@@ -317,6 +334,9 @@ fn main() -> ExitCode {
                 }
             }
             app.tick();
+            for line in app.take_log() {
+                log.line(&line);
+            }
             let now = Instant::now();
             if let Audio::Silent(clock, processor) = &mut audio {
                 clock.advance(processor, now - last);
@@ -357,11 +377,15 @@ fn main() -> ExitCode {
     }
     ratatui::restore();
     if let Audio::Jack(running) = audio {
+        log.line(&format!("stopping after {} xruns", running.xruns()));
         running.stop();
+    } else {
+        log.line("stopping");
     }
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
+            log.line(&format!("terminal error: {e}"));
             eprintln!("dj-tui: {e}");
             ExitCode::FAILURE
         }

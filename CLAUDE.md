@@ -84,6 +84,14 @@ mapping where the UI holds each control. Lights are sent only on change. Mapping
 `mappings/` beside the config file, and `mappings/generic.toml` in the repo is the starting
 point to copy.
 
+## Log file
+
+`src/log.rs` appends timestamped lines to `$XDG_STATE_HOME/dj-tui/dj-tui.log`, rotating past a
+megabyte. It is for what a session leaves behind, not for tracing: startup, failures and
+warnings, and the xrun count at the end. `App::take_log` hands over what happened since the
+last frame, so anything worth keeping is pushed there rather than only shown in the message
+line. Nothing logs from the audio thread.
+
 ## Master limiter
 
 `dsp::Limiter` is the last thing on the master bus, and the cue bus blends in what it puts
