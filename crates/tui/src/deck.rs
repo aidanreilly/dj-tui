@@ -64,6 +64,10 @@ pub const HOT_CUE_COLOURS: [[u8; 3]; 8] = [
     [224, 224, 30],
 ];
 pub const MAIN_CUE_COLOUR: [u8; 3] = [255, 120, 0];
+/// Loop brackets and the lit loop region, matching the pixel renderer's loop green.
+pub const LOOP_COLOUR: [u8; 3] = [40, 220, 120];
+/// Background of the loop region: the loop colour taken down to where glyphs stay readable.
+const LOOP_REGION_BG: [u8; 3] = [18, 46, 30];
 pub const END_WARNING_COLOUR: [u8; 3] = [230, 30, 30];
 
 fn rgb(c: [u8; 3]) -> ratatui::style::Color {
@@ -189,6 +193,19 @@ impl Widget for DeckPanel<'_> {
             }
         }
 
+        if let (Some((start, end)), true) = (v.loop_secs, v.duration_secs > 0.0) {
+            let column = |secs: f64| {
+                let frac = (secs / v.duration_secs).clamp(0.0, 1.0);
+                inner.x + ((inner.width as f64 * frac) as u16).min(inner.width - 1)
+            };
+            let (from, to) = (column(start), column(end));
+            for y in wave_y..(wave_y + WAVEFORM_ROWS).min(inner.bottom()) {
+                for x in from..=to.min(inner.right().saturating_sub(1)) {
+                    buf[(x, y)].set_bg(rgb(LOOP_REGION_BG));
+                }
+            }
+        }
+
         if v.end_warning && v.duration_secs > 0.0 {
             let frac = (v.position_secs / v.duration_secs).clamp(0.0, 1.0);
             let head = inner.x + ((inner.width as f64 * frac) as u16).min(inner.width - 1);
@@ -208,6 +225,11 @@ impl Widget for DeckPanel<'_> {
                 let frac = (secs / v.duration_secs).clamp(0.0, 1.0);
                 inner.x + ((inner.width as f64 * frac) as u16).min(inner.width - 1)
             };
+            if let Some((start, end)) = v.loop_secs {
+                let style = Style::new().fg(rgb(LOOP_COLOUR));
+                buf.set_string(column(start), marker_y, "⟦", style);
+                buf.set_string(column(end), marker_y, "⟧", style);
+            }
             if let Some(cue) = v.cue_secs {
                 buf.set_string(
                     column(cue),
@@ -247,10 +269,16 @@ impl Widget for DeckPanel<'_> {
                 .beat
                 .map(|(bar, beat)| format!("   BAR {bar}.{beat}"))
                 .unwrap_or_default();
+            let flags = match (v.loop_secs.is_some(), v.quantize) {
+                (true, true) => "   LOOP  QUANT",
+                (true, false) => "   LOOP",
+                (false, true) => "   QUANT",
+                (false, false) => "",
+            };
             buf.set_string(
                 inner.x,
                 status_y,
-                format!("{cues}   {state}{bar}"),
+                format!("{cues}   {state}{bar}{flags}"),
                 Style::new(),
             );
         }

@@ -237,3 +237,37 @@ fn end_warning_turns_the_unplayed_waveform_red() {
     let [r, g, b] = tui::END_WARNING_COLOUR;
     assert_eq!(cell.fg, Color::Rgb(r, g, b));
 }
+
+#[test]
+fn a_loop_is_bracketed_under_the_waveform_and_tinted_behind_it() {
+    use ratatui::style::Color;
+    let mut v = loaded_view(true);
+    // Inner width 78 over 30 s: 6 s is column 1 + 15, 12 s is column 1 + 31.
+    v.loop_secs = Some((6.0, 12.0));
+    let buf = render(&v, 80, 13);
+    let marker_y = 2 + tui::WAVEFORM_ROWS;
+    let [r, g, b] = tui::LOOP_COLOUR;
+    assert_eq!(buf[(16, marker_y)].symbol(), "⟦");
+    assert_eq!(buf[(16, marker_y)].fg, Color::Rgb(r, g, b));
+    assert_eq!(buf[(32, marker_y)].symbol(), "⟧");
+    assert_eq!(buf[(32, marker_y)].fg, Color::Rgb(r, g, b));
+
+    let inside = &buf[(24, 2 + tui::WAVEFORM_ROWS / 2)];
+    assert_eq!(inside.bg, Color::Rgb(18, 46, 30), "the loop region is lit");
+    let outside = &buf[(60, 2 + tui::WAVEFORM_ROWS / 2)];
+    assert_ne!(outside.bg, inside.bg, "only the loop region is lit");
+}
+
+#[test]
+fn the_status_row_shows_the_loop_and_quantize_state() {
+    let mut v = loaded_view(true);
+    v.loop_secs = Some((6.0, 12.0));
+    v.quantize = true;
+    let text = buffer_text(&render(&v, 80, 13));
+    assert!(text.contains("LOOP"), "{text}");
+    assert!(text.contains("QUANT"), "{text}");
+
+    let quiet = buffer_text(&render(&loaded_view(true), 80, 13));
+    assert!(!quiet.contains("LOOP"), "{quiet}");
+    assert!(!quiet.contains("QUANT"), "{quiet}");
+}

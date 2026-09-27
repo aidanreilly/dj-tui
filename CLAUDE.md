@@ -1,9 +1,9 @@
 # Working on dj-tui
 
 Spec and milestone plan: `docs/spec.md`. M0 through M3 are done. M4 has tempo and key
-detection in `crates/analysis`, running on load. Cues persist through the track sidecar rather
-than the SQLite store M5 describes. The GiantSteps evaluation script from M4 is still missing,
-and so is everything from M5 onwards.
+detection in `crates/analysis`, running on load. From M5 there are loops, beat jump and quantize, and
+cues persist through the track sidecar rather than the SQLite store the spec describes. Still
+missing: manual loop in and out points, M4's GiantSteps evaluation script, and M6 onwards.
 
 ## Rules
 
@@ -29,6 +29,15 @@ The loader produces a per-band envelope alongside the peak envelope, and both re
 the colour rules that turn those bands into 3-Band, RGB or Blue. Downsampling averages bands
 the same way it averages peaks, and a cell takes its colour from the row centres it covers.
 `w` cycles the modes, and `[ui] waveform_mode` sets the one the app starts in.
+
+## Loops
+
+Loop lengths are counted in beats, so `ControlState` carries each deck's beat grid in frames
+and the UI sends absolute frame positions. The engine deck wraps only on the step that crosses
+the loop end, which is what lets a hot cue or a seek out of a loop keep playing. Quantize is a
+UI-side snap of loop in points and jumps to the nearest beat, not something the engine knows
+about. Both renderers draw the loop green: a tint plus edge lines in `tui::pixel`, a lit
+background and brackets in `tui::deck`.
 
 ## Track sidecar
 

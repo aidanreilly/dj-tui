@@ -5,7 +5,7 @@
 Writes <mode>.png (pixel waveforms, as Ghostty shows them) and <mode>_glyph.png (the
 character fallback used in tmux or terminals without kitty graphics).
 """
-import re, sys
+import os, re, sys
 from PIL import Image, ImageDraw, ImageFont
 
 CW, CH = 10, 20
@@ -14,8 +14,30 @@ FG = (220, 220, 220)
 NAMED = {"Black": (0, 0, 0), "Red": (220, 50, 47), "Green": (80, 200, 80), "Yellow": (230, 200, 40),
          "Blue": (60, 110, 230), "Magenta": (200, 80, 200), "Cyan": (60, 200, 200), "Gray": (170, 170, 170),
          "DarkGray": (100, 100, 100), "White": (255, 255, 255)}
-font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 16)
-bold = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 16)
+def mono(bold=False):
+    """First monospace font that opens, since the path differs per distribution."""
+    names = ["DejaVuSansMono", "NotoSansMono", "FiraMono", "RedHatMono", "LiberationMono"]
+    suffix = ["-Bold", "-SemiBold", "-Medium"] if bold else ["", "-Regular"]
+    roots = ["/usr/share/fonts", "/usr/local/share/fonts", os.path.expanduser("~/.local/share/fonts")]
+    found = []
+    for root in roots:
+        for dirpath, _, files in os.walk(root):
+            for f in files:
+                if f.rsplit(".", 1)[-1].lower() in ("ttf", "otf"):
+                    found.append(os.path.join(dirpath, f))
+    for name in names:
+        for suf in suffix:
+            for path in found:
+                if os.path.basename(path).startswith(f"{name}{suf}."):
+                    return ImageFont.truetype(path, 16)
+    for name in names:
+        for path in found:
+            if os.path.basename(path).startswith(name):
+                return ImageFont.truetype(path, 16)
+    raise SystemExit("no monospace TTF or OTF font found; install dejavu-sans-mono-fonts")
+
+font = mono()
+bold = mono(bold=True)
 
 def colour(s, default):
     m = re.match(r"Rgb\((\d+), (\d+), (\d+)\)", s)

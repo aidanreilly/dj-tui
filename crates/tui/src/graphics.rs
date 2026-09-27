@@ -1,7 +1,7 @@
 //! Draws pixel waveforms over the glyph ones on terminals with a bitmap protocol.
 //! Created only when detection found one; everything else keeps the glyph renderer.
 
-use crate::pixel::{playhead_x, Palette, PixelWaveform, Wave};
+use crate::pixel::{loop_columns, playhead_x, Palette, PixelWaveform, Wave};
 use crate::{screen_layout, waveform_area, ScreenView};
 use image::DynamicImage;
 use ratatui::{layout::Size, Frame};
@@ -61,6 +61,7 @@ impl Graphics {
                 bands: &dv.bands,
                 mode: dv.waveform_mode,
                 warning: dv.end_warning,
+                loop_cols: loop_columns(dv.loop_secs, dv.duration_secs, px.0),
             };
             match deck.pixel.update(&wave, px, playhead, &self.palette) {
                 Some(img) => {

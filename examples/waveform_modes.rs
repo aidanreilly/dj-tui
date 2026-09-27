@@ -82,6 +82,7 @@ fn main() {
             bands: &bands,
             mode,
             warning: false,
+            loop_cols: None,
         };
         let img = WaveformBitmaps::rasterize(&wave, w, h, &Palette::default())
             .compose(Some(w / 3), &Palette::default());

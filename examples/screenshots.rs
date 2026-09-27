@@ -10,7 +10,7 @@ use loader::{band_envelope, waveform_envelope, ENVELOPE_POINTS};
 use ratatui::{backend::TestBackend, layout::Rect, Terminal};
 use std::f32::consts::TAU;
 use std::io::Write;
-use tui::pixel::{playhead_x, Palette, Wave, WaveformBitmaps, WaveformMode};
+use tui::pixel::{loop_columns, playhead_x, Palette, Wave, WaveformBitmaps, WaveformMode};
 use tui::{
     render_screen, screen_layout, waveform_area, DeckView, MixerView, ScreenView, StripView,
 };
@@ -188,11 +188,14 @@ fn main() {
                 bands: &decks[i].bands,
                 mode,
                 warning: i == 1,
+                // The same loop the deck view shows, so both renderers appear in a shot.
+                loop_cols: loop_columns(view.decks[i].loop_secs, decks[i].secs, w),
             };
             let pal = Palette::default();
             let img = WaveformBitmaps::rasterize(&wave, w, h, &pal).compose_with(
                 playhead_x(positions[i], decks[i].secs, w),
                 wave.warning,
+                wave.loop_cols,
                 &pal,
             );
             let mut f = std::fs::File::create(format!("{out}/{name}_deck{i}.rgba")).unwrap();

@@ -34,6 +34,8 @@ pub struct Palette {
     pub centre_line: Rgba<u8>,
     pub playhead: Rgba<u8>,
     pub warning: Rgba<u8>,
+    /// Loop region: the green a CDJ lights its loop with.
+    pub loop_region: Rgba<u8>,
 }
 
 impl Default for Palette {
@@ -49,6 +51,7 @@ impl Default for Palette {
             centre_line: Rgba([58, 50, 84, 255]),
             playhead: Rgba([236, 232, 210, 255]),
             warning: Rgba([230, 30, 30, 255]),
+            loop_region: Rgba([40, 220, 120, 255]),
         }
     }
 }
@@ -85,11 +88,16 @@ pub struct Wave<'a> {
     pub mode: WaveformMode,
     /// End-of-track warning flash: tint the unplayed part red.
     pub warning: bool,
+    /// Pixel columns `[start, end)` of the active loop, from [`loop_columns`].
+    pub loop_cols: Option<(u32, u32)>,
 }
 
 /// Exponent that pushes weaker bands toward zero in RGB mode, so hues stay clear
 /// instead of washing out toward grey.
 const RGB_SATURATION: f32 = 2.2;
+
+/// How far the loop region pulls the waveform toward the loop colour.
+const LOOP_TINT: f32 = 0.45;
 
 /// How far the waveform reaches from the centre, as a fraction of half the height.
 pub fn extent(mode: WaveformMode, peak: f32, bands: [f32; 3]) -> f32 {
@@ -241,7 +249,7 @@ impl WaveformBitmaps {
 
     /// The image to show: played part dimmed, then the playhead line.
     pub fn compose(&self, playhead: Option<u32>, palette: &Palette) -> RgbaImage {
-        self.compose_with(playhead, false, palette)
+        self.compose_with(playhead, false, None, palette)
     }
 
     /// Like [`compose`](Self::compose), with the end-of-track warning tint on the unplayed part.
@@ -249,6 +257,7 @@ impl WaveformBitmaps {
         &self,
         playhead: Option<u32>,
         warning: bool,
+        loop_cols: Option<(u32, u32)>,
         palette: &Palette,
     ) -> RgbaImage {
         let mut img = self.normal.clone();
@@ -266,14 +275,39 @@ impl WaveformBitmaps {
                 }
             }
         }
-        let Some(px) = playhead else { return img };
         let (w, h) = img.dimensions();
-        for y in 0..h {
-            for x in 0..px.min(w) {
-                img.put_pixel(x, y, *self.dimmed.get_pixel(x, y));
+        // The played part is dimmed first, so the loop below tints what is actually shown.
+        if let Some(px) = playhead {
+            for y in 0..h {
+                for x in 0..px.min(w) {
+                    img.put_pixel(x, y, *self.dimmed.get_pixel(x, y));
+                }
             }
-            for x in px.min(w)..(px + PLAYHEAD_WIDTH).min(w) {
-                img.put_pixel(x, y, palette.playhead);
+        }
+        if let Some((start, end)) = loop_cols {
+            for y in 0..h {
+                for x in start.min(w)..end.min(w) {
+                    let p = img.get_pixel_mut(x, y);
+                    if p[3] > 0 {
+                        let a = p[3];
+                        *p = lerp(*p, palette.loop_region, LOOP_TINT);
+                        p[3] = a;
+                    }
+                }
+                // Solid lines at the in and out points, so short loops stay visible.
+                for x in [start, end.saturating_sub(1)] {
+                    if x < w {
+                        img.put_pixel(x, y, palette.loop_region);
+                    }
+                }
+            }
+        }
+        // The playhead goes on last and covers whatever it crosses.
+        if let Some(px) = playhead {
+            for y in 0..h {
+                for x in px.min(w)..(px + PLAYHEAD_WIDTH).min(w) {
+                    img.put_pixel(x, y, palette.playhead);
+                }
             }
         }
         img
@@ -287,6 +321,20 @@ pub fn playhead_x(position_secs: f64, duration_secs: f64, width: u32) -> Option<
     }
     let frac = (position_secs / duration_secs).clamp(0.0, 1.0);
     Some(((frac * width as f64) as u32).min(width.saturating_sub(PLAYHEAD_WIDTH)))
+}
+
+/// Pixel columns `[start, end)` the loop covers, or `None` without a loop or a track.
+pub fn loop_columns(
+    loop_secs: Option<(f64, f64)>,
+    duration_secs: f64,
+    width: u32,
+) -> Option<(u32, u32)> {
+    let (start, end) = loop_secs?;
+    if duration_secs <= 0.0 || width == 0 {
+        return None;
+    }
+    let col = |secs: f64| ((secs / duration_secs).clamp(0.0, 1.0) * width as f64) as u32;
+    Some((col(start), col(end).max(col(start) + 1).min(width)))
 }
 
 fn fingerprint(wave: &Wave) -> u64 {
@@ -304,13 +352,16 @@ fn fingerprint(wave: &Wave) -> u64 {
     h.finish()
 }
 
+/// What the terminal is currently showing: playhead column, warning flash and loop region.
+type Shown = (Option<u32>, bool, Option<(u32, u32)>);
+
 /// Per-deck cache. Rasterises on a new track or size, recomposes when the playhead
 /// crosses into a new pixel column, and otherwise reports that nothing changed.
 #[derive(Default)]
 pub struct PixelWaveform {
     source: Option<(u64, (u32, u32))>,
     bitmaps: Option<WaveformBitmaps>,
-    shown: Option<(Option<u32>, bool)>,
+    shown: Option<Shown>,
     rasterizations: u64,
 }
 
@@ -337,13 +388,13 @@ impl PixelWaveform {
             self.shown = None;
             self.rasterizations += 1;
         }
-        if self.shown == Some((playhead, wave.warning)) {
+        if self.shown == Some((playhead, wave.warning, wave.loop_cols)) {
             return None;
         }
-        self.shown = Some((playhead, wave.warning));
+        self.shown = Some((playhead, wave.warning, wave.loop_cols));
         self.bitmaps
             .as_ref()
-            .map(|b| b.compose_with(playhead, wave.warning, palette))
+            .map(|b| b.compose_with(playhead, wave.warning, wave.loop_cols, palette))
     }
 
     pub fn has_image(&self) -> bool {

@@ -3,7 +3,8 @@
 
 use image::{Rgba, RgbaImage};
 use tui::pixel::{
-    playhead_x, Palette, PixelWaveform, Wave, WaveformBitmaps, WaveformMode, PLAYHEAD_WIDTH,
+    loop_columns, playhead_x, Palette, PixelWaveform, Wave, WaveformBitmaps, WaveformMode,
+    PLAYHEAD_WIDTH,
 };
 
 const W: u32 = 200;
@@ -20,6 +21,7 @@ fn blue(ranges: &[[f32; 2]]) -> Wave<'_> {
         bands: &[],
         mode: WaveformMode::Blue,
         warning: false,
+        loop_cols: None,
     }
 }
 
@@ -134,6 +136,7 @@ fn three_band_image_uses_only_the_three_band_colours_inside() {
         bands: &bands,
         mode: WaveformMode::ThreeBand,
         warning: false,
+        loop_cols: None,
     };
     let b = WaveformBitmaps::rasterize(&wave, 10, H, &p);
     let mut seen = std::collections::HashSet::new();
@@ -162,6 +165,7 @@ fn rgb_image_colours_a_bass_column_red() {
         bands: &bands,
         mode: WaveformMode::Rgb,
         warning: false,
+        loop_cols: None,
     };
     let b = WaveformBitmaps::rasterize(&wave, 10, H, &pal());
     let px = b.normal().get_pixel(5, H / 2);
@@ -179,6 +183,7 @@ fn changing_mode_rasterises_again() {
             bands: &bands,
             mode: WaveformMode::ThreeBand,
             warning: false,
+            loop_cols: None,
         },
         (W, H),
         None,
@@ -190,6 +195,7 @@ fn changing_mode_rasterises_again() {
             bands: &bands,
             mode: WaveformMode::Rgb,
             warning: false,
+            loop_cols: None,
         },
         (W, H),
         None,
@@ -314,7 +320,7 @@ fn no_waveform_means_no_image() {
 fn end_warning_tints_the_unplayed_part_red() {
     let p = pal();
     let b = WaveformBitmaps::rasterize(&blue(&flat(1.0, 64)), W, H, &p);
-    let img = b.compose_with(Some(100), true, &p);
+    let img = b.compose_with(Some(100), true, None, &p);
     let unplayed = img.get_pixel(150, H / 2);
     assert!(
         unplayed[0] > 150 && unplayed[0] > unplayed[2],
@@ -334,4 +340,106 @@ fn toggling_the_warning_sends_a_new_image() {
     };
     assert!(pw.update(&w, (W, H), Some(10), &pal()).is_some());
     assert_eq!(pw.rasterizations(), 1, "recompose only");
+}
+
+#[test]
+fn loop_columns_map_the_loop_onto_the_overview() {
+    assert_eq!(
+        loop_columns(Some((30.0, 60.0)), 120.0, 200),
+        Some((50, 100))
+    );
+    assert_eq!(
+        loop_columns(Some((-5.0, 500.0)), 120.0, 200),
+        Some((0, 200)),
+        "a loop reaching past either end stops at the edge"
+    );
+    assert_eq!(loop_columns(None, 120.0, 200), None);
+    assert_eq!(loop_columns(Some((0.0, 10.0)), 0.0, 200), None, "no track");
+    assert_eq!(loop_columns(Some((0.0, 10.0)), 120.0, 0), None, "no width");
+}
+
+#[test]
+fn a_loop_tints_its_region_and_draws_a_line_at_each_edge() {
+    let p = pal();
+    let b = WaveformBitmaps::rasterize(&blue(&flat(1.0, 64)), W, H, &p);
+    let plain = b.compose_with(None, false, None, &p);
+    let looped = b.compose_with(None, false, Some((50, 100)), &p);
+
+    let y = H / 2;
+    assert_eq!(
+        looped.get_pixel(20, y),
+        plain.get_pixel(20, y),
+        "outside the loop nothing changes"
+    );
+    assert_ne!(
+        looped.get_pixel(70, y),
+        plain.get_pixel(70, y),
+        "inside the loop the waveform is tinted"
+    );
+    let edge = looped.get_pixel(50, y);
+    assert_eq!(edge, &p.loop_region, "the loop in point is a solid line");
+    assert_eq!(
+        looped.get_pixel(99, y),
+        &p.loop_region,
+        "and so is the last column of the loop"
+    );
+    assert_eq!(
+        looped.get_pixel(100, y),
+        plain.get_pixel(100, y),
+        "the column after the loop is outside it"
+    );
+}
+
+#[test]
+fn the_loop_tint_keeps_the_waveform_shape() {
+    let p = pal();
+    let b = WaveformBitmaps::rasterize(&blue(&flat(0.4, 64)), W, H, &p);
+    let looped = b.compose_with(None, false, Some((0, W)), &p);
+    let plain = b.compose_with(None, false, None, &p);
+    for x in [10, 60, 150] {
+        assert_eq!(
+            touched_rows(&looped, x),
+            touched_rows(&plain, x),
+            "the tint colours what is drawn, it does not fill the panel"
+        );
+    }
+}
+
+#[test]
+fn changing_the_loop_sends_a_new_image_without_rasterising_again() {
+    let mut pw = PixelWaveform::default();
+    let r = flat(0.5, 64);
+    pw.update(&blue(&r), (W, H), Some(10), &pal());
+    let looped = Wave {
+        loop_cols: Some((20, 80)),
+        ..blue(&r)
+    };
+    assert!(pw.update(&looped, (W, H), Some(10), &pal()).is_some());
+    assert!(
+        pw.update(&looped, (W, H), Some(10), &pal()).is_none(),
+        "the same loop needs no new image"
+    );
+    assert!(pw.update(&blue(&r), (W, H), Some(10), &pal()).is_some());
+    assert_eq!(pw.rasterizations(), 1, "recompose only");
+}
+
+#[test]
+fn the_loop_still_shows_in_the_part_already_played() {
+    let p = pal();
+    let b = WaveformBitmaps::rasterize(&blue(&flat(1.0, 64)), W, H, &p);
+    // The playhead sits past the loop, so the whole loop is in the dimmed part.
+    let img = b.compose_with(Some(150), false, Some((50, 100)), &p);
+    let y = H / 2;
+    assert_eq!(img.get_pixel(50, y), &p.loop_region, "the in point line");
+    assert_eq!(img.get_pixel(99, y), &p.loop_region, "the out point line");
+    assert_ne!(
+        img.get_pixel(70, y),
+        b.dimmed().get_pixel(70, y),
+        "the region inside keeps its tint under the played dimming"
+    );
+    assert_eq!(
+        img.get_pixel(150, y),
+        &p.playhead,
+        "the playhead stays on top"
+    );
 }
