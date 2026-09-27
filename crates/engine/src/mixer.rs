@@ -98,6 +98,7 @@ pub struct Engine {
     cue_mix: f32,
     scratch: [Vec<f32>; 2],
     peaks: Meters,
+    limiter: crate::dsp::Limiter,
 }
 
 impl Default for Engine {
@@ -128,6 +129,7 @@ impl Engine {
                 vec![0.0; MAX_BLOCK_FRAMES * 2],
                 vec![0.0; MAX_BLOCK_FRAMES * 2],
             ],
+            limiter: crate::dsp::Limiter::new(fs),
         }
     }
 
@@ -187,6 +189,11 @@ impl Engine {
 
     pub fn cue_mix(&self) -> f32 {
         self.cue_mix
+    }
+
+    /// How far the master limiter pulled the loudest moment down since the last call, in dB.
+    pub fn limiter_reduction_db(&mut self) -> f32 {
+        self.limiter.reduction_db()
     }
 
     /// Peaks since the previous call, then reset.
@@ -265,11 +272,15 @@ impl Engine {
             ];
             let (a, b) = (&self.scratch[0][..n], &self.scratch[1][..n]);
             for i in 0..n {
-                let m = a[i] * post[0] + b[i] * post[1];
-                let c = a[i] * pfl[0] + b[i] * pfl[1];
-                m_block[i] = m;
-                self.peaks.master = self.peaks.master.max(m.abs());
-                c_block[i] = c * (1.0 - self.cue_mix) + m * self.cue_mix;
+                m_block[i] = a[i] * post[0] + b[i] * post[1];
+                c_block[i] = a[i] * pfl[0] + b[i] * pfl[1];
+            }
+            // The limiter is the last thing on the master bus, and the cue bus blends in
+            // what the master actually puts out rather than the sum before it.
+            self.limiter.process(m_block);
+            for i in 0..n {
+                self.peaks.master = self.peaks.master.max(m_block[i].abs());
+                c_block[i] = c_block[i] * (1.0 - self.cue_mix) + m_block[i] * self.cue_mix;
             }
         }
     }

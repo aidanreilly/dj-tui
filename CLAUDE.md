@@ -84,6 +84,14 @@ mapping where the UI holds each control. Lights are sent only on change. Mapping
 `mappings/` beside the config file, and `mappings/generic.toml` in the repo is the starting
 point to copy.
 
+## Master limiter
+
+`dsp::Limiter` is the last thing on the master bus, and the cue bus blends in what it puts
+out rather than the raw sum. The gain can never rise above what the current sample allows, so
+the output cannot pass `LIMIT_CEILING` at all; only the recovery is smoothed. Channel meters
+read pre-limiter, the master meter reads after it. A test that sets a level near full scale
+should measure the cue bus, which is pre-fader and ahead of the limiter.
+
 ## Track sidecar
 
 Analysis, the overview waveform, cues and the running loop live in `<file name>.dj-tui.json`

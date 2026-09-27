@@ -78,8 +78,14 @@ fn filter_command_low_passes_the_channel() {
 fn trim_command_raises_level() {
     let (mut h, mut p) = setup(1000.0);
     h.send(Command::SetTrim(A, 6.0)).unwrap();
-    let (m, _) = run(&mut p, 0.3);
-    assert!((m - 0.5 * 1.995).abs() < 0.02, "{m}");
+    // Measured on the cue bus, which is pre-fader and ahead of the master limiter.
+    h.send(Command::SetHeadphoneCue(A, true)).unwrap();
+    let (m, c) = run(&mut p, 0.3);
+    assert!((c - 0.5 * 1.995).abs() < 0.02, "{c}");
+    assert!(
+        (m - engine::dsp::LIMIT_CEILING).abs() < 0.01,
+        "and the master stops at the ceiling: {m}"
+    );
 }
 
 #[test]

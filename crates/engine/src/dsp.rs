@@ -338,6 +338,67 @@ impl DjFilter {
     }
 }
 
+/// Highest sample the master bus may put out, a touch under full scale so the converter
+/// never sees a rounded-up 1.0.
+pub const LIMIT_CEILING: f32 = 0.97;
+/// How quickly the limiter lets go once the loud part has passed.
+const LIMIT_RELEASE_SECS: f32 = 0.15;
+/// How close to unity counts as unity, a hundredth of a decibel.
+const LIMIT_SNAP: f32 = 1e-3;
+
+/// Master bus limiter. The gain never rises above what the current sample allows, so the
+/// output cannot pass the ceiling at all; only the recovery is smoothed, which is what stops
+/// a caught transient pumping the whole mix behind it.
+pub struct Limiter {
+    gain: f32,
+    release: f32,
+    /// Deepest reduction since the last `reduction_db`, for metering.
+    deepest: f32,
+}
+
+impl Limiter {
+    pub fn new(fs: f32) -> Self {
+        Self {
+            gain: 1.0,
+            release: smoothing_coeff(fs, LIMIT_RELEASE_SECS),
+            deepest: 1.0,
+        }
+    }
+
+    pub fn process(&mut self, buf: &mut [f32]) {
+        for frame in buf.as_chunks_mut::<2>().0 {
+            // Both channels take the same gain, so nothing moves across the image.
+            let peak = frame[0].abs().max(frame[1].abs());
+            let allowed = if peak > LIMIT_CEILING {
+                LIMIT_CEILING / peak
+            } else {
+                1.0
+            };
+            self.gain += (1.0 - self.gain) * self.release;
+            // Snap at the top: the release step gets too small for f32 to add a couple of
+            // ten-thousandths from unity, and a limiter that has let go should be exactly
+            // transparent rather than a hundredth of a decibel under it forever.
+            if 1.0 - self.gain < LIMIT_SNAP {
+                self.gain = 1.0;
+            }
+            self.gain = self.gain.min(allowed);
+            self.deepest = self.deepest.min(self.gain);
+            frame[0] *= self.gain;
+            frame[1] *= self.gain;
+        }
+    }
+
+    /// How far the limiter pulled the loudest moment down since the last call, in decibels.
+    pub fn reduction_db(&mut self) -> f32 {
+        let deepest = std::mem::replace(&mut self.deepest, 1.0);
+        if deepest >= 1.0 {
+            0.0
+        } else {
+            -20.0 * deepest.log10()
+        }
+    }
+}
+
 /// Input gain, ±12 dB.
 pub struct Trim {
     target: f32,

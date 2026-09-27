@@ -48,11 +48,11 @@ line. Everything works except the sound.
 ## The screen
 
 ```
-┌ DECK A ─────────────────── 128.00  8A ┐┌ MIXER ──────┐
+┌ DECK A ─────────────────── 128.00  8A ┐┌ MIXER ───────┐
 │ Artist - Title          01:12  -03:48 ││        A   B │
-│ ▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█ ││ TRIM ███ ███ │
+│ ▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█ ││ TRIM ███ ███  │
 │          ⟦        ▲1    ▲2            ││ HI   ███ ███ │
-│ [1][2][ ][ ][ ][ ][ ][ ]  PLAYING  BAR 22.3   LOOP  QUANT
+│ [1][2][ ][ ][ ][ ][ ][ ]  PLAYING   BAR 22.3 LOOP  QUANT
 └───────────────────────────────────────┘│ FX    Echo   │
   PHASE  B ▮▮▮▮▮|▮▮▮▮▮  +0.12 beat       │ WET  ███     │
 ┌ DECK B ───────────────────────────────┐│ PK   ▮▮▮▮▯▯▯ │
@@ -88,7 +88,7 @@ then `u`. Lowercase turns a control down, Shift turns it up.
 ### Transport
 
 | Key | What it does |
-|---|---|
+| --- | --- |
 | `Space` | Play or pause |
 | `c` | Cue. Hold to preview from the cue point, release to snap back |
 | `1`–`8` | Hot cue: jump to it, or set it if the pad is empty |
@@ -106,7 +106,7 @@ recent Alacritty). Elsewhere cue works as a press, and the status line says so.
 ### Loops
 
 | Key | What it does |
-|---|---|
+| --- | --- |
 | `l` | Four-beat loop on and off |
 | `i` / `I` | Mark the loop in point, then close the loop where the playhead is |
 | `[` / `]` | Halve and double the loop, keeping the in point |
@@ -118,7 +118,7 @@ with the track and comes back the next time you load it.
 ### Mixer
 
 | Key | What it does |
-|---|---|
+| --- | --- |
 | `v` / `V` | Channel fader |
 | `←` / `→` | Crossfader, `Shift` snaps it to the end |
 | `r` / `R` | Trim |
@@ -130,7 +130,7 @@ with the track and comes back the next time you load it.
 ### Effects
 
 | Key | What it does |
-|---|---|
+| --- | --- |
 | `f` | Effect on and off |
 | `F` | Next effect: Echo, Flanger, Reverb, Bitcrusher |
 | `9` / `0` | Wet down and up |
@@ -143,7 +143,7 @@ Echo and reverb keep ringing after you switch them off, rather than cutting dead
 ### Everything else
 
 | Key | What it does |
-|---|---|
+| --- | --- |
 | `Tab` | Switch focused deck |
 | `` ` `` | Send the next key to the other deck |
 | `w` | Waveform colour mode: 3-Band, RGB, Blue |
