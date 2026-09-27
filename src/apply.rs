@@ -8,6 +8,7 @@ use engine::dsp::{EqBand, EQ_MAX_DB, TRIM_RANGE_DB};
 use engine::fx::{FxKind, FX_PARAMS};
 use engine::{Command, DeckId, Snapshot};
 use input::{Action, Dir};
+use midi::Control;
 
 /// Step sizes and limits for keyboard controls.
 #[derive(Debug, Clone)]
@@ -162,6 +163,88 @@ fn scale_loop(st: &mut ControlState, snap: &Snapshot, d: DeckId, by: f64) -> Opt
     let (start, _) = snap.decks[i].loop_span?;
     let beat = st.beat_frames[i]?;
     Some(Command::SetLoop(d, Some((start, start + beats * beat))))
+}
+
+/// Put a control at an absolute position from 0 to 1, as a MIDI fader or knob does. The
+/// stepped keyboard path cannot express this: the hardware already knows where it is pointing.
+pub fn set_control(
+    st: &mut ControlState,
+    c: &Controls,
+    control: Control,
+    value: f32,
+) -> Option<Command> {
+    let v = value.clamp(0.0, 1.0);
+    Some(match control {
+        Control::Crossfader => {
+            st.crossfader = v * 2.0 - 1.0;
+            Command::SetCrossfader(st.crossfader)
+        }
+        Control::CueMix => Command::SetCueMix(v),
+        Control::Fader(d) => {
+            st.faders[d.index()] = v;
+            Command::SetChannelFader(d, v)
+        }
+        Control::Tempo(d) => {
+            let rate = 1.0 + (v as f64 * 2.0 - 1.0) * c.tempo_range;
+            st.rates[d.index()] = rate;
+            Command::SetRate(d, rate)
+        }
+        Control::Trim(d) => {
+            let db = (v * 2.0 - 1.0) * TRIM_RANGE_DB;
+            st.strips[d.index()].trim_db = db;
+            Command::SetTrim(d, db)
+        }
+        Control::Eq(d, b) => {
+            let b = band(b);
+            // Below centre runs down to the kill floor, above it up to the maximum boost.
+            let db = if v >= 0.5 {
+                (v - 0.5) * 2.0 * EQ_MAX_DB
+            } else {
+                (0.5 - v) * 2.0 * EQ_FLOOR_DB
+            };
+            st.strips[d.index()].eq_db[b as usize] = db;
+            Command::SetEq(d, b, db)
+        }
+        Control::Filter(d) => {
+            let f = v * 2.0 - 1.0;
+            st.strips[d.index()].filter = f;
+            Command::SetFilter(d, f)
+        }
+        Control::FxWet(d) => {
+            st.fx[d.index()].wet = v;
+            Command::SetFxWet(d, v)
+        }
+        Control::FxParam(d, index) => {
+            let knob = st.fx[d.index()].params.get_mut(index)?;
+            *knob = v;
+            Command::SetFxParam(d, index, v)
+        }
+    })
+}
+
+/// Where the UI has a control, from 0 to 1, which is what soft takeover compares against.
+pub fn control_value(st: &ControlState, c: &Controls, control: Control) -> f32 {
+    match control {
+        Control::Crossfader => (st.crossfader + 1.0) / 2.0,
+        Control::CueMix => 0.5,
+        Control::Fader(d) => st.faders[d.index()],
+        Control::Tempo(d) => {
+            (((st.rates[d.index()] - 1.0) / c.tempo_range + 1.0) / 2.0).clamp(0.0, 1.0) as f32
+        }
+        Control::Trim(d) => (st.strips[d.index()].trim_db / TRIM_RANGE_DB + 1.0) / 2.0,
+        Control::Eq(d, b) => {
+            let db = st.strips[d.index()].eq_db[band(b) as usize];
+            if db >= 0.0 {
+                0.5 + db / EQ_MAX_DB / 2.0
+            } else {
+                0.5 - db / EQ_FLOOR_DB / 2.0
+            }
+        }
+        Control::Filter(d) => (st.strips[d.index()].filter + 1.0) / 2.0,
+        Control::FxWet(d) => st.fx[d.index()].wet,
+        Control::FxParam(d, index) => st.fx[d.index()].params.get(index).copied().unwrap_or(0.0),
+    }
+    .clamp(0.0, 1.0)
 }
 
 pub fn apply(

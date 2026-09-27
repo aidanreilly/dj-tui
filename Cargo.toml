@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/analysis", "crates/backend", "crates/engine", "crates/input", "crates/loader", "crates/tui"]
+members = ["crates/analysis", "crates/backend", "crates/engine", "crates/input", "crates/loader", "crates/midi", "crates/tui"]
 resolver = "3"
 
 [workspace.package]
@@ -22,6 +22,7 @@ tui = { path = "crates/tui" }
 loader = { path = "crates/loader" }
 analysis = { path = "crates/analysis" }
 backend = { path = "crates/backend" }
+midi = { path = "crates/midi" }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 ratatui = "0.30"

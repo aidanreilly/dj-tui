@@ -239,3 +239,71 @@ fn unmapped_keys_do_nothing() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, ch('z')), None);
 }
+
+mod action_names {
+    use engine::DeckId::{A, B};
+    use input::{parse_action, Action, Band, Dir};
+
+    #[test]
+    fn transport_and_cues_read_as_words() {
+        assert_eq!(parse_action("play a"), Some(Action::PlayPause(A)));
+        assert_eq!(parse_action("cue b"), Some(Action::CuePress(B)));
+        assert_eq!(parse_action("cue-release b"), Some(Action::CueRelease(B)));
+        assert_eq!(parse_action("hotcue a 3"), Some(Action::HotCue(A, 2)));
+        assert_eq!(parse_action("hotcue a 9"), None, "only eight pads");
+        assert_eq!(parse_action("hotcue a"), None, "which pad?");
+    }
+
+    #[test]
+    fn stepped_controls_name_their_direction() {
+        assert_eq!(
+            parse_action("tempo a up"),
+            Some(Action::Tempo(A, Dir::Up, false))
+        );
+        assert_eq!(
+            parse_action("tempo a down fine"),
+            Some(Action::Tempo(A, Dir::Down, true))
+        );
+        assert_eq!(
+            parse_action("eq b high up"),
+            Some(Action::Eq(B, Band::High, Dir::Up))
+        );
+        assert_eq!(
+            parse_action("eq b kill low"),
+            Some(Action::EqKill(B, Band::Low))
+        );
+        assert_eq!(
+            parse_action("crossfader up"),
+            Some(Action::Crossfader(Dir::Up, false))
+        );
+        assert_eq!(
+            parse_action("nudge a down"),
+            Some(Action::Nudge(A, Dir::Down))
+        );
+        assert_eq!(
+            parse_action("fx param a 2 up"),
+            Some(Action::FxParam(A, 1, Dir::Up))
+        );
+    }
+
+    #[test]
+    fn the_toggles_need_no_more_than_a_deck() {
+        assert_eq!(parse_action("sync a"), Some(Action::Sync(A)));
+        assert_eq!(parse_action("keylock b"), Some(Action::KeyLock(B)));
+        assert_eq!(parse_action("quantize a"), Some(Action::Quantize(A)));
+        assert_eq!(parse_action("loop a"), Some(Action::LoopToggle(A)));
+        assert_eq!(parse_action("loop-in a"), Some(Action::LoopIn(A)));
+        assert_eq!(parse_action("fx a"), Some(Action::FxToggle(A)));
+        assert_eq!(parse_action("fx-next a"), Some(Action::FxNext(A)));
+        assert_eq!(parse_action("waveform"), Some(Action::CycleWaveformMode));
+    }
+
+    #[test]
+    fn spelling_is_forgiving_but_nonsense_is_rejected() {
+        assert_eq!(parse_action("  PLAY   A  "), Some(Action::PlayPause(A)));
+        assert_eq!(parse_action("play c"), None, "there are two decks");
+        assert_eq!(parse_action("fly a"), None);
+        assert_eq!(parse_action(""), None);
+        assert_eq!(parse_action("play a b"), None, "no trailing rubbish");
+    }
+}

@@ -6,7 +6,7 @@ pub enum Dir {
     Down,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Band {
     High,
     Mid,

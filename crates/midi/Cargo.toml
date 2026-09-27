@@ -1,0 +1,12 @@
+[package]
+name = "midi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+engine = { path = "../engine" }
+input = { path = "../input" }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"

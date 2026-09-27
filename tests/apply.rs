@@ -570,3 +570,94 @@ fn filter_steps_and_returns_exactly_to_centre() {
         matches!(run(&mut st, &s, Action::Filter(A, Dir::Up)), Some(Command::SetFilter(A, v)) if v == 1.0)
     );
 }
+
+mod absolute {
+    use super::*;
+    use dj_tui::apply::set_control;
+    use midi::Control;
+
+    fn set(st: &mut ControlState, control: Control, value: f32) -> Option<Command> {
+        set_control(st, &ctl(), control, value)
+    }
+
+    #[test]
+    fn a_fader_goes_where_it_is_put() {
+        let mut st = ControlState::default();
+        assert!(matches!(
+            set(&mut st, Control::Fader(A), 0.25),
+            Some(Command::SetChannelFader(A, v)) if (v - 0.25).abs() < 1e-6
+        ));
+        assert_eq!(st.faders[0], 0.25, "the UI keeps what it was given");
+    }
+
+    #[test]
+    fn the_crossfader_spans_both_ends() {
+        let mut st = ControlState::default();
+        set(&mut st, Control::Crossfader, 0.0);
+        assert_eq!(st.crossfader, -1.0);
+        set(&mut st, Control::Crossfader, 1.0);
+        assert_eq!(st.crossfader, 1.0);
+        set(&mut st, Control::Crossfader, 0.5);
+        assert_eq!(st.crossfader, 0.0, "the middle is the middle");
+    }
+
+    #[test]
+    fn the_tempo_knob_covers_the_configured_range() {
+        let mut st = ControlState::default();
+        set(&mut st, Control::Tempo(B), 1.0);
+        assert!((st.rates[1] - 1.08).abs() < 1e-6, "{}", st.rates[1]);
+        set(&mut st, Control::Tempo(B), 0.0);
+        assert!((st.rates[1] - 0.92).abs() < 1e-6, "{}", st.rates[1]);
+        set(&mut st, Control::Tempo(B), 0.5);
+        assert!((st.rates[1] - 1.0).abs() < 1e-6, "centred is normal speed");
+    }
+
+    #[test]
+    fn eq_trim_and_filter_land_on_their_own_ranges() {
+        let mut st = ControlState::default();
+        set(&mut st, Control::Eq(A, Band::High), 1.0);
+        assert_eq!(st.strips[0].eq_db[2], 6.0, "the EQ tops out at +6 dB");
+        set(&mut st, Control::Eq(A, Band::High), 0.0);
+        assert!(st.strips[0].eq_db[2] <= -26.0, "and bottoms out at a kill");
+        set(&mut st, Control::Trim(A), 1.0);
+        assert_eq!(st.strips[0].trim_db, 12.0);
+        set(&mut st, Control::Filter(A), 0.5);
+        assert_eq!(st.strips[0].filter, 0.0, "centred is no filter");
+        set(&mut st, Control::Filter(A), 0.0);
+        assert_eq!(st.strips[0].filter, -1.0);
+    }
+
+    #[test]
+    fn the_effect_knobs_are_reachable_too() {
+        let mut st = ControlState::default();
+        set(&mut st, Control::FxWet(A), 0.75);
+        assert_eq!(st.fx[0].wet, 0.75);
+        set(&mut st, Control::FxParam(A, 1), 0.2);
+        assert_eq!(st.fx[0].params[1], 0.2);
+        assert!(
+            set(&mut st, Control::FxParam(A, 7), 0.5).is_none(),
+            "no such knob"
+        );
+    }
+
+    #[test]
+    fn values_outside_the_range_are_pulled_back_in() {
+        let mut st = ControlState::default();
+        set(&mut st, Control::Fader(A), 4.0);
+        assert_eq!(st.faders[0], 1.0);
+        set(&mut st, Control::Fader(A), -4.0);
+        assert_eq!(st.faders[0], 0.0);
+    }
+
+    #[test]
+    fn what_the_ui_holds_reads_back_for_soft_takeover() {
+        use dj_tui::apply::control_value;
+        let mut st = ControlState::default();
+        set(&mut st, Control::Fader(A), 0.3);
+        set(&mut st, Control::Crossfader, 0.25);
+        set(&mut st, Control::Tempo(A), 0.75);
+        assert!((control_value(&st, &ctl(), Control::Fader(A)) - 0.3).abs() < 1e-6);
+        assert!((control_value(&st, &ctl(), Control::Crossfader) - 0.25).abs() < 1e-6);
+        assert!((control_value(&st, &ctl(), Control::Tempo(A)) - 0.75).abs() < 1e-6);
+    }
+}
