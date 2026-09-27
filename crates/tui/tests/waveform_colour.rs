@@ -94,16 +94,21 @@ fn without_band_data_every_mode_still_draws() {
 }
 
 #[test]
-fn downsampling_bands_keeps_each_bands_peak() {
+fn downsampling_bands_averages_like_the_waveform_does() {
+    // Averaging matches `downsample_ranges`, so band heights stay on the waveform's scale.
+    // Taking the peak instead let a single hi-hat turn a whole wide column white.
     let src = [
         [0.1, 0.9, 0.0],
         [0.7, 0.2, 0.3],
         [0.0, 0.0, 1.0],
         [0.2, 0.1, 0.0],
     ];
-    assert_eq!(
-        downsample_bands(&src, 2),
-        vec![[0.7, 0.9, 0.3], [0.2, 0.1, 1.0]]
-    );
+    let got = downsample_bands(&src, 2);
+    let want = [[0.4, 0.55, 0.15], [0.1, 0.05, 0.5]];
+    for (g, w) in got.iter().zip(want) {
+        for i in 0..3 {
+            assert!((g[i] - w[i]).abs() < 1e-6, "{got:?}");
+        }
+    }
     assert_eq!(downsample_bands(&[], 3), vec![[0.0; 3]; 3]);
 }

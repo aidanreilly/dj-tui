@@ -119,7 +119,8 @@ pub fn downsample_peaks(src: &[f32], n: usize) -> Vec<f32> {
         .collect()
 }
 
-/// Reduce per-band peaks to `n` columns, keeping each band's peak in every bucket.
+/// Reduce per-band peaks to `n` columns by averaging each bucket, the same way
+/// [`downsample_ranges`] does, so band heights stay comparable with the waveform.
 pub fn downsample_bands(src: &[[f32; 3]], n: usize) -> Vec<[f32; 3]> {
     if src.is_empty() {
         return vec![[0.0; 3]; n];
@@ -129,8 +130,9 @@ pub fn downsample_bands(src: &[[f32; 3]], n: usize) -> Vec<[f32; 3]> {
         .map(|j| {
             let start = (j * len / n).min(len - 1);
             let end = ((j + 1) * len / n).clamp(start + 1, len);
+            let n = (end - start) as f32;
             src[start..end].iter().fold([0.0f32; 3], |acc, b| {
-                [acc[0].max(b[0]), acc[1].max(b[1]), acc[2].max(b[2])]
+                [acc[0] + b[0] / n, acc[1] + b[1] / n, acc[2] + b[2] / n]
             })
         })
         .collect()

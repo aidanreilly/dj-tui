@@ -149,3 +149,22 @@ fn glyph_waveform_uses_mode_colours() {
         other => panic!("expected an RGB colour, got {other:?}"),
     }
 }
+
+#[test]
+fn a_trace_of_treble_does_not_paint_a_vocal_white_in_3_band() {
+    use ratatui::style::Color;
+    let pal = tui::pixel::Palette::default();
+    let mut view = loaded_view(true);
+    view.waveform = vec![[-0.8, 0.8]; 200];
+    view.bands = vec![[0.02, 0.8, 0.03]; 200];
+    view.waveform_mode = tui::pixel::WaveformMode::ThreeBand;
+    view.position_secs = 0.0;
+    let buf = render(&view, 80, 13);
+    let cell = &buf[(40, 2 + tui::WAVEFORM_ROWS / 2)];
+    let [r, g, b, _] = pal.three_band[1].0;
+    assert_eq!(
+        cell.fg,
+        Color::Rgb(r, g, b),
+        "centre of a vocal should be amber"
+    );
+}

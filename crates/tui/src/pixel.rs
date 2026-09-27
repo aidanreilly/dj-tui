@@ -202,9 +202,10 @@ impl WaveformBitmaps {
             // Keep very quiet passages visible: at least one pixel, centred.
             let half = (reach * mid).max(0.5);
             span(&mut normal, x, mid - half, mid + half, |y| {
-                // Sample colour at the row's inner edge so partial edge rows keep the
-                // outermost band's colour.
-                let d = ((y as f32 + 0.5 - mid).abs() - 0.5).max(0.0) / mid;
+                // Sample colour at the row's centre; the caller clamps to the reach so partial
+                // edge rows keep the outermost band's colour. Sampling the inner edge instead
+                // made any trace of treble paint the centre rows white.
+                let d = (y as f32 + 0.5 - mid).abs() / mid;
                 colour_at(wave.mode, peak, b, d.min(reach), palette)
                     .unwrap_or(palette.three_band[0])
             });

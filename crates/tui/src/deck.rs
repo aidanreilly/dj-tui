@@ -128,8 +128,8 @@ impl Widget for DeckPanel<'_> {
             if y >= inner.bottom() {
                 break;
             }
-            // Colour each cell from its inner edge, like the pixel renderer does per row.
-            let d = ((i as f32 + 0.5 - half_rows).abs() - 0.5).max(0.0) / half_rows;
+            // Colour each cell from its centre, like the pixel renderer does per row.
+            let d = (i as f32 + 0.5 - half_rows).abs() / half_rows;
             for (col, glyph) in row.chars().enumerate().filter(|(_, glyph)| *glyph != ' ') {
                 let peak = columns[col][1];
                 let b = bands[col];
