@@ -86,10 +86,11 @@ Keys act on the **focused deck**, which `Tab` switches. The deck and channel tha
 focus are greyed out, so a glance tells you where the next key will land. Lowercase turns a
 control down, Shift turns it up.
 
-The keyboard has two modes. **Mix mode** is where it starts and where everything below lives.
-**Browser mode**, on `b` or `/`, hands the whole keyboard to the track list so letters type a
-search; `Esc` hands it back in one press. The browser panel lights its border and lists its own
-commands while it holds the keyboard.
+The keyboard has three modes, and the status line names whichever one holds it. **Mix mode** is
+where it starts and where everything below lives. **Browser mode**, on `b` or `/`, hands the
+whole keyboard to the track list so letters type a search; the panel lights its border and
+lists its own commands while it holds the keyboard. **The device screen**, on `Ctrl+D`, takes
+the keyboard the same way. `Esc` returns from either in one press.
 
 ### Transport
 
@@ -395,7 +396,9 @@ state = "playing a"
 
 Buttons and encoders name an action the way the keyboard produces it: `play a`, `cue b`,
 `hotcue a 3`, `loop a`, `fx-next b`, `eq a low up`, `eq a swap low`, `crossfader fade up`,
-`fader b fade down`, `filter a sweep up`, `fade-length double`, `cancel-fades`. Add `hold = true` to a cue button so it
+`fader b fade down`, `filter a sweep up`, `fade-length double`, `cancel-fades`. An encoder
+leaves the direction off and dj-tui appends `up` or `down` as it turns, so an encoder writes
+`crossfader fade`, `fader a fade`, `filter b sweep` or `fade-length`. Add `hold = true` to a cue button so it
 previews while held. Knobs name a control they set outright: `fader a`, `crossfader`,
 `eq b mid`, `filter a`, `tempo a`, `fx wet a`, `fx param a 1`. Lights follow `playing a`,
 `cued a`, `loop a`, `fx a`, `sync a`, `keylock a`, `quantize a` or `hotcue a 1`.

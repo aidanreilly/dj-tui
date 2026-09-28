@@ -76,6 +76,8 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["crossfader", "fade", way] => Action::CrossfaderFade(dir(way)?),
         ["fade-length", "halve"] => Action::FadeLength(Dir::Down),
         ["fade-length", "double"] => Action::FadeLength(Dir::Up),
+        // An encoder's action gets `up` or `down` appended, so it needs the general form too.
+        ["fade-length", way] => Action::FadeLength(dir(way)?),
         ["cancel-fades"] => Action::CancelFades,
         ["browser"] => Action::BrowserEnter,
         ["browser-clear"] => Action::BrowserClear,

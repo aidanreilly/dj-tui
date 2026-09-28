@@ -6,13 +6,6 @@ use engine::DeckId;
 
 impl Keymap {
     pub(super) fn mix(&mut self, e: KeyEvent) -> Option<Action> {
-        if let Some(deck) = self.pending_seek.take() {
-            return match e.key {
-                Key::Char(c @ '0'..='9') => Some(Action::SeekTenth(deck, c as u8 - b'0')),
-                _ => None,
-            };
-        }
-
         let target = self.focused;
 
         if e.ctrl {
@@ -77,6 +70,11 @@ impl Keymap {
             }
             '9' | '0' => FxWet(d, dir(c == '0')),
             CUE_KEY => {
+                // Auto-repeat arrives as more presses. Pressing cue again while it is held
+                // would re-seek to the cue point over and over.
+                if self.cue_held.is_some() {
+                    return None;
+                }
                 self.cue_held = Some(d);
                 CuePress(d)
             }

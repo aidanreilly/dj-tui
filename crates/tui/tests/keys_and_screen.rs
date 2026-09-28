@@ -60,13 +60,18 @@ fn space_is_its_own_key_and_backtab_is_tab() {
 }
 
 #[test]
-fn key_repeat_is_ignored_so_holds_do_not_retrigger() {
-    let e = convert_key(ct(
+fn auto_repeat_arrives_as_a_press_so_holding_a_key_keeps_stepping() {
+    // Terminals that report event types send Repeat while a key is held. Dropping it meant
+    // holding an arrow moved the fader exactly one step on the terminals dj-tui recommends.
+    let e = convert_key(ct(KeyCode::Down, KeyModifiers::NONE, KeyEventKind::Repeat));
+    assert_eq!(e, Some(KeyEvent::press(Key::Down)));
+    // Cue is held rather than stepped, and the keymap is what keeps it from retriggering.
+    let c = convert_key(ct(
         KeyCode::Char('c'),
         KeyModifiers::NONE,
         KeyEventKind::Repeat,
     ));
-    assert_eq!(e, None);
+    assert_eq!(c, Some(KeyEvent::press(Key::Char('c'))));
 }
 
 #[test]

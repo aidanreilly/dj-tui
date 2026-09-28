@@ -594,3 +594,35 @@ mod modes {
         assert_eq!(press(&mut km, Key::Space), Some(Action::PlayPause(A)));
     }
 }
+
+mod review_fixes {
+    use super::*;
+
+    #[test]
+    fn tab_does_not_leave_the_seek_prefix_armed_on_the_deck_you_left() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('g'));
+        press(&mut km, Key::Tab);
+        // Before this was fixed, the digit fired a seek on deck A while focus sat on B.
+        let got = press(&mut km, ch('3'));
+        assert!(
+            !matches!(got, Some(Action::SeekTenth(..))),
+            "the prefix leaked across Tab: {got:?}"
+        );
+    }
+
+    #[test]
+    fn holding_the_cue_key_presses_it_once() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('c')), Some(Action::CuePress(A)));
+        // Auto-repeat arrives as more presses; the deck must not re-seek to the cue point.
+        assert_eq!(press(&mut km, ch('c')), None);
+        assert_eq!(press(&mut km, ch('c')), None);
+        assert_eq!(
+            km.handle(KeyEvent::release(ch('c'))),
+            Some(Action::CueRelease(A))
+        );
+        // And it arms again after the release.
+        assert_eq!(press(&mut km, ch('c')), Some(Action::CuePress(A)));
+    }
+}

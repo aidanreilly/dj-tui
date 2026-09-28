@@ -371,3 +371,19 @@ mod devices {
         assert!(app.view(String::new()).devices.is_some(), "and it stays up");
     }
 }
+
+#[test]
+fn leaving_browser_mode_gives_the_mixer_back_even_from_full_screen() {
+    let (mut app, _p) = setup();
+    press(&mut app, Key::Char('b'));
+    app.on_key(KeyEvent::press(Key::Char('f')).alt());
+    assert!(app.view(String::new()).browser.fullscreen);
+
+    press(&mut app, Key::Esc);
+    let view = app.view(String::new());
+    assert!(!view.browser.active);
+    assert!(
+        !view.browser.fullscreen,
+        "a full-screen list in mix mode hides the decks and the mixer with no key to undo it"
+    );
+}

@@ -252,6 +252,7 @@ state = "fx b"
 # input = "note 0 44"
 # action = "cancel-fades"              # what Esc does
 #
+# An encoder's action leaves the direction off: dj-tui appends "up" or "down" as it turns.
 # [[encoders]]
 # input = "cc 0 40"
-# action = "fade-length double"        # the other way sends "fade-length halve"
+# action = "fade-length"               # one way doubles it, the other halves it

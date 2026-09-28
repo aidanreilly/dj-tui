@@ -546,9 +546,17 @@ impl App {
             Action::BrowserMove(dir) => self.browser.move_selection(dir),
             Action::BrowserSort(reverse) => self.browser.sort_by(reverse),
             Action::BrowserFullscreen => self.browser.fullscreen = !self.browser.fullscreen,
-            Action::Search => self.browser.clear_query(),
-            // Entering and leaving are the keymap's business; the app only draws the result.
-            Action::BrowserEnter | Action::BrowserLeave => {}
+            Action::Search => {
+                self.browser.clear_query();
+                self.keymap.set_mode(input::Mode::Browser);
+            }
+            Action::BrowserEnter => self.keymap.set_mode(input::Mode::Browser),
+            Action::BrowserLeave => {
+                // Full screen is a browser-mode affordance; leaving it behind would strand
+                // the person in mix mode with no mixer on screen and no key to bring it back.
+                self.browser.fullscreen = false;
+                self.keymap.set_mode(input::Mode::Mix);
+            }
             Action::BrowserType(c) => self.browser.type_char(c),
             Action::BrowserBackspace => self.browser.backspace(),
             Action::BrowserClear => self.browser.clear_query(),
@@ -556,8 +564,14 @@ impl App {
                 input::Dir::Up => -1,
                 input::Dir::Down => 1,
             }),
-            Action::DeviceChoose => self.choose_device(),
-            Action::DeviceClose => self.device_selected = None,
+            Action::DeviceChoose => {
+                self.choose_device();
+                self.keymap.set_mode(input::Mode::Mix);
+            }
+            Action::DeviceClose => {
+                self.device_selected = None;
+                self.keymap.set_mode(input::Mode::Mix);
+            }
             Action::AnalyseLibrary => self.start_analysis(),
             Action::CrossfaderFade(dir) => {
                 let to = end_of_travel(dir);
@@ -605,6 +619,7 @@ impl App {
                     .iter()
                     .position(|(name, _)| *name == self.current_device);
                 self.device_selected = Some(current.unwrap_or(0));
+                self.keymap.set_mode(input::Mode::Devices);
             }
             _ => {
                 if let Some(control) = manual_control(action) {

@@ -707,3 +707,57 @@ mod fades {
         assert_eq!(app.view(String::new()).mixer.strips[0].filter, 0.0);
     }
 }
+
+/// A controller reaches `App::on_action` directly, never through the keymap, so any action
+/// that changes which screen is up has to move the mode from here too.
+mod from_a_controller {
+    use super::*;
+    use input::Action;
+
+    #[test]
+    fn a_mapped_browser_button_gives_the_browser_the_keyboard() {
+        let (mut app, _p) = setup();
+        assert!(!app.view(String::new()).browser.active);
+        app.on_action(Action::BrowserEnter);
+        assert!(
+            app.view(String::new()).browser.active,
+            "the button did nothing"
+        );
+        app.on_action(Action::BrowserLeave);
+        assert!(!app.view(String::new()).browser.active);
+    }
+
+    #[test]
+    fn a_mapped_search_button_opens_the_browser_too() {
+        let (mut app, _p) = setup();
+        app.on_action(Action::Search);
+        assert!(app.view(String::new()).browser.active);
+    }
+
+    #[test]
+    fn a_mapped_devices_button_takes_the_keys_off_the_mixer() {
+        let (mut app, mut p) = setup();
+        app.set_devices(
+            vec![
+                ("hw:0,0".into(), "Built-in".into()),
+                ("default".into(), "Default".into()),
+            ],
+            "default".into(),
+            String::new(),
+        );
+        app.on_action(Action::Devices);
+        assert!(
+            app.view(String::new()).devices.is_some(),
+            "the screen is up"
+        );
+
+        // With the overlay covering the screen, an arrow must move the list rather than a
+        // fader nobody can see.
+        let before = app.view(String::new()).mixer.faders[0];
+        app.on_key(KeyEvent::press(Key::Up));
+        process(&mut p, 16);
+        let view = app.view(String::new());
+        assert_eq!(view.devices.as_ref().unwrap().selected, 0, "the list moved");
+        assert_eq!(view.mixer.faders[0], before, "and the fader did not");
+    }
+}

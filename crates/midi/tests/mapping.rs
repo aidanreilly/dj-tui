@@ -320,3 +320,68 @@ fn learn_mode_turns_the_next_message_into_a_line_for_the_file() {
         "[[buttons]]\ninput = \"note 0 48\"\naction = \"play a\"\n"
     );
 }
+
+/// Every action the keyboard's new gestures produce, as a mapping file names them. An encoder
+/// gets its direction appended, so its action has to parse with `up` and `down` on the end.
+mod new_gestures {
+    use super::*;
+
+    const HEAD: &str = "name = \"Probe\"\nports = [\"Probe\"]\n";
+
+    #[test]
+    fn the_shipped_examples_parse_as_buttons() {
+        for name in [
+            "crossfader fade up",
+            "crossfader fade down",
+            "crossfader fade centre",
+            "crossfader centre",
+            "fader a fade down",
+            "fader b fade up",
+            "filter a sweep up",
+            "filter a sweep centre",
+            "filter b centre",
+            "eq a swap low",
+            "cancel-fades",
+            "fade-length halve",
+            "fade-length double",
+        ] {
+            let toml = format!("{HEAD}[[buttons]]\ninput = \"note 0 11\"\naction = \"{name}\"\n");
+            Mapping::from_toml(&toml).unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
+    }
+
+    #[test]
+    fn the_fade_length_encoder_parses_with_a_direction_appended() {
+        let m = Mapping::from_toml(&format!(
+            "{HEAD}[[encoders]]\ninput = \"cc 0 40\"\naction = \"fade-length\"\n"
+        ))
+        .expect("an encoder turns the fade length both ways");
+        let mut m = m;
+        let turn = |m: &mut Mapping, value: u8| {
+            m.handle(Message::Cc {
+                channel: 0,
+                controller: 40,
+                value,
+            })
+        };
+        // Two's complement around 64, as the rest of this crate reads encoders.
+        assert_eq!(
+            turn(&mut m, 1),
+            Outcome::Act(Action::FadeLength(Dir::Up)),
+            "one way doubles it"
+        );
+        assert_eq!(
+            turn(&mut m, 127),
+            Outcome::Act(Action::FadeLength(Dir::Down)),
+            "the other halves it"
+        );
+    }
+
+    #[test]
+    fn the_sweep_and_fade_gestures_work_as_encoders_too() {
+        for name in ["crossfader fade", "fader a fade", "filter b sweep"] {
+            let toml = format!("{HEAD}[[encoders]]\ninput = \"cc 0 41\"\naction = \"{name}\"\n");
+            Mapping::from_toml(&toml).unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
+    }
+}

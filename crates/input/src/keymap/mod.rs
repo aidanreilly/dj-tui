@@ -104,6 +104,16 @@ impl Keymap {
         self.mode
     }
 
+    /// Put the keyboard in a mode from outside. A controller reaches the app's actions
+    /// directly and never comes through `handle`, so without this the mode and whatever is
+    /// on screen drift apart: a mapped `devices` button would raise the overlay while the
+    /// arrows carried on moving faders behind it.
+    pub fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        // A mode change abandons any half-typed prefix.
+        self.pending_seek = None;
+    }
+
     pub fn handle(&mut self, e: KeyEvent) -> Option<Action> {
         // Cue is the only held key, and its release belongs to the deck that was pressed.
         if e.release {
@@ -111,6 +121,15 @@ impl Keymap {
                 Key::Char(c) if c.to_ascii_lowercase() == CUE_KEY => {
                     self.cue_held.take().map(Action::CueRelease)
                 }
+                _ => None,
+            };
+        }
+
+        // The seek prefix is consumed before anything else, including Tab. Leaving it armed
+        // across a focus change fired the seek on the deck you had just left.
+        if let Some(deck) = self.pending_seek.take() {
+            return match e.key {
+                Key::Char(c @ '0'..='9') => Some(Action::SeekTenth(deck, c as u8 - b'0')),
                 _ => None,
             };
         }
