@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct MixerView {
     /// -1 is fully deck A, 1 is fully deck B.
     pub crossfader: f32,
@@ -18,6 +18,26 @@ pub struct MixerView {
     pub strips: [StripView; 2],
     /// Master bus peak, linear.
     pub master_meter: f32,
+    /// How long an automated fade runs, in beats.
+    pub fade_beats: f64,
+    /// Where a running crossfader fade is heading, -1 to 1.
+    pub crossfader_fade_target: Option<f32>,
+}
+
+impl Default for MixerView {
+    fn default() -> Self {
+        Self {
+            crossfader: 0.0,
+            faders: [1.0; 2],
+            headphone_cue: [false; 2],
+            cue_mix: 0.5,
+            strips: Default::default(),
+            master_meter: 0.0,
+            // Zero would draw "fade 0" on any view built without one.
+            fade_beats: 8.0,
+            crossfader_fade_target: None,
+        }
+    }
 }
 
 /// One channel's controls above the fader.
@@ -36,6 +56,8 @@ pub struct StripView {
     pub fx_name: &'static str,
     pub fx_on: bool,
     pub fx_wet: f32,
+    /// Where a running fader fade is heading, 0 to 1.
+    pub fade_target: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,10 +136,21 @@ fn dot(on: bool) -> char {
     }
 }
 
-fn crossfader_bar(x: f32) -> String {
-    let pos = (((x.clamp(-1.0, 1.0) + 1.0) / 2.0) * (XFADE_WIDTH - 1) as f32).round() as usize;
+/// Which cell of a bar of `width` a -1..1 position lands in.
+fn bipolar_cell(x: f32, width: usize) -> usize {
+    (((x.clamp(-1.0, 1.0) + 1.0) / 2.0) * (width - 1) as f32).round() as usize
+}
+
+fn crossfader_bar(x: f32, fade_target: Option<f32>) -> String {
+    let pos = bipolar_cell(x, XFADE_WIDTH);
+    let target = fade_target.map(|t| bipolar_cell(t, XFADE_WIDTH));
     (0..XFADE_WIDTH)
-        .map(|i| if i == pos { '╋' } else { '━' })
+        .map(|i| match i {
+            i if i == pos => '╋',
+            // A hollow marker at the far end of a running fade, so the move is visible.
+            i if Some(i) == target => '╎',
+            _ => '━',
+        })
         .collect()
 }
 
@@ -125,6 +158,19 @@ fn fader_bar(v: f32) -> String {
     let filled = (v.clamp(0.0, 1.0) * FADER_WIDTH as f32).round() as usize;
     (0..FADER_WIDTH)
         .map(|i| if i < filled { '█' } else { '▯' })
+        .collect()
+}
+
+/// A level bar with a marker where a running fade is heading.
+fn fading_level(v: f32, fade_target: Option<f32>) -> String {
+    let bar = level_bar(v);
+    let Some(target) = fade_target else {
+        return bar;
+    };
+    let cell = (target.clamp(0.0, 1.0) * (BAR - 1) as f32).round() as usize;
+    bar.chars()
+        .enumerate()
+        .map(|(i, c)| if i == cell { '╎' } else { c })
         .collect()
 }
 
@@ -252,7 +298,11 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
             row("WET", level_bar(a.fx_wet), level_bar(b.fx_wet)),
             Line::from(""),
             meter_row("PK", a.meter, b.meter),
-            row("VOL", level_bar(m.faders[0]), level_bar(m.faders[1])),
+            row(
+                "VOL",
+                fading_level(m.faders[0], a.fade_target),
+                fading_level(m.faders[1], b.fade_target),
+            ),
             Line::from(format!(
                 "{:<5}{:^w$} {:^w$}",
                 "CUE",
@@ -262,7 +312,11 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
             )),
             row("MIX", level_bar(m.cue_mix), String::new()),
             Line::from(""),
-            Line::from(format!("A {} B", crossfader_bar(m.crossfader))),
+            Line::from(format!(
+                "A {} B   fade {}",
+                crossfader_bar(m.crossfader, m.crossfader_fade_target),
+                m.fade_beats
+            )),
             {
                 let mut spans = vec![Span::raw(format!("{:<5}", "MSTR"))];
                 spans.extend(meter_spans(m.master_meter));
@@ -281,7 +335,7 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 fader_bar(m.faders[1]),
                 dot(m.headphone_cue[0]),
                 dot(m.headphone_cue[1]),
-                crossfader_bar(m.crossfader)
+                crossfader_bar(m.crossfader, m.crossfader_fade_target)
             )),
             Line::from(pk),
         ]

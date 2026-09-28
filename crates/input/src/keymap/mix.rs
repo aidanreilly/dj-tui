@@ -26,14 +26,19 @@ impl Keymap {
             Key::Space => Some(Action::PlayPause(target)),
             Key::Enter => Some(Action::Load(target)),
             // Horizontal arrows are the horizontal fader, vertical arrows the vertical one
-            // belonging to whichever deck has focus. Shift goes hard to an end.
+            // belonging to whichever deck has focus. Shift goes hard to an end, Alt fades.
+            Key::Left if e.alt => Some(Action::CrossfaderFade(Dir::Down)),
+            Key::Right if e.alt => Some(Action::CrossfaderFade(Dir::Up)),
             Key::Left => Some(Action::Crossfader(Dir::Down, e.shift)),
             Key::Right => Some(Action::Crossfader(Dir::Up, e.shift)),
+            Key::Up if e.alt => Some(Action::FaderFade(target, Dir::Up)),
+            Key::Down if e.alt => Some(Action::FaderFade(target, Dir::Down)),
             Key::Up if e.shift => Some(Action::FaderEnd(target, Dir::Up)),
             Key::Down if e.shift => Some(Action::FaderEnd(target, Dir::Down)),
             Key::Up => Some(Action::Fader(target, Dir::Up)),
             Key::Down => Some(Action::Fader(target, Dir::Down)),
-            Key::Esc | Key::Backspace | Key::Tab => None,
+            Key::Esc => Some(Action::CancelFades),
+            Key::Backspace | Key::Tab => None,
             Key::Char(c) => self.char_action(c, e.alt, target),
         }
     }
@@ -98,9 +103,20 @@ impl Keymap {
             'm' => HeadphoneCue(d),
             'h' | 'H' => CueMix(dir(c == 'H')),
             'r' | 'R' => Trim(d, dir(c == 'R')),
-            'o' | 'O' => Filter(d, dir(c == 'O')),
+            // Alt on a continuous control's key means do it slowly.
+            'o' | 'O' => {
+                if alt {
+                    FilterSweep(d, dir(c == 'O'))
+                } else {
+                    Filter(d, dir(c == 'O'))
+                }
+            }
             'x' => CrossfaderCentre,
+            'X' => CrossfaderFadeCentre,
             'v' => FilterCentre(d),
+            'V' => FilterSweepCentre(d),
+            '{' => FadeLength(Dir::Down),
+            '}' => FadeLength(Dir::Up),
             '/' => Search,
             'b' => BrowserEnter,
             'w' | 'W' => CycleWaveformMode,

@@ -2,6 +2,7 @@
 //! metadata and the background loader. Everything here runs on the UI thread.
 
 use crate::apply::{apply_many, ControlState, Controls};
+use crate::automation::{Automation, Curve};
 use crate::config::Config;
 use crate::view::{screen_view, DeckMeta};
 use engine::{Command, DeckId, EngineHandle, Snapshot};
@@ -48,6 +49,12 @@ pub struct App {
     device_selected: Option<usize>,
     /// A device the user picked, for the caller to act on.
     chosen_device: Option<String>,
+    /// Fades running on their own, and the length they run for.
+    automation: Automation,
+    /// Values a fade produced this frame, reused so the tick allocates nothing.
+    fade_values: Vec<(midi::Control, f32)>,
+    /// When the last frame was, for the fade tick's delta.
+    last_frame: std::time::Instant,
 }
 
 struct Persisted {
@@ -84,6 +91,9 @@ impl App {
             device_note: String::new(),
             device_selected: None,
             chosen_device: None,
+            automation: Automation::new(config.mixer.fade_beats),
+            fade_values: Vec::with_capacity(8),
+            last_frame: std::time::Instant::now(),
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -100,6 +110,8 @@ impl App {
 
     /// Queue a file for background loading onto `deck`.
     pub fn load_path(&mut self, deck: DeckId, path: PathBuf) {
+        // A fade aimed at a track being replaced is aimed at nothing.
+        self.automation.cancel_deck(deck);
         self.metas[deck.index()].loading = true;
         self.message = format!("Loading {} on deck {}…", path.display(), deck_letter(deck));
         self.loader.request(deck, path);
@@ -125,6 +137,9 @@ impl App {
 
     /// Call once per UI frame: frees replaced tracks and picks up finished loads.
     pub fn tick(&mut self) {
+        let dt = self.last_frame.elapsed().as_secs_f64();
+        self.last_frame = std::time::Instant::now();
+        self.tick_fades(dt);
         self.handle.collect_garbage();
         self.save_changed_cues();
         while let Some(note) = self.loader.try_recv_note() {
@@ -467,6 +482,8 @@ impl App {
 
     /// Put a control where a MIDI fader or knob says it is.
     pub fn set_control(&mut self, control: midi::Control, value: f32) {
+        // A hand on the hardware always wins.
+        self.automation.cancel(control);
         if let Some(cmd) =
             crate::apply::set_control(&mut self.state, &self.controls, control, value)
         {
@@ -542,6 +559,45 @@ impl App {
             Action::DeviceChoose => self.choose_device(),
             Action::DeviceClose => self.device_selected = None,
             Action::AnalyseLibrary => self.start_analysis(),
+            Action::CrossfaderFade(dir) => {
+                let to = end_of_travel(dir);
+                let focused = self.keymap.focused();
+                self.start_fade(midi::Control::Crossfader, to, Curve::Position, focused);
+            }
+            Action::CrossfaderFadeCentre => {
+                let focused = self.keymap.focused();
+                self.start_fade(midi::Control::Crossfader, 0.5, Curve::Position, focused);
+            }
+            Action::FaderFade(d, dir) => {
+                self.start_fade(
+                    midi::Control::Fader(d),
+                    end_of_travel(dir),
+                    Curve::Decibel,
+                    d,
+                );
+            }
+            Action::FilterSweep(d, dir) => {
+                self.start_fade(
+                    midi::Control::Filter(d),
+                    end_of_travel(dir),
+                    Curve::Position,
+                    d,
+                );
+            }
+            Action::FilterSweepCentre(d) => {
+                self.start_fade(midi::Control::Filter(d), 0.5, Curve::Position, d);
+            }
+            Action::FadeLength(dir) => {
+                self.automation.scale_length(dir);
+                self.message = format!("Fade length: {} beats", self.automation.fade_beats());
+            }
+            Action::CancelFades => {
+                // Silent when there is nothing to stop, so Esc is safe to lean on.
+                if self.automation.running() > 0 {
+                    self.automation.cancel_all();
+                    self.message = "Fades stopped".into();
+                }
+            }
             Action::Devices => {
                 // Open on the device in use, so Enter on it changes nothing.
                 let current = self
@@ -551,6 +607,9 @@ impl App {
                 self.device_selected = Some(current.unwrap_or(0));
             }
             _ => {
+                if let Some(control) = manual_control(action) {
+                    self.automation.cancel(control);
+                }
                 let snap = self.handle.snapshot();
                 // A band swap moves two channels, so both commands go in the same frame and
                 // land in the same audio callback.
@@ -567,6 +626,42 @@ impl App {
             }
         }
         false
+    }
+
+    /// Advance running fades by `dt` seconds and send what they reached. Called once a frame,
+    /// and directly from tests.
+    pub fn tick_fades(&mut self, dt: f64) {
+        let mut values = std::mem::take(&mut self.fade_values);
+        values.clear();
+        self.automation.tick(dt, &mut values);
+        for &(control, v) in &values {
+            if let Some(cmd) =
+                crate::apply::set_control(&mut self.state, &self.controls, control, v)
+            {
+                self.send(cmd);
+            }
+        }
+        self.fade_values = values;
+    }
+
+    /// Start a fade on `control` toward `to`, taking its length from `deck`'s beat grid.
+    /// Targets are in the 0-to-1 space `Control` uses, so the crossfader's centre is 0.5.
+    fn start_fade(&mut self, control: midi::Control, to: f32, curve: Curve, deck: DeckId) {
+        let i = deck.index();
+        let secs = self.automation.secs_for(
+            self.state.beat_frames[i],
+            self.state.rates[i],
+            self.sample_rate,
+        );
+        let from = crate::apply::control_value(&self.state, &self.controls, control);
+        self.automation.start(control, from, to, secs, curve);
+        if self.automation.target(control).is_some() {
+            self.message = format!(
+                "{} over {} beats",
+                fade_label(control, to),
+                self.automation.fade_beats()
+            );
+        }
     }
 
     /// Seek a loaded deck to a normalized position from 0.0 (start) to 1.0 (end).
@@ -658,9 +753,19 @@ impl App {
                 fx_name: fx.kind.name(),
                 fx_on: fx.on,
                 fx_wet: fx.wet,
+                fade_target: self.automation.target(midi::Control::Fader(if i == 0 {
+                    DeckId::A
+                } else {
+                    DeckId::B
+                })),
             };
         }
         v.mixer.master_meter = self.meters[2];
+        v.mixer.fade_beats = self.automation.fade_beats();
+        v.mixer.crossfader_fade_target = self
+            .automation
+            .target(midi::Control::Crossfader)
+            .map(|t| t * 2.0 - 1.0);
         v.mixer.cue_mix = self.state.cue_mix;
         v
     }
@@ -669,6 +774,53 @@ impl App {
         if self.handle.send(cmd).is_err() {
             self.message = "Audio engine is not keeping up (command queue full)".into();
         }
+    }
+}
+
+/// Where a direction points on a control's own travel, in the 0-to-1 `Control` space.
+fn end_of_travel(dir: input::Dir) -> f32 {
+    match dir {
+        input::Dir::Up => 1.0,
+        input::Dir::Down => 0.0,
+    }
+}
+
+/// The control a stepped or slammed action moves, so its fade can let go of it.
+fn manual_control(action: Action) -> Option<midi::Control> {
+    Some(match action {
+        Action::Crossfader(..) | Action::CrossfaderCentre => midi::Control::Crossfader,
+        Action::Fader(d, _) | Action::FaderEnd(d, _) => midi::Control::Fader(d),
+        Action::Filter(d, _) | Action::FilterCentre(d) => midi::Control::Filter(d),
+        Action::Trim(d, _) => midi::Control::Trim(d),
+        Action::Tempo(d, ..) => midi::Control::Tempo(d),
+        Action::CueMix(_) => midi::Control::CueMix,
+        Action::FxWet(d, _) => midi::Control::FxWet(d),
+        Action::FxParam(d, i, _) => midi::Control::FxParam(d, i),
+        _ => return None,
+    })
+}
+
+/// What a starting fade says for itself. A fade cannot be seen beginning, only heard.
+fn fade_label(control: midi::Control, to: f32) -> String {
+    match control {
+        midi::Control::Crossfader => match to {
+            t if t > 0.75 => "Crossfader to B".into(),
+            t if t < 0.25 => "Crossfader to A".into(),
+            _ => "Crossfader to the middle".into(),
+        },
+        midi::Control::Fader(d) => {
+            let way = if to > 0.5 { "up" } else { "down" };
+            format!("Deck {} fader {way}", deck_letter(d))
+        }
+        midi::Control::Filter(d) => {
+            let way = match to {
+                t if t > 0.75 => "to high-pass",
+                t if t < 0.25 => "to low-pass",
+                _ => "back to the middle",
+            };
+            format!("Deck {} filter {way}", deck_letter(d))
+        }
+        _ => "Fade".into(),
     }
 }
 

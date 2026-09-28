@@ -1,5 +1,6 @@
 //! `~/.config/dj-tui/config.toml`. Every field is optional; unknown keys are an error.
 
+use crate::automation::{MAX_FADE_BEATS, MIN_FADE_BEATS};
 use engine::CrossfaderCurve;
 use serde::{Deserialize, Deserializer};
 use std::path::PathBuf;
@@ -169,11 +170,22 @@ impl Default for Deck {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Mixer {
     #[serde(deserialize_with = "curve")]
     pub crossfader_curve: CrossfaderCurve,
+    /// How long an automated fade runs, in beats.
+    pub fade_beats: f64,
+}
+
+impl Default for Mixer {
+    fn default() -> Self {
+        Self {
+            crossfader_curve: CrossfaderCurve::default(),
+            fade_beats: 8.0,
+        }
+    }
 }
 
 fn curve<'de, D: Deserializer<'de>>(d: D) -> Result<CrossfaderCurve, D::Error> {
@@ -228,6 +240,12 @@ impl Config {
             return Err(format!(
                 "deck.tempo_range must be one of {TEMPO_RANGES:?}, got {}",
                 self.deck.tempo_range
+            ));
+        }
+        let beats = self.mixer.fade_beats;
+        if !(MIN_FADE_BEATS..=MAX_FADE_BEATS).contains(&beats) {
+            return Err(format!(
+                "mixer.fade_beats must be from {MIN_FADE_BEATS} to {MAX_FADE_BEATS} beats, got {beats}"
             ));
         }
         let b = self.audio.buffer_frames;

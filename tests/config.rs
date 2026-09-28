@@ -203,3 +203,26 @@ fn saving_a_device_adds_what_the_file_is_missing() {
     let empty = with_device("", "default");
     assert_eq!(Config::from_toml(&empty).unwrap().audio.device, "default");
 }
+
+#[test]
+fn a_fade_length_outside_the_range_is_rejected_by_name() {
+    let err = Config::from_toml("[mixer]\nfade_beats = 0\n").unwrap_err();
+    assert!(err.contains("fade_beats"), "got {err}");
+    assert!(
+        err.contains("2") && err.contains("64"),
+        "names the range: {err}"
+    );
+    assert!(Config::from_toml("[mixer]\nfade_beats = 500\n").is_err());
+    assert_eq!(
+        Config::from_toml("[mixer]\nfade_beats = 16\n")
+            .unwrap()
+            .mixer
+            .fade_beats,
+        16.0
+    );
+}
+
+#[test]
+fn the_fade_length_defaults_to_eight_beats() {
+    assert_eq!(Config::default().mixer.fade_beats, 8.0);
+}

@@ -598,3 +598,112 @@ fn cues_set_on_a_deck_are_saved_beside_the_file_and_come_back() {
     let cue = app.snapshot().decks[0].hot_cues[1].expect("hot cue 2 restored");
     assert!((cue - 4800.0).abs() < 1.0, "{cue}");
 }
+
+mod fades {
+    use super::*;
+
+    /// Advance the fades and let the engine apply what they sent. `mixer.crossfader` and
+    /// `mixer.faders` come off the engine snapshot, so without the processor running they
+    /// never move and an assertion on them cannot fail.
+    fn settle(app: &mut App, p: &mut EngineProcessor, dt: f64) {
+        app.tick_fades(dt);
+        process(p, 16);
+    }
+
+    #[test]
+    fn a_crossfader_fade_moves_it_over_several_frames_and_lands_on_the_end() {
+        let (mut app, mut p) = setup();
+        app.on_key(KeyEvent::press(Key::Char('x')));
+        process(&mut p, 16);
+        assert_eq!(app.view(String::new()).mixer.crossfader, 0.0);
+        app.on_key(KeyEvent::press(Key::Right).alt());
+        assert_eq!(
+            app.view(String::new()).mixer.crossfader_fade_target,
+            Some(1.0),
+            "the marker shows where it is going"
+        );
+
+        settle(&mut app, &mut p, 0.1);
+        let part = app.view(String::new()).mixer.crossfader;
+        assert!(part > 0.0 && part < 1.0, "on its way: {part}");
+
+        settle(&mut app, &mut p, 60.0);
+        let v = app.view(String::new());
+        assert_eq!(v.mixer.crossfader, 1.0);
+        assert_eq!(v.mixer.crossfader_fade_target, None, "it finished");
+    }
+
+    #[test]
+    fn a_manual_move_takes_the_control_back_from_its_fade() {
+        let (mut app, mut p) = setup();
+        app.on_key(KeyEvent::press(Key::Right).alt());
+        settle(&mut app, &mut p, 0.05);
+        app.on_key(KeyEvent::press(Key::Left));
+        process(&mut p, 16);
+        let before = app.view(String::new()).mixer.crossfader;
+        assert!(before < 0.0, "the step moved it left: {before}");
+        settle(&mut app, &mut p, 10.0);
+        assert_eq!(app.view(String::new()).mixer.crossfader, before);
+    }
+
+    #[test]
+    fn a_midi_knob_takes_the_control_back_from_its_fade() {
+        let (mut app, mut p) = setup();
+        app.on_key(KeyEvent::press(Key::Right).alt());
+        settle(&mut app, &mut p, 0.05);
+        app.set_control(midi::Control::Crossfader, 0.25);
+        settle(&mut app, &mut p, 10.0);
+        let v = app.view(String::new()).mixer.crossfader;
+        assert!((v - -0.5).abs() < 1e-5, "the knob won: {v}");
+    }
+
+    /// Review Focus 4.
+    #[test]
+    fn esc_with_nothing_running_does_nothing() {
+        let (mut app, mut p) = setup();
+        let before = app.view(String::new()).mixer.crossfader;
+        app.on_key(KeyEvent::press(Key::Esc));
+        settle(&mut app, &mut p, 1.0);
+        assert_eq!(app.view(String::new()).mixer.crossfader, before);
+        assert_eq!(app.message(), "", "and says nothing about it");
+    }
+
+    #[test]
+    fn esc_stops_every_fade_where_it_stands() {
+        let (mut app, mut p) = setup();
+        app.on_key(KeyEvent::press(Key::Right).alt());
+        app.on_key(KeyEvent::press(Key::Down).alt());
+        settle(&mut app, &mut p, 0.1);
+        app.on_key(KeyEvent::press(Key::Esc));
+        let held = app.view(String::new());
+        assert!(held.mixer.crossfader > 0.0, "the crossfader had moved");
+        assert!(held.mixer.faders[0] < 1.0, "and so had the fader");
+        settle(&mut app, &mut p, 10.0);
+        let after = app.view(String::new());
+        assert_eq!(after.mixer.crossfader, held.mixer.crossfader);
+        assert_eq!(after.mixer.faders[0], held.mixer.faders[0]);
+        assert!(app.message().contains("Fades"), "{}", app.message());
+    }
+
+    #[test]
+    fn the_fade_length_is_on_screen_and_scales_with_the_braces() {
+        let (mut app, _p) = setup();
+        let start = app.view(String::new()).mixer.fade_beats;
+        assert_eq!(start, 8.0);
+        app.on_key(KeyEvent::press(Key::Char('}')));
+        assert_eq!(app.view(String::new()).mixer.fade_beats, 16.0);
+        app.on_key(KeyEvent::press(Key::Char('{')));
+        assert_eq!(app.view(String::new()).mixer.fade_beats, 8.0);
+    }
+
+    #[test]
+    fn a_filter_sweep_runs_and_v_brings_it_back() {
+        let (mut app, mut p) = setup();
+        app.on_key(KeyEvent::press(Key::Char('O')).alt());
+        settle(&mut app, &mut p, 60.0);
+        assert!((app.view(String::new()).mixer.strips[0].filter - 1.0).abs() < 1e-6);
+        app.on_key(KeyEvent::press(Key::Char('V')));
+        settle(&mut app, &mut p, 60.0);
+        assert_eq!(app.view(String::new()).mixer.strips[0].filter, 0.0);
+    }
+}

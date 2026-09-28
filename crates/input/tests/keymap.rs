@@ -204,6 +204,48 @@ fn the_browser_no_longer_moves_from_mix_mode() {
 }
 
 #[test]
+fn alt_on_a_continuous_control_fades_it() {
+    let mut km = Keymap::new();
+    let alt = |km: &mut Keymap, k: Key| km.handle(KeyEvent::press(k).alt());
+    assert_eq!(
+        alt(&mut km, Key::Left),
+        Some(Action::CrossfaderFade(Dir::Down))
+    );
+    assert_eq!(
+        alt(&mut km, Key::Right),
+        Some(Action::CrossfaderFade(Dir::Up))
+    );
+    assert_eq!(alt(&mut km, Key::Up), Some(Action::FaderFade(A, Dir::Up)));
+    assert_eq!(
+        alt(&mut km, Key::Down),
+        Some(Action::FaderFade(A, Dir::Down))
+    );
+    assert_eq!(
+        km.handle(KeyEvent::press(ch('o')).alt()),
+        Some(Action::FilterSweep(A, Dir::Down))
+    );
+    assert_eq!(
+        km.handle(KeyEvent::press(ch('O')).alt()),
+        Some(Action::FilterSweep(A, Dir::Up))
+    );
+}
+
+#[test]
+fn the_capitals_of_the_centre_keys_fade_to_centre() {
+    let mut km = Keymap::new();
+    assert_eq!(press(&mut km, ch('X')), Some(Action::CrossfaderFadeCentre));
+    assert_eq!(press(&mut km, ch('V')), Some(Action::FilterSweepCentre(A)));
+}
+
+#[test]
+fn braces_scale_the_fade_length_and_esc_cancels() {
+    let mut km = Keymap::new();
+    assert_eq!(press(&mut km, ch('{')), Some(Action::FadeLength(Dir::Down)));
+    assert_eq!(press(&mut km, ch('}')), Some(Action::FadeLength(Dir::Up)));
+    assert_eq!(press(&mut km, Key::Esc), Some(Action::CancelFades));
+}
+
+#[test]
 fn deck_toggles_and_loops() {
     let mut km = Keymap::new();
     let d: DeckId = A;
@@ -341,6 +383,33 @@ mod action_names {
             parse_action("eq a swap low"),
             Some(Action::EqSwap(A, Band::Low))
         );
+        assert_eq!(
+            parse_action("crossfader fade up"),
+            Some(Action::CrossfaderFade(Dir::Up))
+        );
+        assert_eq!(
+            parse_action("crossfader fade centre"),
+            Some(Action::CrossfaderFadeCentre)
+        );
+        assert_eq!(
+            parse_action("fader a fade down"),
+            Some(Action::FaderFade(A, Dir::Down))
+        );
+        assert_eq!(
+            parse_action("filter b sweep up"),
+            Some(Action::FilterSweep(B, Dir::Up))
+        );
+        assert_eq!(
+            parse_action("filter b sweep centre"),
+            Some(Action::FilterSweepCentre(B))
+        );
+        assert_eq!(
+            parse_action("fade-length double"),
+            Some(Action::FadeLength(Dir::Up))
+        );
+        assert_eq!(parse_action("cancel-fades"), Some(Action::CancelFades));
+        assert_eq!(parse_action("browser"), Some(Action::BrowserEnter));
+        assert_eq!(parse_action("browser-clear"), Some(Action::BrowserClear));
         // The general forms still reach their own arms.
         assert_eq!(
             parse_action("filter a up"),

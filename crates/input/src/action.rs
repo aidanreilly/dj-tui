@@ -53,6 +53,18 @@ pub enum Action {
     /// Put a bipolar control back at neutral.
     FilterCentre(DeckId),
     CrossfaderCentre,
+    /// Fade the crossfader to an end over the fade length.
+    CrossfaderFade(Dir),
+    CrossfaderFadeCentre,
+    /// Fade a channel fader to full or to silence.
+    FaderFade(DeckId, Dir),
+    /// Sweep the filter to an end.
+    FilterSweep(DeckId, Dir),
+    FilterSweepCentre(DeckId),
+    /// Halve or double the shared fade length.
+    FadeLength(Dir),
+    /// Stop every running fade where it stands.
+    CancelFades,
     HeadphoneCue(DeckId),
     /// Blend the headphones between the cue bus and the master.
     CueMix(Dir),
