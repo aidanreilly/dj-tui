@@ -300,7 +300,7 @@ fn phase_meter_shows_the_offset_between_decks() {
     };
     let none = render_phase(None);
     assert!(
-        none.contains("PHASE") && none.contains("no beat grid"),
+        none.contains("PHASE") && none.contains("both decks running"),
         "{none}"
     );
     let centred = render_phase(Some(0.0));

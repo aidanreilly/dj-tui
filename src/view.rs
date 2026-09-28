@@ -87,15 +87,15 @@ pub fn screen_view(
         help: false,
         browser: Default::default(),
         devices: None,
+        // Both decks have to be running for an offset between them to mean anything. A deck
+        // that has run out keeps its track and its grid, with its position pinned at the end,
+        // so comparing against it would sweep a whole beat of offset every beat and read as
+        // the sync coming apart.
         phase: match (&metas[0].grid, &metas[1].grid) {
-            (Some(a), Some(b))
-                if snap.decks[0].track_frames > 0 && snap.decks[1].track_frames > 0 =>
-            {
-                Some(phase_offset(
-                    a.phase(snap.decks[0].position / rate),
-                    b.phase(snap.decks[1].position / rate),
-                ))
-            }
+            (Some(a), Some(b)) if snap.decks.iter().all(running) => Some(phase_offset(
+                a.phase(snap.decks[0].position / rate),
+                b.phase(snap.decks[1].position / rate),
+            )),
             _ => None,
         },
     }
@@ -116,6 +116,12 @@ pub fn end_warning(
         && threshold_secs > 0
         && remaining_secs < threshold_secs as f64
         && (elapsed_secs / WARNING_FLASH_SECS).fract() < 0.5
+}
+
+/// Whether a deck is a usable timing reference: it has a track and is playing it. A stopped
+/// deck is still a grid, but it is no longer a clock.
+fn running(deck: &engine::DeckSnapshot) -> bool {
+    deck.track_frames > 0 && deck.playing
 }
 
 /// Deck B's beat phase minus deck A's, wrapped into -0.5..0.5 beats.

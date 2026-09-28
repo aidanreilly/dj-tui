@@ -470,7 +470,13 @@ pub fn apply(
                 st.rates[i] = want;
                 return Some(Command::SetRate(d, want));
             }
-            // Tempo already matches, so this press lines the beats up.
+            // Tempo already matches, so this press lines the beats up. That needs the other
+            // deck to be running: one whose track has ended keeps its grid with its position
+            // pinned at the end, and lining up against a frozen phase jerks this deck to an
+            // arbitrary point. With nothing to follow, this deck is its own reference.
+            if !snap.decks[other].playing {
+                return None;
+            }
             let phase = |deck: usize, beat: f64| {
                 ((snap.decks[deck].position - st.first_beat_frames[deck]) / beat).rem_euclid(1.0)
             };

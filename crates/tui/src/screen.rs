@@ -401,7 +401,7 @@ const PHASE_WIDTH: usize = 33;
 fn render_phase(f: &mut Frame, area: Rect, phase: Option<f64>) {
     let line = match phase {
         None => Line::from(Span::styled(
-            " PHASE  no beat grid on both decks",
+            " PHASE  needs both decks running with a beat grid",
             Style::new().add_modifier(Modifier::DIM),
         )),
         Some(p) => {

@@ -447,8 +447,10 @@ fn sync_matches_the_other_decks_tempo() {
 #[test]
 fn sync_lines_the_beats_up_after_the_tempo_matches() {
     let (mut st, mut s) = two_decks();
-    // Deck B is a quarter of a beat past its downbeat, deck A is on one.
+    // Deck B is a quarter of a beat past its downbeat, deck A is on one. B is the reference,
+    // so it is running: a stopped deck has no phase to line up with.
     s.decks[1].position = 22_500.0 / 4.0;
+    s.decks[1].playing = true;
     s.decks[0].position = 48_000.0;
     run(&mut st, &s, Action::Sync(A));
     // The second press, with tempo already matched, moves the playhead into phase.
@@ -826,4 +828,64 @@ fn a_swap_overrides_whatever_the_kills_were_set_to() {
         kills(&cmds),
         vec![(B, EqBand::Mid, false), (A, EqBand::Mid, true)]
     );
+}
+
+/// A deck that has run out is still a grid but no longer a clock: its position sits pinned at
+/// the end. Lining the beats up against it would jerk the playhead to match a frozen phase.
+mod sync_against_a_stopped_deck {
+    use super::*;
+
+    /// Both decks analysed at the same tempo, A stopped at the end of its track, B playing.
+    fn state_and_snapshot() -> (ControlState, Snapshot) {
+        let st = ControlState {
+            beat_frames: [Some(24_000.0); 2],
+            first_beat_frames: [0.0; 2],
+            ..Default::default()
+        };
+        let mut s = Snapshot::default();
+        for d in s.decks.iter_mut() {
+            d.track_frames = 480_000;
+        }
+        s.decks[0].position = 480_000.0;
+        s.decks[0].playing = false;
+        s.decks[1].position = 6_000.0;
+        s.decks[1].playing = true;
+        (st, s)
+    }
+
+    #[test]
+    fn matching_tempo_against_a_stopped_deck_still_works() {
+        // Its BPM and its tempo fader are both known whether it is running or not, and
+        // matching the beat length it was playing at means running at the same rate.
+        let (mut st, s) = state_and_snapshot();
+        st.rates[0] = 1.04;
+        let cmd = run(&mut st, &s, Action::Sync(B));
+        assert!(
+            matches!(cmd, Some(Command::SetRate(B, r)) if (r - 1.04).abs() < 1e-6),
+            "got {cmd:?}"
+        );
+    }
+
+    #[test]
+    fn lining_the_beats_up_against_a_stopped_deck_does_nothing() {
+        let (mut st, s) = state_and_snapshot();
+        // Tempo already matches, so this press would be the phase alignment.
+        let cmd = run(&mut st, &s, Action::Sync(B));
+        assert!(
+            cmd.is_none(),
+            "a stopped deck has no phase to line up with, got {cmd:?}"
+        );
+    }
+
+    #[test]
+    fn lining_the_beats_up_against_a_running_deck_still_seeks() {
+        let (mut st, mut s) = state_and_snapshot();
+        s.decks[0].playing = true;
+        s.decks[0].position = 1_000.0;
+        let cmd = run(&mut st, &s, Action::Sync(B));
+        assert!(
+            matches!(cmd, Some(Command::Seek(B, _))),
+            "two running decks still line up, got {cmd:?}"
+        );
+    }
 }

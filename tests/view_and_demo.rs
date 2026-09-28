@@ -88,3 +88,70 @@ fn null_clock_carries_fractional_frames() {
     }
     assert_eq!(h.snapshot().decks[0].position, 10.0);
 }
+
+/// A deck whose track has run out keeps its track loaded and its position pinned at the end,
+/// so it is still a grid but no longer a clock. Comparing a playing deck against a frozen one
+/// sweeps a full beat of offset every beat, which reads as the sync glitching.
+mod a_stopped_deck_is_not_a_timing_reference {
+    use super::*;
+    use analysis::tempo::BeatGrid;
+
+    fn grid() -> Option<BeatGrid> {
+        // 120 BPM at the 1000 Hz rate these view tests use.
+        Some(BeatGrid {
+            bpm: 120.0,
+            first_beat_secs: 0.0,
+        })
+    }
+
+    fn metas() -> [DeckMeta; 2] {
+        [
+            DeckMeta {
+                grid: grid(),
+                ..Default::default()
+            },
+            DeckMeta {
+                grid: grid(),
+                ..Default::default()
+            },
+        ]
+    }
+
+    /// Two decks both playing is the case the meter is for, and it still works.
+    #[test]
+    fn two_playing_decks_still_report_an_offset() {
+        let mut snap = Snapshot::default();
+        for d in snap.decks.iter_mut() {
+            d.track_frames = 10_000;
+            d.playing = true;
+        }
+        snap.decks[0].position = 1000.0;
+        snap.decks[1].position = 1125.0;
+        let v = screen_view(&snap, 1000, DeckId::A, &metas(), String::new());
+        assert!(v.phase.is_some(), "both playing, so there is an offset");
+    }
+
+    #[test]
+    fn the_meter_goes_quiet_when_the_reference_deck_has_stopped() {
+        let mut snap = Snapshot::default();
+        for d in snap.decks.iter_mut() {
+            d.track_frames = 10_000;
+        }
+        // Deck A has run out: pinned at the end, no longer playing.
+        snap.decks[0].position = 10_000.0;
+        snap.decks[0].playing = false;
+        snap.decks[1].playing = true;
+
+        // Deck B carries on. Against a frozen A the offset would sweep with it.
+        snap.decks[1].position = 1000.0;
+        let first = screen_view(&snap, 1000, DeckId::A, &metas(), String::new()).phase;
+        snap.decks[1].position = 1125.0;
+        let later = screen_view(&snap, 1000, DeckId::A, &metas(), String::new()).phase;
+
+        assert_eq!(
+            first, None,
+            "a stopped deck is not something to be in phase with"
+        );
+        assert_eq!(first, later, "and so the meter does not sweep");
+    }
+}

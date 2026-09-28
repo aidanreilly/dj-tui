@@ -350,7 +350,13 @@ impl App {
     fn note_sync_key(&mut self, action: Action, cmd: Option<&Command>) {
         let Action::Sync(d) = action else { return };
         let letter = deck_letter(d);
+        let snap = self.handle.snapshot();
+        let other = &snap.decks[1 - d.index()];
         self.message = match cmd {
+            // With nothing running to follow, this deck keeps its own time.
+            None if other.track_frames > 0 && !other.playing => {
+                format!("Deck {letter} is the only one running, so it sets the time")
+            }
             None => format!("Deck {letter} needs a beat grid on both decks to sync"),
             Some(Command::SetRate(_, _)) => {
                 let bpm = self.metas[d.index()]
