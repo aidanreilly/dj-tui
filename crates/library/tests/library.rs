@@ -62,6 +62,26 @@ fn what_the_sidecar_knows_fills_the_columns() {
     assert!(entry.analysed(), "it has been through analysis");
 }
 
+#[test]
+fn a_track_whose_tempo_came_back_empty_is_still_waiting_for_analysis() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("Tape Transfer.wav");
+    touch(&audio);
+    let sidecar = r#"{"format":"dj-tui track data","version":1,
+            "audio":{"file_size":16,"fingerprint":"0000000000000000"},
+            "analysis":{"bpm":null,"first_beat_secs":null,"key":"8A","key_name":"A minor"},
+            "waveform":{"points":0,"ranges":[],"bands":[]},
+            "track":{"title":"Tape Transfer","artist":"Synthetic","duration_secs":312.0}}"#;
+    std::fs::write(loader::sidecar::sidecar_path(&audio), sidecar).unwrap();
+
+    let entry = &scan(&[dir.path().to_path_buf()])[0];
+    assert_eq!(entry.key(), Key::from_camelot("8A"), "the key was found");
+    assert!(
+        !entry.analysed(),
+        "no tempo, so a batch run should pick it up again"
+    );
+}
+
 /// name, BPM, Camelot key, length.
 type Spec<'a> = (&'a str, Option<f64>, Option<&'a str>, Option<f64>);
 

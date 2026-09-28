@@ -63,8 +63,19 @@ impl std::fmt::Debug for LoadedTrack {
     }
 }
 
-/// Decode `path` into a stereo track at `session_rate`.
+/// Decode `path` into a stereo track at `session_rate`, taking whatever analysis is saved
+/// beside the file.
 pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadError> {
+    load(path, session_rate, false)
+}
+
+/// The same for a batch run, which reads a file again when the saved analysis has no tempo
+/// in it. Those are the ones a better detector can still rescue.
+pub fn analyse_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadError> {
+    load(path, session_rate, true)
+}
+
+fn load(path: &Path, session_rate: u32, retry_empty: bool) -> Result<LoadedTrack, LoadError> {
     let decoded = decode::decode(path)?;
     let [l, r] = if decoded.sample_rate == session_rate {
         decoded.channels
@@ -78,7 +89,8 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
     let cues = saved.as_ref().map(|s| s.cues.clone()).unwrap_or_default();
     let reusable = saved
         .and_then(|s| s.analysis)
-        .filter(|a| a.waveform.len() == ENVELOPE_POINTS && a.bands.len() == ENVELOPE_POINTS);
+        .filter(|a| a.waveform.len() == ENVELOPE_POINTS && a.bands.len() == ENVELOPE_POINTS)
+        .filter(|a| a.grid.is_some() || !retry_empty);
     let from_sidecar = reusable.is_some();
     let stored = match reusable {
         Some(a) => a,
@@ -278,7 +290,9 @@ impl Loader {
                         }
                         Request::Analyse(path) => {
                             // The decoded audio is dropped; the sidecar is the point.
-                            let error = load_file(&path, session_rate).err().map(|e| e.to_string());
+                            let error = analyse_file(&path, session_rate)
+                                .err()
+                                .map(|e| e.to_string());
                             if analysed_tx.send(Analysed { path, error }).is_err() {
                                 break;
                             }

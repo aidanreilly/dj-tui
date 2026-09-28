@@ -29,6 +29,27 @@ fn music(dir: &Path, names: &[&str]) {
     }
 }
 
+/// Music with a beat in it, for the tests that run analysis: a track whose tempo never
+/// came back is not counted as analysed.
+fn beat_music(dir: &Path, names: &[&str]) {
+    let beat = 60.0 / 128.0;
+    let mono: Vec<f32> = (0..RATE as usize * 6)
+        .map(|i| {
+            let tb = (i as f32 / RATE as f32) % beat;
+            if tb < 0.02 {
+                (-tb / 0.004).exp() * (std::f32::consts::TAU * 1500.0 * tb).sin()
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    for name in names {
+        let path = dir.join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        write_wav(&path, &stereo(&mono), 2, RATE, Fmt::Float32);
+    }
+}
+
 fn press(app: &mut App, key: Key) {
     app.on_key(KeyEvent::press(key));
 }
@@ -209,9 +230,9 @@ fn a_track_that_would_mix_with_the_playing_deck_is_marked() {
 }
 
 #[test]
-fn a_analyses_everything_in_the_list_that_has_no_sidecar_yet() {
+fn a_analyses_everything_in_the_list_that_has_no_analysis_yet() {
     let dir = tempfile::tempdir().unwrap();
-    music(dir.path(), &["One.wav", "Two.wav"]);
+    beat_music(dir.path(), &["One.wav", "Two.wav"]);
     let (mut app, mut p) = setup();
     app.scan_library(&[dir.path().to_path_buf()]);
     assert!(
@@ -253,9 +274,9 @@ fn a_analyses_everything_in_the_list_that_has_no_sidecar_yet() {
 }
 
 #[test]
-fn analysis_leaves_tracks_that_already_have_a_sidecar_alone() {
+fn analysis_leaves_tracks_that_already_have_a_tempo_alone() {
     let dir = tempfile::tempdir().unwrap();
-    music(dir.path(), &["One.wav"]);
+    beat_music(dir.path(), &["One.wav"]);
     let (mut app, mut p) = setup();
     app.scan_library(&[dir.path().to_path_buf()]);
     press(&mut app, Key::Char('A'));

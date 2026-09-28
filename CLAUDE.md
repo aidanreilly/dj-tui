@@ -119,8 +119,13 @@ While the search prompt is open `App::on_key` takes the keyboard before the keym
 so letters are letters. Playlists are m3u. Key highlighting compares each row against the key
 of whichever deck is playing, deck A first.
 
-`A` analyses everything with no sidecar yet, one file at a time through the loader thread so
+`A` analyses everything with no tempo yet, one file at a time through the loader thread so
 the machine stays usable, with progress in the panel title. Pressing it again stops the run.
+A track counts as analysed once its sidecar holds a grid, so a file the detector could not
+read last time is picked up again: `loader::analyse_file` is the batch entry point and it
+ignores a saved analysis with no grid, which is how a better detector reaches a library that
+has already been scanned. A deck load still takes the sidecar as it stands. The cost is that
+a track with no beat in it is read again on every run.
 
 ## Master limiter
 
@@ -141,6 +146,17 @@ of a stored field changes. Cue edits are saved from a background thread, never f
 thread.
 
 ## Detector accuracy
+
+A candidate tempo is scored with the comb of its own line, its eighths and its sixteenths,
+each weaker than the last. A beat has all three under it and a cross rhythm has only its own,
+which is what stops a five-against-four acid pattern reading as 150 BPM over a 120 BPM track.
+The search runs inside the configured range, so half and double time fold there rather than
+through a list of multipliers.
+
+Tempo is read in thirty-second windows and the median wins. A whole-file sum only holds for a
+tempo that never moves, and a tape transfer that loses a beat and a half across a side smears
+it away entirely. Windows that sit more than three percent from the median mean the track has
+no one tempo, and it gets no grid at all.
 
 `analysis::eval` scores tempo and key against reference annotations, and
 `cargo run --release --example giantsteps -- <dataset dir>` runs it over a dataset, reading

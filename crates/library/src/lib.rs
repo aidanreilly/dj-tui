@@ -39,13 +39,16 @@ impl Entry {
             Some(artist) => format!("{artist} - {title}"),
             None => title,
         };
+        let bpm = analysis.and_then(|a| a.grid.map(|g| g.bpm));
         Entry {
             path: path.to_path_buf(),
             display,
-            bpm: analysis.and_then(|a| a.grid.map(|g| g.bpm)),
+            bpm,
             key: analysis.and_then(|a| a.key),
             duration_secs: info.and_then(|i| i.duration_secs),
-            analysed: analysis.is_some(),
+            // A sidecar with no tempo in it is worth another run: the file may be one the
+            // detector could not read the first time round.
+            analysed: bpm.is_some(),
         }
     }
 

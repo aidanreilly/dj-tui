@@ -99,6 +99,28 @@ fn second_load_reuses_the_saved_analysis() {
 }
 
 #[test]
+fn a_batch_run_tries_a_saved_analysis_with_no_tempo_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = track(&dir);
+    load_file(&audio, RATE).unwrap();
+    // What the detector leaves behind when it cannot read a tempo.
+    let mut j = json(&audio);
+    j["analysis"]["bpm"] = Value::Null;
+    j["analysis"]["first_beat_secs"] = Value::Null;
+    std::fs::write(sidecar_path(&audio), j.to_string()).unwrap();
+
+    let deck = load_file(&audio, RATE).unwrap();
+    assert!(deck.from_sidecar, "a deck load takes the sidecar as it is");
+    assert!(deck.grid.is_none());
+
+    let again = loader::analyse_file(&audio, RATE).unwrap();
+    assert!(!again.from_sidecar, "a batch run reads the audio again");
+    let bpm = again.grid.unwrap().bpm;
+    assert!((bpm - 128.0).abs() < 0.1, "{bpm}");
+    assert!((json(&audio)["analysis"]["bpm"].as_f64().unwrap() - 128.0).abs() < 0.1);
+}
+
+#[test]
 fn saved_waveform_round_trips_closely() {
     let dir = tempfile::tempdir().unwrap();
     let audio = track(&dir);
