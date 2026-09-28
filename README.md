@@ -49,7 +49,8 @@ line. Everything works except the sound.
 
 ## The screen
 
-<img width="800" alt="image" src="https://github.com/user-attachments/assets/fc9006b7-06a6-4223-9d6c-2e9c84868794" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/84e15cdb-4f35-42f5-9a28-d0e770f7c255" />
+
 
 
 Each deck shows its title, BPM at the current tempo fader setting, musical key in Camelot
