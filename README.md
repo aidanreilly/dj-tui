@@ -47,22 +47,8 @@ line. Everything works except the sound.
 
 ## The screen
 
-```
-┌ DECK A ─────────────────── 128.00  8A ┐┌ MIXER ───────┐
-│ Artist - Title          01:12  -03:48 ││        A   B │
-│ ▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█▇▅▃▂▁▂▃▅▇█ ││ TRIM ███ ███  │
-│          ⟦        ▲1    ▲2            ││ HI   ███ ███ │
-│ [1][2][ ][ ][ ][ ][ ][ ]  PLAYING   BAR 22.3 LOOP  QUANT
-└───────────────────────────────────────┘│ FX    Echo   │
-  PHASE  B ▮▮▮▮▮|▮▮▮▮▮  +0.12 beat       │ WET  ███     │
-┌ DECK B ───────────────────────────────┐│ PK   ▮▮▮▮▯▯▯ │
-│ ...                                   ││ VOL  ███████ │
-└───────────────────────────────────────┘└──────────────┘
-┌ BROWSER ──────────────────────────────────────────────┐
-│ Loaded Artist - Title on deck A                       │
-│ JACK dj-tui @ 48000 Hz / 256 frames, xruns 0  |  ...  │
-└───────────────────────────────────────────────────────┘
-```
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/fc9006b7-06a6-4223-9d6c-2e9c84868794" />
+
 
 Each deck shows its title, BPM at the current tempo fader setting, musical key in Camelot
 notation, elapsed and remaining time, and the overview waveform. Under the waveform sit the
