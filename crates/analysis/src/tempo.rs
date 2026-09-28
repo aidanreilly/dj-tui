@@ -16,6 +16,13 @@ const FINE_SPAN: f64 = 0.3;
 const FINE_STEP: f64 = 0.002;
 /// Below this share of perfectly regular onsets there is no usable beat.
 const MIN_COHERENCE: f64 = 0.05;
+/// How far the windows may sit from the middle tempo, as a share of it, before the track
+/// counts as having no one tempo at all. A drifting record stays well inside this.
+const MAX_SPREAD: f64 = 0.03;
+/// Tempo is read in windows this long. A whole-file sum smears on anything that drifts,
+/// and a record that loses a beat and a half across a side still holds its tempo across
+/// half a minute.
+const WINDOW_SECS: f64 = 30.0;
 
 /// Tempos are folded by halving or doubling into `[min, max)`, which settles half and
 /// double time. The default suits most dance music.
@@ -169,6 +176,21 @@ fn best_comb(env: &[f64], fps: f64, range: TempoRange) -> (f64, f64) {
     best
 }
 
+/// The envelope cut into window-length pieces, or whole when it is too short to cut.
+fn windows(env: &[f64], fps: f64) -> Vec<&[f64]> {
+    let len = (WINDOW_SECS * fps) as usize;
+    if env.len() < 2 * len {
+        return vec![env];
+    }
+    env.chunks(len).filter(|w| w.len() * 2 >= len).collect()
+}
+
+/// The middle value, which ignores the windows where an intro or a breakdown reads wrong.
+fn median(mut values: Vec<f64>) -> f64 {
+    values.sort_by(f64::total_cmp);
+    values[values.len() / 2]
+}
+
 pub fn detect_tempo(track: &Track, range: TempoRange) -> Option<BeatGrid> {
     let env = onset_envelope(track);
     let total: f64 = env.iter().map(|v| v.abs()).sum();
@@ -176,8 +198,20 @@ pub fn detect_tempo(track: &Track, range: TempoRange) -> Option<BeatGrid> {
         return None;
     }
     let fps = track.sample_rate() as f64 / HOP as f64;
-    let (coarse, score) = best_comb(&env, fps, range);
-    if score / total < MIN_COHERENCE {
+    let picks: Vec<(f64, f64)> = windows(&env, fps)
+        .iter()
+        .map(|w| {
+            let (bpm, score) = best_comb(w, fps, range);
+            let total: f64 = w.iter().map(|v| v.abs()).sum();
+            (bpm, score / total.max(1e-9))
+        })
+        .collect();
+    if median(picks.iter().map(|&(_, s)| s).collect()) < MIN_COHERENCE {
+        return None;
+    }
+    let coarse = median(picks.iter().map(|&(b, _)| b).collect());
+    let spread = median(picks.iter().map(|&(b, _)| (b - coarse).abs()).collect()) / coarse;
+    if spread > MAX_SPREAD {
         return None;
     }
     let (bpm, _) = best_in(&env, fps, coarse - FINE_SPAN, coarse + FINE_SPAN, FINE_STEP);

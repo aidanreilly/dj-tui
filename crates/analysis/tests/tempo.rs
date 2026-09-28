@@ -67,6 +67,22 @@ fn beat_grid_lines_up_with_the_first_beat() {
 }
 
 #[test]
+fn a_drifting_track_reads_its_middle_tempo() {
+    let got = bpm_of(&drifting_clicks(123.0, 117.0, 150.0));
+    assert!((got - 120.0).abs() < 0.5, "got {got:.3}");
+}
+
+#[test]
+fn a_track_with_no_steady_tempo_has_no_grid() {
+    let t = shifting_clicks(&[95.0, 150.0, 110.0, 165.0], 40.0);
+    assert!(
+        detect_tempo(&t, TempoRange::default()).is_none(),
+        "got {:?}",
+        detect_tempo(&t, TempoRange::default())
+    );
+}
+
+#[test]
 fn silence_has_no_tempo() {
     assert!(detect_tempo(&silence(10.0), TempoRange::default()).is_none());
 }

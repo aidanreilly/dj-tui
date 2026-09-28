@@ -59,6 +59,37 @@ pub fn house(bpm: f32, secs: f32) -> Track {
     track(mono)
 }
 
+/// Clicks whose tempo slides evenly from `from_bpm` to `to_bpm`, the way a tape or vinyl
+/// transfer loses speed across a side.
+pub fn drifting_clicks(from_bpm: f32, to_bpm: f32, secs: f32) -> Track {
+    let n = (secs * FS as f32) as usize;
+    let mut mono = vec![0.0f32; n];
+    let mut t = 0.0f32;
+    while t < secs {
+        let bpm = from_bpm + (to_bpm - from_bpm) * (t / secs);
+        let start = (t * FS as f32) as usize;
+        for j in 0..(0.03 * FS as f32) as usize {
+            let tb = j as f32 / FS as f32;
+            if let Some(s) = mono.get_mut(start + j) {
+                *s += (-tb / 0.005).exp() * (TAU * 1500.0 * tb).sin();
+            }
+        }
+        t += 60.0 / bpm;
+    }
+    track(mono)
+}
+
+/// Clicks that hold each tempo in turn for `secs_each`, the way a live set or a track
+/// stitched out of sections does.
+pub fn shifting_clicks(bpms: &[f32], secs_each: f32) -> Track {
+    let mut mono = Vec::new();
+    for &bpm in bpms {
+        let part = clicks(bpm, secs_each, 0.0);
+        mono.extend((0..part.frames()).map(|i| part.frame_at(i as f64).0));
+    }
+    track(mono)
+}
+
 /// A sixteenth-note line with a kick on the beat and accents on a five-against-four
 /// cross rhythm, which is what an acid pattern does to the onset envelope.
 pub fn cross_rhythm(bpm: f32, secs: f32) -> Track {
