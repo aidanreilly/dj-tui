@@ -73,7 +73,8 @@ WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF all play.
 
 ## The screen
 
-<img width="800" alt="image" src="https://github.com/user-attachments/assets/84e15cdb-4f35-42f5-9a28-d0e770f7c255" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/e53ba705-95af-4571-9dcc-fa680fe2a07c" />
+
 
 In the last thirty seconds of a track the unplayed part of the
 waveform flashes red.
