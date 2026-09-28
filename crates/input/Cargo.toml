@@ -7,3 +7,6 @@ rust-version.workspace = true
 
 [dependencies]
 engine = { path = "../engine" }
+
+[dev-dependencies]
+midi = { path = "../midi" }
