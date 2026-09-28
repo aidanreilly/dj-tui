@@ -41,29 +41,19 @@ cargo run -- --no-audio track.flac              # no sound server; the clock run
 cargo run -- --midi-learn                       # print what a controller sends
 ```
 
-WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF all play. Opus does not: symphonia has no decoder
-for it yet.
-
-Without a sound server dj-tui still runs, driving a silent clock, and says so on the status
-line. Everything works except the sound.
+WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF all play.
 
 ## The screen
 
 <img width="800" alt="image" src="https://github.com/user-attachments/assets/84e15cdb-4f35-42f5-9a28-d0e770f7c255" />
 
-
-
-Each deck shows its title, BPM at the current tempo fader setting, musical key in Camelot
-notation, elapsed and remaining time, and the overview waveform. Under the waveform sit the
-markers: `▲` for the main cue and each hot cue in its own colour, `⟦ ⟧` around a loop. The row
-below has the hot cue pads, the transport state, the bar and beat counter, and flags for
-`LOOP`, `QUANT` and `KEY`. In the last thirty seconds of a track the unplayed part of the
+In the last thirty seconds of a track the unplayed part of the
 waveform flashes red.
 
 The phase meter between the decks shows how far deck B's beat sits from deck A's, so you can
 see a mix drifting before you hear it.
 
-The mixer strip carries trim, the three-band isolator, the filter, the effect in the slot with
+A mixer strip carries trim, the three-band isolator, the filter, the effect in the slot with
 its wet level, peak meters, channel faders, headphone cue and the crossfader.
 
 Press `?` for the key list at any time.
