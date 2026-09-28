@@ -30,6 +30,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      # jack-sys builds against jack.pc, so this job needs the same packages as `test`.
+      # Without them its build script panics and the job never reaches the compiler.
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev libjack-jackd2-dev
       - uses: dtolnay/rust-toolchain@1.90
       - run: cargo test --workspace --locked
 
