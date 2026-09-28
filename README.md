@@ -99,6 +99,10 @@ whole keyboard to the track list so letters type a search; the panel lights its 
 lists its own commands while it holds the keyboard. **The device screen**, on `Ctrl+D`, takes
 the keyboard the same way. `Esc` returns from either in one press.
 
+![The dj-tui key map on a UK keyboard](images/keyboard.svg)
+
+Regenerate that picture after changing a binding with `python3 scripts/keyboard-svg.py`.
+
 ### Transport
 
 | Key | What it does |
