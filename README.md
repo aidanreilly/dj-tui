@@ -273,6 +273,42 @@ set one. It records each session's start, the audio device it found, tracks that
 load, sidecar files it could not write, and the xrun count on the way out. Past a megabyte the
 file moves to `dj-tui.log.old` and a new one starts.
 
+## Known issues and what is not done yet
+
+Honest list, kept current.
+
+**Unverified in a real terminal.** `Shift`+arrow and `Alt`+arrow reach the app as CSI
+sequences and nothing here has confirmed they arrive. `Alt+S` already worked before the fade
+keys landed, which covers `Alt+O`, and dj-tui asks the terminal to disambiguate escape codes
+at startup. If a pair does not arrive in yours, the crossfader and channel faders still step
+with plain arrows and `x` still centres the crossfader; the slam and the fade are what you
+lose. Report it and those two gestures move to a letter pair.
+
+**Fades are stepped, not ramped.** The mixer applies fader and crossfader gains as plain
+scalars with no per-sample ramp, so both a fade and a manual key press move the gain in one
+jump. A fade is held to at least 0.7 seconds, which keeps each of its 30-per-second steps no
+larger than one manual press, so it is no worse than what has always shipped. Per-sample ramps
+in the engine would remove the floor and make both click-free. Deferred, not rejected.
+
+**A short fade length is a request, not a promise.** Asking for 2 beats at 200 BPM gives you
+0.7 seconds rather than 0.6, for the reason above. The mixer strip shows the beats you asked
+for, not the seconds you got.
+
+**`Esc` belongs to browser mode while it is open.** A fade cannot be stopped without leaving
+the browser first. That follows from the browser owning the whole keyboard, which is what
+freed the arrow keys.
+
+**Moving focus redraws both waveform images.** Greying the unfocused deck happens when the
+image is rasterised, so `Tab` re-rasterises and resends both decks. It is not noticeable, but
+it is more work per press than the glyph renderer needs.
+
+Deliberately not built, so they are not worth proposing again: holding a band key for a
+momentary kill (needs tap-versus-hold timing, and fails without key release reporting), fades
+that wait for the next beat (a beat of nothing happening reads as a dropped keypress), a
+sub-mode for stepped EQ gain on the keyboard, per-gesture fade lengths behind a digit prefix,
+a crossfader curve that passes both channels at unity, and musical divisions rather than
+percentages for the effect knobs.
+
 ## Without a sound server
 
 dj-tui can drive a card directly:
