@@ -24,6 +24,12 @@ fn a_house_loop_with_off_beat_hats_reads_as_the_kick_tempo() {
 }
 
 #[test]
+fn a_cross_rhythm_does_not_stand_in_for_the_beat() {
+    let got = bpm_of(&cross_rhythm(120.0, 60.0));
+    assert!((got - 120.0).abs() < 0.1, "got {got:.3}");
+}
+
+#[test]
 fn half_time_is_folded_into_the_default_range() {
     let got = bpm_of(&clicks(70.0, 60.0, 0.0));
     assert!((got - 140.0).abs() < 0.1, "got {got:.3}");

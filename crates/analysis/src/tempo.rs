@@ -11,8 +11,6 @@ use std::f64::consts::TAU;
 
 const WIN: usize = 1024;
 const HOP: usize = 512;
-const SEARCH_MIN: f64 = 50.0;
-const SEARCH_MAX: f64 = 220.0;
 const COARSE_STEP: f64 = 0.1;
 const FINE_SPAN: f64 = 0.3;
 const FINE_STEP: f64 = 0.002;
@@ -144,6 +142,33 @@ fn best_in(env: &[f64], fps: f64, lo: f64, hi: f64, step: f64) -> (f64, f64) {
     best
 }
 
+/// A beat carries its own subdivisions: eighths and sixteenths sit on top of it, each a
+/// little weaker. Scoring a candidate with that comb tells a beat apart from a cross rhythm,
+/// which is strong on its own line and has nothing underneath it.
+const SUBDIVISIONS: [(f64, f64); 3] = [(1.0, 1.0), (2.0, 0.5), (4.0, 0.25)];
+
+fn comb_score(env: &[f64], fps: f64, bpm: f64) -> f64 {
+    SUBDIVISIONS
+        .iter()
+        .map(|(mult, weight)| weight * coherence(env, fps, bpm * mult).0)
+        .sum()
+}
+
+/// The best-scoring tempo inside the range, which is where the fold to half or double time
+/// now happens: a 70 BPM track wins at 140 on its second harmonic.
+fn best_comb(env: &[f64], fps: f64, range: TempoRange) -> (f64, f64) {
+    let mut best = (range.min, 0.0);
+    let mut bpm = range.min;
+    while bpm < range.max {
+        let score = comb_score(env, fps, bpm);
+        if score > best.1 {
+            best = (bpm, score);
+        }
+        bpm += COARSE_STEP;
+    }
+    best
+}
+
 pub fn detect_tempo(track: &Track, range: TempoRange) -> Option<BeatGrid> {
     let env = onset_envelope(track);
     let total: f64 = env.iter().map(|v| v.abs()).sum();
@@ -151,43 +176,10 @@ pub fn detect_tempo(track: &Track, range: TempoRange) -> Option<BeatGrid> {
         return None;
     }
     let fps = track.sample_rate() as f64 / HOP as f64;
-    let (raw, raw_score) = best_in(&env, fps, SEARCH_MIN, SEARCH_MAX, COARSE_STEP);
-    if raw_score / total < MIN_COHERENCE {
+    let (coarse, score) = best_comb(&env, fps, range);
+    if score / total < MIN_COHERENCE {
         return None;
     }
-
-    // Harmonically related tempos score almost as well; take the strongest one in range.
-    let mut choice: Option<(f64, f64)> = None;
-    for m in [1.0, 2.0, 0.5, 3.0, 1.0 / 3.0, 4.0, 0.25, 1.5, 2.0 / 3.0] {
-        let c = raw * m;
-        if c < range.min || c >= range.max {
-            continue;
-        }
-        let (bpm, score) = best_in(
-            &env,
-            fps,
-            c - 2.0 * COARSE_STEP * m.max(1.0),
-            c + 2.0 * COARSE_STEP * m.max(1.0),
-            COARSE_STEP / 2.0,
-        );
-        if score >= 0.6 * raw_score && choice.is_none_or(|(_, s)| score > s * 1.05) {
-            choice = Some((bpm, score));
-        }
-    }
-    let coarse = match choice {
-        Some((bpm, _)) => bpm,
-        None => {
-            let mut b = raw;
-            while b >= range.max {
-                b /= 2.0;
-            }
-            while b < range.min {
-                b *= 2.0;
-            }
-            b
-        }
-    };
-
     let (bpm, _) = best_in(&env, fps, coarse - FINE_SPAN, coarse + FINE_SPAN, FINE_STEP);
     let (_, phase) = coherence(&env, fps, bpm);
     let period_frames = 60.0 / bpm * fps;
