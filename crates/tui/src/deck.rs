@@ -103,11 +103,15 @@ impl Widget for DeckPanel<'_> {
     }
 }
 
-/// Grey every cell of `area`. An unfocused deck stays readable and stops competing for the
-/// eye, which matters more now that Tab is the only way to reach the other deck.
+/// Grey the contents of `area`, leaving its outermost ring alone. Dimming the border and the
+/// title too turned the panel into a grey slab; the frame is what tells you the panel is still
+/// there, and focus reads from its weight and the marker rather than from murk.
 fn grey_out(area: Rect, buf: &mut Buffer) {
-    for y in area.top()..area.bottom().min(buf.area.bottom()) {
-        for x in area.left()..area.right().min(buf.area.right()) {
+    if area.width < 3 || area.height < 3 {
+        return;
+    }
+    for y in area.top() + 1..(area.bottom() - 1).min(buf.area.bottom()) {
+        for x in area.left() + 1..(area.right() - 1).min(buf.area.right()) {
             buf[(x, y)].modifier |= Modifier::DIM;
         }
     }

@@ -309,20 +309,30 @@ fn a_loop_in_point_waiting_for_its_out_point_shows_dimmed() {
 }
 
 #[test]
-fn the_unfocused_deck_is_greyed_out_so_focus_is_obvious_at_a_glance() {
+fn the_unfocused_decks_contents_are_greyed_out_but_its_frame_is_not() {
     let focused = render(&loaded_view(true), 80, DECK_HEIGHT);
     let unfocused = render(&loaded_view(false), 80, DECK_HEIGHT);
 
-    // The border, the title and the status row all go dim, not just the border style.
-    for (x, y) in [(0u16, 0u16), (3, 1), (3, DECK_HEIGHT - 1)] {
+    // The contents recede: the title row and the status row under the waveform.
+    for (x, y) in [(3u16, 1u16), (3, DECK_HEIGHT - 2)] {
         assert!(
             unfocused[(x, y)].modifier.contains(Modifier::DIM),
-            "unfocused cell at {x},{y} should be dim: {:?}",
+            "unfocused content at {x},{y} should be dim: {:?}",
             unfocused[(x, y)].symbol()
         );
         assert!(
             !focused[(x, y)].modifier.contains(Modifier::DIM),
-            "focused cell at {x},{y} should not be dim"
+            "focused content at {x},{y} should not be dim"
+        );
+    }
+
+    // The frame stays readable, so the panel does not turn into a grey slab. Focus is still
+    // obvious from the border weight and the marker, which the plain/thick tests cover.
+    for (x, y) in [(0u16, 0u16), (0, DECK_HEIGHT - 1), (40, 0)] {
+        assert!(
+            !unfocused[(x, y)].modifier.contains(Modifier::DIM),
+            "the border at {x},{y} should stay crisp: {:?}",
+            unfocused[(x, y)].symbol()
         );
     }
 }

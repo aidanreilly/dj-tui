@@ -18,8 +18,10 @@ pub const PLAYHEAD_WIDTH: u32 = 2;
 const DIM: f32 = 0.4;
 
 /// How far an unfocused deck's whole waveform is pulled down. The glyph renderer dims its
-/// panel with a terminal attribute; an image has to be drawn darker to match.
-const UNFOCUSED: f32 = 0.45;
+/// panel with a terminal attribute; an image has to be drawn darker to match. Kept light:
+/// the point is that the deck recedes, not that its waveform becomes unreadable, and the
+/// played part of it is already dimmed again by `DIM` on top of this.
+pub const UNFOCUSED: f32 = 0.7;
 
 /// Same contrast curve as the glyph renderer, so both modes read alike.
 fn shape(peak: f32) -> f32 {

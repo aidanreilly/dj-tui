@@ -4,7 +4,7 @@
 use image::{Rgba, RgbaImage};
 use tui::pixel::{
     loop_columns, playhead_x, Palette, PixelWaveform, Wave, WaveformBitmaps, WaveformMode,
-    PLAYHEAD_WIDTH,
+    PLAYHEAD_WIDTH, UNFOCUSED,
 };
 
 const W: u32 = 200;
@@ -471,9 +471,22 @@ fn an_unfocused_decks_waveform_is_rasterized_darker() {
     };
     let (a, b) = (brightness(lit.normal()), brightness(grey.normal()));
     assert!(a > 0, "the focused deck drew something");
+    // Tie the assertion to the constant rather than to a magic ratio, so tuning the look
+    // does not need the test rewritten, and removing the dimming still fails it.
+    let ratio = b as f32 / a as f32;
     assert!(
-        b * 2 < a,
-        "the unfocused deck is clearly darker: {b} against {a}"
+        (ratio - UNFOCUSED).abs() < 0.03,
+        "expected about {UNFOCUSED} of the brightness, got {ratio}"
+    );
+}
+
+#[test]
+fn the_unfocused_waveform_stays_readable() {
+    // The unfocused deck should recede, not become a grey smear: you still read its waveform
+    // to decide what to do next with it.
+    assert!(
+        (0.55..=0.85).contains(&UNFOCUSED),
+        "UNFOCUSED is {UNFOCUSED}, which is either invisible or pointless"
     );
 }
 
