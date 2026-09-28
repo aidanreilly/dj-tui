@@ -540,3 +540,72 @@ fn a_killed_band_is_dimmed_in_the_deck_title() {
         "a live band is not"
     );
 }
+
+/// Both decks with a bpm and key set, rendered at a chosen (sub-wide-layout) terminal width
+/// so the deck panel gets exactly that width. Returns deck A's and deck B's title rows.
+fn deck_rows_with_bpm_and_key(width: u16) -> (String, String) {
+    let mut a = deck(DeckId::A, true);
+    a.bpm = Some(124.0);
+    a.key = Some("8A".into());
+    let mut b = deck(DeckId::B, false);
+    b.bpm = Some(124.0);
+    b.key = Some("8A".into());
+    let view = ScreenView {
+        decks: [a, b],
+        mixer: MixerView::default(),
+        status: String::new(),
+        message: String::new(),
+        phase: None,
+        help: false,
+        browser: Default::default(),
+        devices: None,
+    };
+    let mut term = Terminal::new(TestBackend::new(width, 44)).unwrap();
+    term.draw(|f| render_screen(f, &view)).unwrap();
+    let buf = term.backend().buffer().clone();
+    let text: String = (0..buf.area.height)
+        .map(|y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+                + "\n"
+        })
+        .collect();
+    let a_row = text
+        .lines()
+        .find(|l| l.contains("DECK A"))
+        .expect("deck A's row")
+        .to_string();
+    let b_row = text
+        .lines()
+        .find(|l| l.contains("DECK B"))
+        .expect("deck B's row")
+        .to_string();
+    (a_row, b_row)
+}
+
+#[test]
+fn a_narrow_panel_drops_the_markers_but_keeps_bpm_and_key() {
+    // Below either deck's threshold: there is no shorter marker form, so both are dropped
+    // and the BPM/key — what a glance needs most — stay.
+    let (a_row, b_row) = deck_rows_with_bpm_and_key(38);
+    for (name, row) in [("A", &a_row), ("B", &b_row)] {
+        assert!(!row.contains("[hi]"), "deck {name} kept a marker: {row}");
+        assert!(!row.contains("[mid]"), "deck {name} kept a marker: {row}");
+        assert!(!row.contains("[low]"), "deck {name} kept a marker: {row}");
+        assert!(row.contains("124.00"), "deck {name} lost its bpm: {row}");
+        assert!(row.contains("8A"), "deck {name} lost its key: {row}");
+    }
+}
+
+#[test]
+fn the_focused_and_unfocused_decks_agree_on_whether_the_markers_fit() {
+    // Deck A's focused label carries `▶`, three bytes for one column. Sized to sit exactly
+    // where a byte count (rather than a column count) used to make deck A alone think the
+    // markers didn't fit, while deck B — plain ASCII, unaffected either way — already showed
+    // them: both panels are always the same width in the real layout, so that disagreement
+    // was the bug (finding 1). Fixed, both read the same width the same way and agree.
+    let (a_row, b_row) = deck_rows_with_bpm_and_key(41);
+    assert!(a_row.contains("[hi]"), "deck A dropped the markers: {a_row}");
+    assert!(b_row.contains("[hi]"), "deck B dropped the markers: {b_row}");
+}

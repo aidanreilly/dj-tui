@@ -141,7 +141,10 @@ impl DeckPanel<'_> {
         const MARKERS: [(&str, usize); 3] = [("[hi]", 2), ("[mid]", 1), ("[low]", 0)];
         let marker_width = 1 + MARKERS.iter().map(|(t, _)| t.len() + 1).sum::<usize>();
         let mut right: Vec<Span> = Vec::new();
-        if area.width as usize > label.len() + info.len() + marker_width {
+        // Byte length overcounts a label with a multi-byte glyph (the focused `▶`), which
+        // made the focused and unfocused deck disagree about whether the markers fit at an
+        // identical panel width: count the columns they actually occupy instead.
+        if area.width as usize > label.chars().count() + info.chars().count() + marker_width {
             right.push(Span::raw(" "));
             for (text, band) in MARKERS {
                 let style = if v.kills[band] {
