@@ -153,7 +153,7 @@ control's key means do it slowly**, over the fade length.
 | `X` | Crossfader fades to the middle |
 | `V` | Filter sweeps back to the middle |
 | `{` / `}` | Halve and double the fade length |
-| `Esc` | Stop every running fade where it stands |w
+| `Esc` | Stop every running fade where it stands |
 
 ### Everything else
 
