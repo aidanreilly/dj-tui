@@ -201,7 +201,7 @@
 <path d="M 942.0 100.0 h 96.0 v 130.0 h -79.0 v -62.0 h -17.0 z" fill="#27567f" stroke="#c9c9d2"/>
 <text x="952.0" y="116.0" font-size="12" font-weight="600" fill="#ffffff">Enter</text>
 <text x="952.0" y="134.0" font-size="10" fill="#ffffff">load track</text>
-<text x="24" y="390.0" font-size="11" fill="#1b1b20" opacity="0.75">Shift is the second line on a key. Alt on a fader or the filter fades it instead of stepping, and Alt on a hot cue clears it. Letters type into the browser while it holds the keyboard, where Alt and a letter is its own command.</text>
+<text x="24" y="390.0" font-size="11" fill="#1b1b20" opacity="0.75">Shift is the second line. Alt on a fader or the filter fades it instead of stepping, and Alt on a hot cue clears it.</text>
 <rect x="24" y="406.0" width="13" height="13" rx="3" fill="#2f6f4f"/>
 <text x="43" y="416.0" font-size="11" fill="#1b1b20">Transport</text>
 <rect x="131.4" y="406.0" width="13" height="13" rx="3" fill="#1f6f72"/>
