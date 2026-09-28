@@ -1,12 +1,4 @@
-# dj-tui configuration.
-#
-# Copy this to ~/.config/dj-tui/config.toml, or to $XDG_CONFIG_HOME/dj-tui/config.toml if you
-# set one, and change what you want. Every key below is at the value dj-tui uses when the key
-# is absent, so a copy of this file behaves exactly like no file at all.
-#
-# Every key is optional and whole sections can be left out. A key dj-tui does not recognise is
-# an error rather than something it ignores, so a typo is reported at startup instead of
-# quietly doing nothing.
+# Copy to ~/.config/dj-tui/config.toml or to $XDG_CONFIG_HOME/dj-tui/config.toml
 
 [audio]
 

@@ -40,6 +40,12 @@ impl Graphics {
 
     /// Call right after `render_screen` with the same view.
     pub fn render(&mut self, frame: &mut Frame, view: &ScreenView) {
+        // A kitty image is not a cell attribute, so nothing drawn over it afterwards hides
+        // it: the full-screen browser, the help overlay and the device screen all have to
+        // keep it off the screen in the first place.
+        if covers_the_decks(view) {
+            return;
+        }
         let layout = screen_layout(frame.area());
         let font = self.picker.font_size();
         for (i, panel) in [layout.deck_a, layout.deck_b].into_iter().enumerate() {
@@ -88,6 +94,11 @@ impl Graphics {
     pub fn transmissions(&self) -> u64 {
         self.transmissions
     }
+}
+
+/// Whether something is drawn where the deck panels would be.
+fn covers_the_decks(view: &ScreenView) -> bool {
+    view.browser.fullscreen || view.help || view.devices.is_some()
 }
 
 fn make_protocol(picker: &Picker, img: DynamicImage, size: Size, id: u32) -> Option<Protocol> {

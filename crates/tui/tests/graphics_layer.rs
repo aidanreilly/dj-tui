@@ -5,8 +5,8 @@ use engine::DeckId;
 use ratatui::{backend::TestBackend, buffer::Buffer, layout::Rect, Terminal};
 use ratatui_image::picker::{Picker, ProtocolType};
 use tui::{
-    render_screen, screen_layout, waveform_area, DeckView, Graphics, MixerView, ScreenView,
-    WAVEFORM_ROWS,
+    render_screen, screen_layout, waveform_area, DeckView, DeviceView, Graphics, MixerView,
+    ScreenView, WAVEFORM_ROWS,
 };
 
 const KITTY_PLACEHOLDER: char = '\u{10EEEE}';
@@ -158,5 +158,74 @@ fn text_outside_the_waveform_is_untouched() {
         .collect();
     for needle in ["▶ DECK A", "DECK B", "MIXER", "BROWSER", "PLAYING"] {
         assert!(text.contains(needle), "{needle} missing");
+    }
+}
+
+/// A kitty image is not a cell attribute, so nothing drawn afterwards can paint over it.
+/// Anything that takes the deck area away has to stop the image being placed at all.
+mod covered_decks {
+    use super::*;
+
+    fn placeholder(s: &str) -> bool {
+        s.contains(KITTY_PLACEHOLDER)
+    }
+
+    fn drawn(v: &ScreenView) -> (Buffer, u64) {
+        let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
+        let mut g = Graphics::new(kitty());
+        let buf = draw(&mut term, &mut g, v);
+        (buf, g.transmissions())
+    }
+
+    #[test]
+    fn a_full_screen_browser_has_no_waveform_image_on_it() {
+        let mut v = view(30.0, true);
+        v.browser.fullscreen = true;
+        let (buf, transmissions) = drawn(&v);
+        assert!(
+            !area_has(&buf, buf.area, placeholder),
+            "the browser has the whole screen, so no deck image belongs over it"
+        );
+        assert_eq!(transmissions, 0, "and nothing was sent to the terminal");
+    }
+
+    #[test]
+    fn the_help_overlay_has_no_waveform_image_on_it() {
+        let mut v = view(30.0, true);
+        v.help = true;
+        let (buf, transmissions) = drawn(&v);
+        assert!(!area_has(&buf, buf.area, placeholder), "help is covered");
+        assert_eq!(transmissions, 0);
+    }
+
+    #[test]
+    fn the_device_screen_has_no_waveform_image_on_it() {
+        let mut v = view(30.0, true);
+        v.devices = Some(DeviceView {
+            devices: vec![("hw:0,0".into(), "A card".into())],
+            selected: 0,
+            current: "hw:0,0".into(),
+            note: "48000 Hz".into(),
+        });
+        let (buf, transmissions) = drawn(&v);
+        assert!(!area_has(&buf, buf.area, placeholder), "devices is covered");
+        assert_eq!(transmissions, 0);
+    }
+
+    #[test]
+    fn the_decks_get_their_images_back_once_the_browser_shrinks() {
+        let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
+        let mut g = Graphics::new(kitty());
+        let mut v = view(30.0, true);
+        v.browser.fullscreen = true;
+        draw(&mut term, &mut g, &v);
+        v.browser.fullscreen = false;
+        let buf = draw(&mut term, &mut g, &v);
+        let l = screen_layout(Rect::new(0, 0, 120, 44));
+        assert!(
+            area_has(&buf, waveform_area(l.deck_a), placeholder),
+            "deck A is back on screen and has no image"
+        );
+        assert_eq!(g.transmissions(), 2, "one per deck, sent on the way back");
     }
 }

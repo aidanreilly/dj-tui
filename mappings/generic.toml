@@ -1,10 +1,8 @@
-# A two-deck controller with the layout most of them share. Copy this into
-# $XDG_CONFIG_HOME/dj-tui/mappings/ and change the numbers to match your hardware:
-# run dj-tui with a controller connected and the message line names what it sends.
-#
-# Deck A is on MIDI channel 0 and deck B on channel 1, which is how most units are laid out.
+# MIDI config for dj-tui
+# Copy to $XDG_CONFIG_HOME/dj-tui/mappings/dj-tui.toml and change to match your hardware
+# Deck A is on MIDI channel 0 and deck B on channel 1
 
-name = "Generic 2-deck"
+name = "dj-tui control midi control"
 ports = ["Controller", "DJ"]
 
 # --- Transport ---
