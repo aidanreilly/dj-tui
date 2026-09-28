@@ -230,6 +230,20 @@ JACK_DEFAULT_SERVER=test DJ_TUI_JACK_TESTS=1 cargo test -p backend --test jack_d
 
 ## Toolchain
 
-MSRV is 1.88, the minimum for ratatui 0.30.2 and ratatui-image 11.1 (kitty compression).
-The workspace uses `resolver = "3"`, so `cargo update` only picks crates that build on 1.88.
+MSRV is 1.90, set by `quantette`, which arrives as `ratatui-image` 11.1 -> `icy_sixel` ->
+`quantette` and is not optional there. dj-tui draws through the kitty protocol and never uses
+sixel, so this is a floor paid for a code path that never runs; `icy_sixel` becoming optional
+upstream is the way out. Do not lower it to 1.88 without checking that chain: the CI `msrv`
+job pins the toolchain and `cargo test --workspace --locked` fails at resolve time, before any
+compilation, which is why the failure reads as three unrelated crates rather than as one.
+
+The workspace uses `resolver = "3"`, so `cargo update` prefers crates that build on the MSRV,
+but it will not downgrade something already in the lock. When the `msrv` job goes red, compare
+the ceiling against the floor:
+
+```sh
+cargo metadata --format-version 1 --locked | python3 -c "import json,sys;\
+print(sorted(((p['rust_version'],p['name']) for p in json.load(sys.stdin)['packages'] \
+if p.get('rust_version')), reverse=True)[:5])"
+```
 

@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.88
+      - uses: dtolnay/rust-toolchain@1.90
       - run: cargo test --workspace --locked
 
   # Detector accuracy against the GiantSteps sets (spec 6). The datasets are far too big to

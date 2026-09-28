@@ -30,7 +30,9 @@ their own. If yours does not, run through the wrapper: `pw-jack cargo run -- tra
 For real JACK2 instead of PipeWire, install `jack-audio-connection-kit-devel`, which replaces
 the PipeWire package rather than sitting beside it.
 
-Rust 1.88 or newer.
+Rust 1.90 or newer. Fedora 44 ships new enough; on Debian and Ubuntu the packaged `cargo` is
+usually older than this, so install the toolchain with [rustup](https://rustup.rs) instead of
+`apt install cargo`.
 
 ## Terminal requirements
 
