@@ -37,7 +37,7 @@ cargo run -- ~/Music/one.flac ~/Music/two.mp3   # deck A, deck B
 cargo run -- --demo                             # click tracks at 124 and 126 BPM
 cargo run -- --no-audio track.flac              # no sound server; the clock runs anyway
 cargo run -- --midi-learn                       # print what a controller sends
-```l
+```
 
 ## Controls
 
