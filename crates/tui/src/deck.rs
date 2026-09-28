@@ -138,7 +138,7 @@ impl DeckPanel<'_> {
         };
         // The markers go ahead of the BPM, and give way to it when the panel is too narrow
         // for both: the tempo is what a glance needs most.
-        const MARKERS: [(&str, usize); 3] = [("[hi]", 2), ("[mid]", 1), ("[low]", 0)];
+        const MARKERS: [(&str, usize); 3] = [("[low]", 0), ("[mid]", 1), ("[hi]", 2)];
         let marker_width = 1 + MARKERS.iter().map(|(t, _)| t.len() + 1).sum::<usize>();
         let mut right: Vec<Span> = Vec::new();
         // Byte length overcounts a label with a multi-byte glyph (the focused `▶`), which

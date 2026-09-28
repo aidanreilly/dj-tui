@@ -462,7 +462,7 @@ fn deck_title_row(kills: [bool; 3]) -> (String, Buffer) {
 #[test]
 fn the_deck_title_names_the_bands() {
     let (row, _) = deck_title_row([false; 3]);
-    assert!(row.contains("[hi] [mid] [low]"), "{row}");
+    assert!(row.contains("[low] [mid] [hi]"), "{row}");
 }
 
 #[test]
