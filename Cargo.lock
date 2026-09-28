@@ -103,6 +103,7 @@ dependencies = [
  "alsa",
  "engine",
  "jack",
+ "libc",
  "rtrb",
 ]
 

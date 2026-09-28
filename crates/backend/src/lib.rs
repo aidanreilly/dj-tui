@@ -4,6 +4,7 @@
 mod alsa_backend;
 mod jack_backend;
 mod planar;
+pub mod realtime;
 mod routing;
 
 pub use alsa_backend::{devices as alsa_devices, AlsaBackend, AlsaRunning, Device};

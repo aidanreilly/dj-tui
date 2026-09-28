@@ -114,24 +114,46 @@ enum Audio {
 }
 
 impl Audio {
+    /// How the thread doing the audio is scheduled, once it has reported.
+    fn scheduling(&self) -> Option<backend::realtime::Scheduling> {
+        match self {
+            Audio::Jack(r) => r.scheduling(),
+            Audio::Alsa(r) => r.scheduling(),
+            Audio::Silent(..) => None,
+        }
+    }
+
     fn status(&self) -> String {
         match self {
             Audio::Jack(r) => format!(
-                "JACK {} @ {} Hz / {} frames, xruns {}",
+                "JACK {} @ {} Hz / {} frames, {}, xruns {}",
                 r.client_name(),
                 r.sample_rate(),
                 r.buffer_size(),
+                sched_label(r.scheduling()),
                 r.xruns()
             ),
             Audio::Alsa(r) => format!(
-                "ALSA {} @ {} Hz / {} frames, xruns {}",
+                "ALSA {} @ {} Hz / {} frames, {}, xruns {}",
                 r.device(),
                 r.sample_rate(),
                 r.buffer_size(),
+                sched_label(r.scheduling()),
                 r.xruns()
             ),
             Audio::Silent(..) => "no audio output".into(),
         }
+    }
+}
+
+/// How the audio thread is scheduled, for the status line. An audio thread that is not
+/// realtime glitches under load whatever the buffer size is, and nothing else on screen says
+/// so, which is why it sits beside the rate and the xrun count.
+fn sched_label(sched: Option<backend::realtime::Scheduling>) -> String {
+    match sched {
+        Some(s) => s.label(),
+        // The JACK callback has not run yet, so it has not reported.
+        None => "scheduling unknown".into(),
     }
 }
 
@@ -337,6 +359,10 @@ fn main() -> ExitCode {
     let mut note = notes.next();
     let mut note_shown = Instant::now();
     let mut last = Instant::now();
+    // The audio thread reports its scheduling once it has run, which for JACK is after
+    // activate. Say so once, since an audio thread that is not realtime glitches under load
+    // however large the buffer is, and nothing else would tell anyone why.
+    let mut sched_reported = false;
 
     let result = (|| -> std::io::Result<()> {
         loop {
@@ -401,6 +427,22 @@ fn main() -> ExitCode {
                 }
             }
             app.tick();
+            if !sched_reported {
+                if let Some(sched) = audio.scheduling() {
+                    sched_reported = true;
+                    if !sched.is_realtime() {
+                        let line = "The audio thread is not running at realtime priority, so \
+                                    it will glitch under load whatever the buffer size is. On \
+                                    a PipeWire or JACK desktop this is granted by the server, \
+                                    usually through rtkit or membership of the audio group."
+                            .to_string();
+                        log.line(&line);
+                        app.note(line);
+                    } else {
+                        log.line(&format!("audio thread: {}", sched.label()));
+                    }
+                }
+            }
             if let Some(device) = app.chosen_device() {
                 // Changing device means reopening it, which is a restart: write the choice
                 // into the config so the next run picks it up, and say so.

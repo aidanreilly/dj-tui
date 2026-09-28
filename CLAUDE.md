@@ -85,6 +85,33 @@ mapping where the UI holds each control. Lights are sent only on change. Mapping
 `mappings/` beside the config file, and `mappings/generic.toml` in the repo is the starting
 point to copy.
 
+## Realtime scheduling
+
+`crates/backend/src/realtime.rs` is the whole of it: `scheduling()` reads the calling thread's
+policy, `request_realtime()` asks for SCHED_FIFO at `AUDIO_PRIORITY` (10, modest on purpose),
+and `Scheduling` packs into a `u32` so an audio thread can report through an atomic with zero
+meaning "has not run yet". Both are two syscalls and no allocation, so calling them once from
+inside a callback is safe.
+
+Who asks, and who can only look:
+
+- ALSA owns its playback thread, so it asks at the top of the spawn closure before `play`.
+- JACK does not own the callback thread, but that thread lives in our process, so the first
+  callback asks when the server left it ordinary. It never overrides a server that already
+  granted realtime, because the server's priority is deliberate and ours would be lower.
+  pipewire-jack does not always elevate a client's callback thread even where PipeWire's own
+  data loops are `RR 20`, which is exactly the case this covers.
+
+A refusal is the ordinary case: `RLIMIT_RTPRIO` is granted to a group, not to everyone, so
+`request_realtime` returns `EPERM` on a stock desktop and nothing stops. What it got goes on
+the status line beside the rate and the xrun count, and a non-realtime thread logs one line
+saying why it will glitch. That report is the point: the priority is usually not dj-tui's to
+take, so saying what happened is more use than trying harder.
+
+Deliberately not done: asking rtkit over D-Bus, which would need a D-Bus dependency to reach
+the same cap the server already has; and `mlockall`, which is the other half of realtime
+hygiene and belongs with it if it is ever added.
+
 ## Log file
 
 `src/log.rs` appends timestamped lines to `$XDG_STATE_HOME/dj-tui/dj-tui.log`, rotating past a

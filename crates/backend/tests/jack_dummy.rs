@@ -41,6 +41,15 @@ fn plays_through_a_real_jack_server() {
     let pos = h.snapshot().decks[0].position;
     assert!(pos > rate as f64 * 0.1, "position only {pos}");
     assert_eq!(running.xruns(), running.xruns(), "xrun counter readable");
+
+    // The callback has run, so it has reported how the server scheduled it. Whether that is
+    // realtime depends on the machine, which is the point of reporting it at all.
+    let sched = running
+        .scheduling()
+        .expect("the callback reports its scheduling once it has run");
+    eprintln!("jack callback scheduling: {}", sched.label());
+    assert!(!sched.label().is_empty());
+
     h.collect_garbage();
     running.stop();
 }

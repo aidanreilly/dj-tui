@@ -273,6 +273,32 @@ Analysis, the waveform and your cues are saved beside the audio as `<file name>.
 so they load instantly the second time and travel with the music if you move your library.
 Editing or replacing the audio file invalidates them, and the track is analysed again.
 
+## Glitches under load
+
+The status line says how the audio thread is scheduled, next to the rate and the xrun count:
+`realtime FIFO 10`, `realtime RR 20`, or `not realtime`. An audio thread that is not realtime
+is preempted by ordinary work, which is heard as glitches and counted as xruns however large
+the buffer is, so that word is the first thing to check when a set stutters.
+
+dj-tui asks for realtime on any thread it can: the ALSA backend's playback thread, which it
+owns, and the JACK callback thread when the server left it ordinary. Both requests need
+`RLIMIT_RTPRIO`, which a desktop usually grants to a group rather than to everyone, so both
+fail quietly on a stock setup and dj-tui carries on at ordinary priority.
+
+To grant it on Fedora and most PipeWire desktops:
+
+```sh
+sudo usermod -aG pipewire $USER
+```
+
+Log out and back in, since group membership only applies to new sessions, then check the status
+line says `realtime`. That group is what `/etc/security/limits.d` grants `rtprio` and a large
+`memlock` to, and the memory limit matters as much as the priority: an audio thread that can
+be paged out stalls under memory pressure whatever it is scheduled as.
+
+Without it, `rtkit` still grants PipeWire's own threads a capped `RR 20`, which is enough for
+playback and thin for mixing with effects under load.
+
 ## When something goes wrong
 
 dj-tui keeps a log at `~/.local/state/dj-tui/dj-tui.log`, or under `$XDG_STATE_HOME` if you

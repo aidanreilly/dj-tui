@@ -9,7 +9,7 @@ use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, HwParams, State, PCM};
 use alsa::{Direction, ValueOr};
 use engine::EngineProcessor;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering::Relaxed};
 use std::sync::Arc;
 
 /// Periods in the ring. Two is the minimum that lets one play while the other is filled.
@@ -135,11 +135,19 @@ impl AlsaBackend {
         let stop = Arc::new(AtomicBool::new(false));
         let split = *routing == Routing::Split || channels < 4;
         let renderer = PlanarRenderer::new(period as usize).split_mono(split && channels < 4);
+        let sched = Arc::new(AtomicU32::new(0));
         let thread_xruns = xruns.clone();
         let thread_stop = stop.clone();
+        let thread_sched = sched.clone();
         let handle = std::thread::Builder::new()
             .name("dj-tui-alsa".into())
             .spawn(move || {
+                // This thread is ours, so unlike the JACK path it can ask. A refusal is the
+                // ordinary case on a machine with no realtime budget and is never fatal:
+                // what it got is reported instead, on the status line.
+                let got = crate::realtime::request_realtime(crate::realtime::AUDIO_PRIORITY)
+                    .unwrap_or_else(|_| crate::realtime::scheduling());
+                thread_sched.store(got.to_bits(), Relaxed);
                 play(
                     pcm,
                     processor,
@@ -154,6 +162,7 @@ impl AlsaBackend {
             })
             .map_err(|e| format!("start the ALSA thread: {e}"))?;
         Ok(AlsaRunning {
+            sched,
             device,
             rate,
             period,
@@ -341,6 +350,8 @@ pub struct AlsaRunning {
     buffer: u32,
     channels: u32,
     xruns: Arc<AtomicU64>,
+    /// What the playback thread got when it asked for realtime.
+    sched: Arc<AtomicU32>,
     stop: Arc<AtomicBool>,
     handle: Option<std::thread::JoinHandle<()>>,
 }
@@ -370,6 +381,13 @@ impl AlsaRunning {
 
     pub fn xruns(&self) -> u64 {
         self.xruns.load(Relaxed)
+    }
+
+    /// What the playback thread got when it asked for realtime, or `None` before it has
+    /// started. Not realtime means it competes with everything else, which is heard as
+    /// glitches under load whatever the buffer size is.
+    pub fn scheduling(&self) -> Option<crate::realtime::Scheduling> {
+        crate::realtime::Scheduling::from_bits(self.sched.load(Relaxed))
     }
 
     pub fn stop(mut self) {

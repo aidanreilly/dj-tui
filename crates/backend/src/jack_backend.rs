@@ -5,7 +5,7 @@ use jack::{
     ProcessScope, RawMidi,
 };
 use rtrb::{Consumer, Producer, RingBuffer};
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering::Relaxed};
 use std::sync::Arc;
 
 /// Headroom reserved before JACK tells us the real buffer size.
@@ -24,6 +24,9 @@ pub struct JackBackend {
 
 struct Process {
     ports: [Port<AudioOut>; 4],
+    /// How the server scheduled this thread, packed, sampled on the first callback. The
+    /// server owns the thread, so looking is the only thing available.
+    sched: Arc<AtomicU32>,
     renderer: PlanarRenderer,
     processor: EngineProcessor,
     midi_in: Port<MidiIn>,
@@ -36,6 +39,22 @@ struct Process {
 
 impl jack::ProcessHandler for Process {
     fn process(&mut self, _: &Client, ps: &ProcessScope) -> Control {
+        // Once, on the first callback. The server owns this thread, but it lives in our
+        // process, so when the server left it ordinary we can still ask: pipewire-jack does
+        // not always elevate a client's callback thread even where the server's own loops are
+        // realtime. Never override a server that already granted it, since its choice of
+        // priority is deliberate and ours would be lower.
+        if self.sched.load(Relaxed) == 0 {
+            let mut got = crate::realtime::scheduling();
+            if !got.is_realtime() {
+                if let Ok(raised) =
+                    crate::realtime::request_realtime(crate::realtime::AUDIO_PRIORITY)
+                {
+                    got = raised;
+                }
+            }
+            self.sched.store(got.to_bits(), Relaxed);
+        }
         for event in self.midi_in.iter(ps) {
             // Only the three-byte channel messages the mapping layer reads.
             if let [a, b, c] = *event.bytes {
@@ -91,6 +110,8 @@ pub struct Running {
     midi_connected: Vec<String>,
     warnings: Vec<String>,
     xruns: Arc<AtomicU64>,
+    /// What the callback reported about its own scheduling, once it has run.
+    sched: Arc<AtomicU32>,
     sample_rate: u32,
     buffer_size: u32,
 }
@@ -137,8 +158,10 @@ impl JackBackend {
         let buffer_size = client.buffer_size();
         let name = client.name().to_string();
         let xruns = Arc::new(AtomicU64::new(0));
+        let sched = Arc::new(AtomicU32::new(0));
 
         let process = Process {
+            sched: sched.clone(),
             ports,
             renderer: PlanarRenderer::new(frames).split_mono(*routing == Routing::Split),
             processor,
@@ -173,6 +196,7 @@ impl JackBackend {
             name,
             warnings,
             xruns,
+            sched,
             sample_rate,
             buffer_size,
             midi_rx,
@@ -252,6 +276,13 @@ impl Running {
 
     pub fn xruns(&self) -> u64 {
         self.xruns.load(Relaxed)
+    }
+
+    /// How the server scheduled the audio callback, or `None` before it has run once. The
+    /// server owns that thread, so this is a report and not something dj-tui can change: a
+    /// callback that is not realtime glitches under load however large the buffer is.
+    pub fn scheduling(&self) -> Option<crate::realtime::Scheduling> {
+        crate::realtime::Scheduling::from_bits(self.sched.load(Relaxed))
     }
 
     /// Current (ours, theirs) connections, read back from the server.
