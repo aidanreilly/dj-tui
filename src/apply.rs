@@ -254,6 +254,28 @@ pub fn control_value(st: &ControlState, c: &Controls, control: Control) -> f32 {
     .clamp(0.0, 1.0)
 }
 
+/// Actions that move more than one control at once. Everything else goes through `apply`.
+pub fn apply_many(
+    st: &mut ControlState,
+    c: &Controls,
+    snap: &Snapshot,
+    action: Action,
+) -> Vec<Command> {
+    match action {
+        Action::EqSwap(d, b) => {
+            let b = band(b);
+            let (mine, theirs) = (d.index(), 1 - d.index());
+            st.strips[mine].kills[b as usize] = false;
+            st.strips[theirs].kills[b as usize] = true;
+            vec![
+                Command::SetEqKill(d, b, false),
+                Command::SetEqKill(d.other(), b, true),
+            ]
+        }
+        other => apply(st, c, snap, other).into_iter().collect(),
+    }
+}
+
 pub fn apply(
     st: &mut ControlState,
     c: &Controls,

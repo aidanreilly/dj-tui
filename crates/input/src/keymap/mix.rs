@@ -45,10 +45,15 @@ impl Keymap {
         };
 
         if let Some(band) = eq_band(c) {
-            return Some(if alt {
-                EqKill(d, band)
+            // Stepped EQ gain is a MIDI control. The keyboard gets the two gestures it does
+            // well: kill a band, or hand it to the focused deck.
+            if alt {
+                return None;
+            }
+            return Some(if c.is_uppercase() {
+                EqSwap(d, band)
             } else {
-                Eq(d, band, dir(c.is_uppercase()))
+                EqKill(d, band)
             });
         }
 

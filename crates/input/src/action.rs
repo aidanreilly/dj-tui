@@ -44,6 +44,8 @@ pub enum Action {
     Trim(DeckId, Dir),
     Eq(DeckId, Band, Dir),
     EqKill(DeckId, Band),
+    /// Give a band to this deck: restore it here and kill it on the other one.
+    EqSwap(DeckId, Band),
     Filter(DeckId, Dir),
     Fader(DeckId, Dir),
     HeadphoneCue(DeckId),

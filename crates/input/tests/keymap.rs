@@ -71,33 +71,36 @@ fn digits_trigger_hot_cues_and_alt_digits_clear_them() {
 }
 
 #[test]
-fn lowercase_turns_down_and_uppercase_turns_up() {
+fn the_band_keys_kill_and_swap() {
     let mut km = Keymap::new();
-    assert_eq!(
-        press(&mut km, ch('t')),
-        Some(Action::Eq(A, Band::High, Dir::Down))
-    );
-    assert_eq!(
-        press(&mut km, ch('T')),
-        Some(Action::Eq(A, Band::High, Dir::Up))
-    );
-    assert_eq!(
-        press(&mut km, ch('u')),
-        Some(Action::Eq(A, Band::Low, Dir::Down))
-    );
-    assert_eq!(press(&mut km, ch('v')), Some(Action::Fader(A, Dir::Down)));
-    assert_eq!(press(&mut km, ch('V')), Some(Action::Fader(A, Dir::Up)));
-    assert_eq!(press(&mut km, ch('r')), Some(Action::Trim(A, Dir::Down)));
-    assert_eq!(press(&mut km, ch('O')), Some(Action::Filter(A, Dir::Up)));
+    assert_eq!(press(&mut km, ch('t')), Some(Action::EqKill(A, Band::High)));
+    assert_eq!(press(&mut km, ch('y')), Some(Action::EqKill(A, Band::Mid)));
+    assert_eq!(press(&mut km, ch('u')), Some(Action::EqKill(A, Band::Low)));
+    assert_eq!(press(&mut km, ch('U')), Some(Action::EqSwap(A, Band::Low)));
+    press(&mut km, Key::Tab);
+    assert_eq!(press(&mut km, ch('T')), Some(Action::EqSwap(B, Band::High)));
 }
 
 #[test]
-fn alt_on_eq_keys_toggles_kill() {
+fn eq_gain_is_no_longer_on_the_keyboard() {
     let mut km = Keymap::new();
-    assert_eq!(
-        km.handle(KeyEvent::press(ch('y')).alt()),
-        Some(Action::EqKill(A, Band::Mid))
-    );
+    for key in ['t', 'T', 'y', 'Y', 'u', 'U'] {
+        let got = press(&mut km, ch(key));
+        assert!(
+            !matches!(got, Some(Action::Eq(..))),
+            "{key} produced stepped EQ gain"
+        );
+    }
+    assert_eq!(km.handle(KeyEvent::press(ch('t')).alt()), None);
+}
+
+#[test]
+fn the_other_stepped_controls_keep_their_keys() {
+    let mut km = Keymap::new();
+    assert_eq!(press(&mut km, ch('r')), Some(Action::Trim(A, Dir::Down)));
+    assert_eq!(press(&mut km, ch('R')), Some(Action::Trim(A, Dir::Up)));
+    assert_eq!(press(&mut km, ch('o')), Some(Action::Filter(A, Dir::Down)));
+    assert_eq!(press(&mut km, ch('O')), Some(Action::Filter(A, Dir::Up)));
 }
 
 #[test]

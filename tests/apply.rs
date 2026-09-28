@@ -1,7 +1,7 @@
 //! Turning input actions into engine commands. The UI owns the absolute values of mixer
 //! controls and tempo, so repeated key presses between audio callbacks never get lost.
 
-use dj_tui::apply::{apply, ControlState, Controls};
+use dj_tui::apply::{apply, apply_many, ControlState, Controls};
 use engine::{channel, Command, DeckId::*, Engine, Snapshot, Track};
 use input::{Action, Dir};
 use std::sync::Arc;
@@ -693,4 +693,72 @@ mod absolute {
         assert!((control_value(&st, &ctl(), Control::Crossfader) - 0.25).abs() < 1e-6);
         assert!((control_value(&st, &ctl(), Control::Tempo(A)) - 0.75).abs() < 1e-6);
     }
+}
+
+fn kills(cmds: &[Command]) -> Vec<(engine::DeckId, engine::dsp::EqBand, bool)> {
+    cmds.iter()
+        .map(|c| match c {
+            Command::SetEqKill(d, b, on) => (*d, *b, *on),
+            other => panic!("expected a kill, got {other:?}"),
+        })
+        .collect()
+}
+
+fn swap(state: &mut ControlState, snap: &Snapshot, action: Action) -> Vec<Command> {
+    apply_many(state, &ctl(), snap, action)
+}
+
+#[test]
+fn a_band_swap_gives_the_band_to_the_focused_deck() {
+    use engine::dsp::EqBand;
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    let cmds = swap(&mut st, &s, Action::EqSwap(A, input::Band::Low));
+    assert_eq!(
+        kills(&cmds),
+        vec![(A, EqBand::Low, false), (B, EqBand::Low, true)]
+    );
+    assert!(!st.strips[0].kills[EqBand::Low as usize]);
+    assert!(st.strips[1].kills[EqBand::Low as usize]);
+}
+
+#[test]
+fn a_second_swap_to_the_same_deck_changes_nothing() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    swap(&mut st, &s, Action::EqSwap(A, input::Band::Low));
+    let before = st.clone();
+    swap(&mut st, &s, Action::EqSwap(A, input::Band::Low));
+    assert_eq!(
+        st, before,
+        "idempotent, so a double press cannot undo a drop"
+    );
+}
+
+#[test]
+fn a_swap_the_other_way_flips_both_decks() {
+    use engine::dsp::EqBand;
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    swap(&mut st, &s, Action::EqSwap(A, input::Band::Low));
+    let cmds = swap(&mut st, &s, Action::EqSwap(B, input::Band::Low));
+    assert_eq!(
+        kills(&cmds),
+        vec![(B, EqBand::Low, false), (A, EqBand::Low, true)]
+    );
+}
+
+#[test]
+fn a_swap_overrides_whatever_the_kills_were_set_to() {
+    use engine::dsp::EqBand;
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    // Both killed by hand, which is the state a toggle would get wrong.
+    run(&mut st, &s, Action::EqKill(A, input::Band::Mid));
+    run(&mut st, &s, Action::EqKill(B, input::Band::Mid));
+    let cmds = swap(&mut st, &s, Action::EqSwap(B, input::Band::Mid));
+    assert_eq!(
+        kills(&cmds),
+        vec![(B, EqBand::Mid, false), (A, EqBand::Mid, true)]
+    );
 }
