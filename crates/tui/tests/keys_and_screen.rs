@@ -213,12 +213,50 @@ fn mixer_text(m: MixerView, w: u16, h: u16) -> String {
 }
 
 #[test]
-fn mixer_strip_shows_trim_eq_filter_and_meters() {
+fn mixer_strip_shows_trim_eq_meters_and_the_master_filter() {
     let text = mixer_text(MixerView::default(), 120, 44);
     for label in ["TRIM", "HI", "MID", "LOW", "FLT", "PK", "VOL", "CUE"] {
         assert!(text.contains(label), "missing {label}\n{text}");
     }
 }
+
+#[test]
+fn the_flt_row_is_one_master_control_spanning_both_columns() {
+    let m = MixerView {
+        filter: 1.0,
+        ..Default::default()
+    };
+    let text = mixer_text(m, 120, 44);
+    let flt_rows: Vec<&str> = text.lines().filter(|l| l.contains("FLT")).collect();
+    assert_eq!(
+        flt_rows.len(),
+        1,
+        "one FLT row, not a cell per channel: {text}"
+    );
+    let row = flt_rows[0];
+    let after_label = row.split("FLT").nth(1).unwrap();
+    // The label's own column padding comes first, then the bar runs straight on with no
+    // gaps, so its characters (dashes and the marker) form one contiguous run before the
+    // line's background padding starts.
+    let bar_width = after_label
+        .trim_start()
+        .chars()
+        .take_while(|c| matches!(c, '─' | '●' | '┼'))
+        .count();
+    assert_eq!(
+        bar_width,
+        2 * BAR + 1,
+        "a master control's bar should be as wide as both channel columns plus the space \
+         between them, not confined to one column: {row:?}"
+    );
+    let marker = after_label.find(['●', '┼']).expect("a filter marker");
+    assert!(
+        marker > BAR,
+        "at full high-pass the marker should sit past column A's width ({BAR}): {row:?}"
+    );
+}
+
+const BAR: usize = 7;
 
 #[test]
 fn the_mixer_shows_the_headphone_mix() {

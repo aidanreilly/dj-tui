@@ -185,9 +185,9 @@ and from `App::tick_fades` in tests, so it needs no clock. Values go out through
 `apply::set_control`, which keeps `ControlState` the only owner of absolute values and leaves
 MIDI soft takeover working. The engine is not involved.
 
-`Curve::Position` ramps the control's own travel, for the crossfader (whose configured curve is
-already downstream) and for the master filter. `Curve::Decibel` ramps in dB with a −60 dB floor, for
-channel faders, since `SetChannelFader` takes raw amplitude.
+`Curve::Position` ramps the control's own travel, for the crossfader (whose configured curve
+is already downstream) and for the master filter. `Curve::Decibel` ramps in dB with a −60 dB
+floor, for channel faders, since `SetChannelFader` takes raw amplitude.
 
 Lengths come from the deck's beat grid at its current rate and are fixed when the fade starts.
 `MIN_FADE_SECS` is 0.7 s because `Mixer::process` applies fader gains as plain scalars with no
@@ -197,7 +197,9 @@ deferred, not rejected.
 
 A fade dies on `Esc`, on any manual move of the same control from key or knob
 (`manual_control`, and `set_control` cancels first), on a new track loading onto that deck, and
-when another fade claims the control. At most one fade per control.
+when another fade claims the control. At most one fade per control. The master filter's fade
+is the one exception to the track-load clause: it belongs to no deck, so `cancel_deck` leaves
+it running.
 
 ## Browser
 

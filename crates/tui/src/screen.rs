@@ -108,8 +108,8 @@ const HELP: &[(&str, &str)] = &[
     ("r / R", "trim"),
     ("t / y / u", "kill the highs, mids, lows on deck A"),
     ("T / Y / U", "kill the highs, mids, lows on deck B"),
-    ("o / O", "filter toward low-pass and high-pass"),
-    ("v / V", "filter back to the middle, now or slowly"),
+    ("o / O", "master filter toward low-pass and high-pass"),
+    ("v / V", "master filter back to the middle, now or slowly"),
     ("m", "headphone cue"),
     ("h / H", "headphone mix, cue toward master"),
     ("\u{2190} \u{2192}", "crossfader, Shift goes hard to an end"),
@@ -198,9 +198,13 @@ fn eq_cell(db: f32, kill: bool) -> String {
     }
 }
 
-fn filter_cell(v: f32) -> String {
-    let pos = (((v.clamp(-1.0, 1.0) + 1.0) / 2.0) * (BAR - 1) as f32).round() as usize;
-    (0..BAR)
+/// A master control's bar, drawn across both channel columns (`2 * BAR + 1` wide, the width
+/// `a` and `b`'s cells plus their separating space take together) so it reads as one control
+/// over the whole mix rather than sitting under either deck.
+fn master_cell(v: f32) -> String {
+    let width = 2 * BAR + 1;
+    let pos = (((v.clamp(-1.0, 1.0) + 1.0) / 2.0) * (width - 1) as f32).round() as usize;
+    (0..width)
         .map(|i| {
             if i == pos {
                 if v.abs() < 0.05 {
@@ -315,7 +319,7 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 eq_cell(b.eq_db[0], b.kills[0]),
                 m.focused,
             ),
-            Line::from(format!("{:<5}{}", "FLT", filter_cell(m.filter))),
+            Line::from(format!("{:<5}{}", "FLT", master_cell(m.filter))),
             Line::from(""),
             meter_row("PK", a.meter, b.meter, m.focused),
             row(

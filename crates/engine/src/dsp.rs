@@ -1,4 +1,4 @@
-//! Channel DSP: isolator EQ, one-knob filter and trim (spec 3.3).
+//! Mixer DSP: isolator EQ, trim and the one-knob filter (spec 3.3).
 //!
 //! All processors work in place on interleaved stereo, keep their state in fixed-size
 //! structs, and never allocate. Parameter changes are smoothed to avoid zipper noise.
