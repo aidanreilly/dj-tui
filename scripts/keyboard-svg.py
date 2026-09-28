@@ -190,9 +190,8 @@ def main():
     ly = top + 5 * (U + GAP) + 18
     body.append(
         f'<text x="{PAD}" y="{ly:.1f}" font-size="11" fill="{INK}" opacity="0.75">'
-        f'Shift is the second line on a key. Alt on a fader or the filter fades it instead of '
-        f'stepping, and Alt on a hot cue clears it. Letters type into the browser while it '
-        f'holds the keyboard, where Alt and a letter is its own command.</text>'
+        f'Shift is the second line. Alt on a fader or the filter fades it instead of '
+        f'stepping, and Alt on a hot cue clears it.</text>'
     )
     lx = PAD
     ly += 26
