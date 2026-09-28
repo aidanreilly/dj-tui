@@ -61,7 +61,7 @@ One row per key. `Shift +`, `Alt +` or `Ctrl +` change key travel.
 | `↑` / `↓` | The focused deck's channel fader one step, in dB. Shift goes hard to full or to zero, `Alt` fades. |
 | `x` / `X` | Crossfader back to the middle. Shift fades it there instead. |
 | `r` / `R` | Trim down, and up with Shift. |
-| `t` / `y` / `u` | Kill the highs, mids, lows on deck A. Shift (`T` / `Y` / `U`) kills them on deck B. A press toggles, so pressing again gives the band back. |
+| `t` / `y` / `u` | Kill the lows, mids, highs on deck A. Shift (`T` / `Y` / `U`) kills them on deck B. A press toggles, so pressing again gives the band back. |
 | `o` / `O` | Master filter toward low-pass, and toward high-pass with Shift. `Alt` sweeps it there slowly. |
 | `v` / `V` | Master filter back to the middle. Shift sweeps it back over the fade length. |
 | `m` | Headphone cue on the focused channel. |
@@ -121,7 +121,7 @@ with the track and comes back the next time you load it.
 | `↑` / `↓` | Focused deck's channel fader, one step |
 | `Shift+↑` / `Shift+↓` | Focused deck's fader hard to full or to zero |
 | `x` | Crossfader to the middle |
-| `t` / `y` / `u` | Kill the highs, mids, lows on deck A, and with Shift on deck B |
+| `t` / `y` / `u` | Kill the lows, mids, highs on deck A, and with Shift on deck B |
 | `r` / `R` | Trim |
 | `o` / `O` | Master filter toward low-pass and high-pass |
 | `v` | Master filter back to the middle |

@@ -40,9 +40,9 @@ impl Keymap {
         use Action::*;
         let dir = |up: bool| if up { Dir::Up } else { Dir::Down };
         let eq_band = |c: char| match c.to_ascii_lowercase() {
-            't' => Some(Band::High),
+            't' => Some(Band::Low),
             'y' => Some(Band::Mid),
-            'u' => Some(Band::Low),
+            'u' => Some(Band::High),
             _ => None,
         };
 

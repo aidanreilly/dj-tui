@@ -58,16 +58,16 @@
 <text x="361.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">R up</text>
 <rect x="398.0" y="100.0" width="62.0" height="62" rx="7" fill="#8a5a1f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="404.0" y="116.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">T</text>
-<text x="429.0" y="136.0" font-size="9.8" text-anchor="middle" fill="#ffffff">kill hi A</text>
-<text x="429.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">T kill hi B</text>
+<text x="429.0" y="136.0" font-size="9.8" text-anchor="middle" fill="#ffffff">kill lo A</text>
+<text x="429.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">T kill lo B</text>
 <rect x="466.0" y="100.0" width="62.0" height="62" rx="7" fill="#8a5a1f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="472.0" y="116.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">Y</text>
 <text x="497.0" y="136.0" font-size="9.8" text-anchor="middle" fill="#ffffff">kill mid A</text>
 <text x="497.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">Y kill mid B</text>
 <rect x="534.0" y="100.0" width="62.0" height="62" rx="7" fill="#8a5a1f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="540.0" y="116.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">U</text>
-<text x="565.0" y="136.0" font-size="9.8" text-anchor="middle" fill="#ffffff">kill lo A</text>
-<text x="565.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">U kill lo B</text>
+<text x="565.0" y="136.0" font-size="9.8" text-anchor="middle" fill="#ffffff">kill hi A</text>
+<text x="565.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">U kill hi B</text>
 <rect x="602.0" y="100.0" width="62.0" height="62" rx="7" fill="#1f6f72" stroke="#c9c9d2" stroke-width="1"/>
 <text x="608.0" y="116.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">I</text>
 <text x="633.0" y="136.0" font-size="9.8" text-anchor="middle" fill="#ffffff">loop in</text>

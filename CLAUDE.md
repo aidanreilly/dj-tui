@@ -165,7 +165,7 @@ neutral. The channel fader steps in dB, because a linear step is 0.4 dB at the t
 travel and 26 dB at the bottom.
 
 Stepped EQ gain is reachable only from MIDI. The kill switches name their deck rather than
-following focus: `t`/`y`/`u` drop the highs, mids and lows on deck A and `T`/`Y`/`U` on deck B,
+following focus: `t`/`y`/`u` drop the lows, mids and highs on deck A and `T`/`Y`/`U` on deck B,
 and a press toggles. `Action::Eq` and `Control::Eq` are untouched, so encoders and knobs behave
 as before. `apply_many` exists beside `apply` for the actions that move more than
 one control.
