@@ -143,11 +143,7 @@ control = "eq b low"
 
 [[knobs]]
 input = "cc 0 4"
-control = "filter a"
-
-[[knobs]]
-input = "cc 1 4"
-control = "filter b"
+control = "filter"
 
 [[knobs]]
 input = "pitchbend 0"
@@ -206,7 +202,7 @@ state = "loop b"
 #
 # [[buttons]]
 # input = "note 0 42"
-# action = "filter a sweep up"         # also "down" and "centre"
+# action = "filter sweep up"           # also "down" and "centre"
 #
 # [[buttons]]
 # input = "note 0 44"

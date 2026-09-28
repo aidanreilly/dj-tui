@@ -10,8 +10,13 @@ fn controls_read_as_words() {
     assert_eq!(Control::parse("fader a"), Some(Control::Fader(A)));
     assert_eq!(Control::parse("tempo b"), Some(Control::Tempo(B)));
     assert_eq!(Control::parse("trim a"), Some(Control::Trim(A)));
-    assert_eq!(Control::parse("filter b"), Some(Control::Filter(B)));
     assert_eq!(Control::parse("eq b mid"), Some(Control::Eq(B, Band::Mid)));
+}
+
+#[test]
+fn the_filter_is_a_master_control() {
+    assert_eq!(Control::parse("filter"), Some(Control::Filter));
+    assert_eq!(Control::parse("filter a"), None);
 }
 
 #[test]

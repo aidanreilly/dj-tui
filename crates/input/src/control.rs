@@ -12,12 +12,12 @@ pub enum Control {
     Tempo(DeckId),
     Trim(DeckId),
     Eq(DeckId, Band),
-    Filter(DeckId),
+    Filter,
     CueMix,
 }
 
 impl Control {
-    /// Parse a control name: `fader a`, `eq b mid`, `filter a`, `crossfader`.
+    /// Parse a control name: `fader a`, `eq b mid`, `filter`, `crossfader`.
     pub fn parse(text: &str) -> Option<Control> {
         let lower = text.to_ascii_lowercase();
         let words: Vec<&str> = lower.split_whitespace().collect();
@@ -35,10 +35,10 @@ impl Control {
         Some(match words.as_slice() {
             ["crossfader"] => Control::Crossfader,
             ["cue-mix"] => Control::CueMix,
+            ["filter"] => Control::Filter,
             ["fader", d] => Control::Fader(deck(d)?),
             ["tempo", d] => Control::Tempo(deck(d)?),
             ["trim", d] => Control::Trim(deck(d)?),
-            ["filter", d] => Control::Filter(deck(d)?),
             ["eq", d, b] => Control::Eq(deck(d)?, band(b)?),
             _ => return None,
         })

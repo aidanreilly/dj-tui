@@ -74,8 +74,8 @@
 <text x="633.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">I loop out</text>
 <rect x="670.0" y="100.0" width="62.0" height="62" rx="7" fill="#8a5a1f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="676.0" y="116.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">O</text>
-<text x="701.0" y="136.0" font-size="9.8" text-anchor="middle" fill="#ffffff">filter LP</text>
-<text x="701.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">O filter HP</text>
+<text x="701.0" y="136.0" font-size="9.8" text-anchor="middle" fill="#ffffff">master LP</text>
+<text x="701.0" y="150.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">O master HP</text>
 <rect x="738.0" y="100.0" width="62.0" height="62" rx="7" fill="#e3e3e8" stroke="#c9c9d2" stroke-width="1"/>
 <text x="744.0" y="116.0" font-size="12" font-weight="600" fill="#8a8a95" opacity="0.95">P</text>
 <rect x="806.0" y="100.0" width="62.0" height="62" rx="7" fill="#1f6f72" stroke="#c9c9d2" stroke-width="1"/>
@@ -135,7 +135,7 @@
 <text x="344.0" y="272.0" font-size="9.8" text-anchor="middle" fill="#ffffff">cue (hold)</text>
 <rect x="381.0" y="236.0" width="62.0" height="62" rx="7" fill="#8a5a1f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="387.0" y="252.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">V</text>
-<text x="412.0" y="272.0" font-size="9.8" text-anchor="middle" fill="#ffffff">filter mid</text>
+<text x="412.0" y="272.0" font-size="9.8" text-anchor="middle" fill="#ffffff">master mid</text>
 <text x="412.0" y="286.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">V slowly</text>
 <rect x="449.0" y="236.0" width="62.0" height="62" rx="7" fill="#27567f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="455.0" y="252.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">B</text>

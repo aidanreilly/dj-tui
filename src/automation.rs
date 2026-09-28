@@ -23,8 +23,8 @@ const FADE_FLOOR_DB: f32 = -60.0;
 /// How a fade interpolates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Curve {
-    /// Straight down the control's own travel. For the crossfader, whose configured curve is
-    /// already downstream, and for the filter.
+    /// Straight down the control's own travel. For the crossfader (whose configured curve is
+    /// already downstream) and for the master filter.
     Position,
     /// Even in decibels. For channel faders, which take raw amplitude, where a linear ramp
     /// loses 6 dB in the first half of the travel and the rest in a rush at the end.
@@ -137,12 +137,10 @@ impl Automation {
     /// Stop every fade on one deck's controls, for a track being replaced under them.
     pub fn cancel_deck(&mut self, deck: DeckId) {
         self.fades.retain(|f| match f.control {
-            Control::Fader(d)
-            | Control::Filter(d)
-            | Control::Trim(d)
-            | Control::Tempo(d)
-            | Control::Eq(d, _) => d != deck,
-            Control::Crossfader | Control::CueMix => true,
+            Control::Fader(d) | Control::Trim(d) | Control::Tempo(d) | Control::Eq(d, _) => {
+                d != deck
+            }
+            Control::Crossfader | Control::CueMix | Control::Filter => true,
         });
     }
 

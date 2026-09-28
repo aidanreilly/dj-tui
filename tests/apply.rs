@@ -1,9 +1,10 @@
 //! Turning input actions into engine commands. The UI owns the absolute values of mixer
 //! controls and tempo, so repeated key presses between audio callbacks never get lost.
 
-use dj_tui::apply::{apply, apply_many, ControlState, Controls};
+use dj_tui::apply::{apply, apply_many, control_value, set_control, ControlState, Controls};
 use engine::{channel, Command, DeckId::*, Engine, Snapshot, Track};
 use input::{Action, Dir};
+use midi::Control;
 use std::sync::Arc;
 
 fn ctl() -> Controls {
@@ -136,7 +137,7 @@ fn shift_sends_the_fader_to_an_end() {
 }
 
 #[test]
-fn x_centres_the_crossfader_and_v_centres_the_filter() {
+fn x_centres_the_crossfader() {
     let mut st = ControlState::default();
     let s = Snapshot::default();
     st.crossfader = -1.0;
@@ -144,11 +145,24 @@ fn x_centres_the_crossfader_and_v_centres_the_filter() {
         run(&mut st, &s, Action::CrossfaderCentre),
         Some(Command::SetCrossfader(x)) if x == 0.0
     ));
-    st.strips[0].filter = 0.7;
+}
+
+#[test]
+fn the_filter_is_one_control_whatever_has_focus() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
     assert!(matches!(
-        run(&mut st, &s, Action::FilterCentre(A)),
-        Some(Command::SetFilter(A, f)) if f == 0.0
+        run(&mut st, &s, Action::Filter(Dir::Down)),
+        Some(Command::SetFilter(v)) if (v + 0.1).abs() < 1e-6
     ));
+    st.filter = 0.7;
+    assert!(matches!(
+        run(&mut st, &s, Action::FilterCentre),
+        Some(Command::SetFilter(v)) if v == 0.0
+    ));
+    set_control(&mut st, &ctl(), Control::Filter, 1.0);
+    assert_eq!(st.filter, 1.0);
+    assert_eq!(control_value(&st, &ctl(), Control::Filter), 1.0);
 }
 
 #[test]
@@ -614,18 +628,18 @@ fn filter_steps_and_returns_exactly_to_centre() {
     let mut st = ControlState::default();
     let s = Snapshot::default();
     for _ in 0..3 {
-        run(&mut st, &s, Action::Filter(A, Dir::Down));
+        run(&mut st, &s, Action::Filter(Dir::Down));
     }
-    assert!((st.strips[0].filter + 0.3).abs() < 1e-6);
+    assert!((st.filter + 0.3).abs() < 1e-6);
     for _ in 0..3 {
-        run(&mut st, &s, Action::Filter(A, Dir::Up));
+        run(&mut st, &s, Action::Filter(Dir::Up));
     }
-    assert_eq!(st.strips[0].filter, 0.0);
+    assert_eq!(st.filter, 0.0);
     for _ in 0..30 {
-        run(&mut st, &s, Action::Filter(A, Dir::Up));
+        run(&mut st, &s, Action::Filter(Dir::Up));
     }
     assert!(
-        matches!(run(&mut st, &s, Action::Filter(A, Dir::Up)), Some(Command::SetFilter(A, v)) if v == 1.0)
+        matches!(run(&mut st, &s, Action::Filter(Dir::Up)), Some(Command::SetFilter(v)) if v == 1.0)
     );
 }
 
@@ -671,7 +685,7 @@ mod absolute {
     }
 
     #[test]
-    fn eq_trim_and_filter_land_on_their_own_ranges() {
+    fn eq_and_trim_land_on_their_own_ranges() {
         let mut st = ControlState::default();
         set(&mut st, Control::Eq(A, Band::High), 1.0);
         assert_eq!(st.strips[0].eq_db[2], 6.0, "the EQ tops out at +6 dB");
@@ -679,10 +693,6 @@ mod absolute {
         assert!(st.strips[0].eq_db[2] <= -26.0, "and bottoms out at a kill");
         set(&mut st, Control::Trim(A), 1.0);
         assert_eq!(st.strips[0].trim_db, 12.0);
-        set(&mut st, Control::Filter(A), 0.5);
-        assert_eq!(st.strips[0].filter, 0.0, "centred is no filter");
-        set(&mut st, Control::Filter(A), 0.0);
-        assert_eq!(st.strips[0].filter, -1.0);
     }
 
     #[test]

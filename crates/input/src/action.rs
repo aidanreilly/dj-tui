@@ -42,21 +42,22 @@ pub enum Action {
     Trim(DeckId, Dir),
     Eq(DeckId, Band, Dir),
     EqKill(DeckId, Band),
-    Filter(DeckId, Dir),
+    /// The master filter: toward low-pass or toward high-pass.
+    Filter(Dir),
     Fader(DeckId, Dir),
     /// Send the fader hard to an end.
     FaderEnd(DeckId, Dir),
-    /// Put a bipolar control back at neutral.
-    FilterCentre(DeckId),
+    /// Put the master filter back at neutral.
+    FilterCentre,
     CrossfaderCentre,
     /// Fade the crossfader to an end over the fade length.
     CrossfaderFade(Dir),
     CrossfaderFadeCentre,
     /// Fade a channel fader to full or to silence.
     FaderFade(DeckId, Dir),
-    /// Sweep the filter to an end.
-    FilterSweep(DeckId, Dir),
-    FilterSweepCentre(DeckId),
+    /// Sweep the master filter to an end.
+    FilterSweep(Dir),
+    FilterSweepCentre,
     /// Halve or double the shared fade length.
     FadeLength(Dir),
     /// Stop every running fade where it stands.

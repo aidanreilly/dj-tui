@@ -691,10 +691,10 @@ mod fades {
         let (mut app, mut p) = setup();
         app.on_key(KeyEvent::press(Key::Char('O')).alt());
         settle(&mut app, &mut p, 60.0);
-        assert!((app.view(String::new()).mixer.strips[0].filter - 1.0).abs() < 1e-6);
+        assert!((app.view(String::new()).mixer.filter - 1.0).abs() < 1e-6);
         app.on_key(KeyEvent::press(Key::Char('V')));
         settle(&mut app, &mut p, 60.0);
-        assert_eq!(app.view(String::new()).mixer.strips[0].filter, 0.0);
+        assert_eq!(app.view(String::new()).mixer.filter, 0.0);
     }
 }
 

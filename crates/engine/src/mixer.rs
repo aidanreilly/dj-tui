@@ -53,13 +53,12 @@ pub fn crossfader_gains(x: f32, curve: CrossfaderCurve) -> (f32, f32) {
     }
 }
 
-/// One mixer channel: trim, isolator EQ and filter ahead of the fader.
+/// One mixer channel: trim and isolator EQ ahead of the fader.
 struct Channel {
     fader: f32,
     headphone_cue: bool,
     trim: Trim,
     eq: Isolator,
-    filter: DjFilter,
 }
 
 impl Channel {
@@ -69,7 +68,6 @@ impl Channel {
             headphone_cue: false,
             trim: Trim::new(fs),
             eq: Isolator::new(fs),
-            filter: DjFilter::new(fs),
         }
     }
 }
@@ -77,7 +75,7 @@ impl Channel {
 /// Peak levels since the last call to `Engine::take_peaks`.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Meters {
-    /// Per channel, after EQ and filter, before the fader.
+    /// Per channel, after trim and EQ, before the fader.
     pub channels: [f32; 2],
     /// Master bus.
     pub master: f32,
@@ -93,6 +91,7 @@ pub struct Engine {
     cue_mix: f32,
     scratch: [Vec<f32>; 2],
     peaks: Meters,
+    filter: DjFilter,
     limiter: crate::dsp::Limiter,
 }
 
@@ -124,6 +123,7 @@ impl Engine {
                 vec![0.0; MAX_BLOCK_FRAMES * 2],
                 vec![0.0; MAX_BLOCK_FRAMES * 2],
             ],
+            filter: DjFilter::new(fs),
             limiter: crate::dsp::Limiter::new(fs),
         }
     }
@@ -206,7 +206,7 @@ impl Engine {
             SetTrim(d, db) => self.channels[d.index()].trim.set_db(db),
             SetEq(d, band, db) => self.channels[d.index()].eq.set_gain_db(band, db),
             SetEqKill(d, band, kill) => self.channels[d.index()].eq.set_kill(band, kill),
-            SetFilter(d, v) => self.channels[d.index()].filter.set(v),
+            SetFilter(v) => self.filter.set(v),
             SetCuePoint(d, f) => self.deck_mut(d).set_cue_point(f),
             SetHotCue(d, n, f) => self.deck_mut(d).set_hot_cue(n, f),
             SetLoop(d, span) => self.deck_mut(d).set_loop(span),
@@ -235,7 +235,6 @@ impl Engine {
                 deck.render(buf);
                 ch.trim.process(buf);
                 ch.eq.process(buf);
-                ch.filter.process(buf);
                 *peak = buf.iter().fold(*peak, |m, s| m.max(s.abs()));
             }
             let post = [
@@ -251,6 +250,9 @@ impl Engine {
                 m_block[i] = a[i] * post[0] + b[i] * post[1];
                 c_block[i] = a[i] * pfl[0] + b[i] * pfl[1];
             }
+            // The filter is a master control: one knob over the whole mix, ahead of the
+            // limiter so the limiter still has the last word on level.
+            self.filter.process(m_block);
             // The limiter is the last thing on the master bus, and the cue bus blends in
             // what the master actually puts out rather than the sum before it.
             self.limiter.process(m_block);

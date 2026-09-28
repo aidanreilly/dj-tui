@@ -257,7 +257,7 @@ input = "cc 0 2"
 control = "eq b mid"
 [[knobs]]
 input = "cc 0 3"
-control = "filter b"
+control = "filter"
 [[knobs]]
 input = "cc 0 4"
 control = "trim a"
@@ -266,7 +266,7 @@ control = "trim a"
     .unwrap();
     assert_eq!(m.control_for("cc 0 1"), Some(Control::Crossfader));
     assert_eq!(m.control_for("cc 0 2"), Some(Control::Eq(B, Band::Mid)));
-    assert_eq!(m.control_for("cc 0 3"), Some(Control::Filter(B)));
+    assert_eq!(m.control_for("cc 0 3"), Some(Control::Filter));
     assert_eq!(m.control_for("cc 0 4"), Some(Control::Trim(A)));
 }
 
@@ -337,9 +337,9 @@ mod new_gestures {
             "crossfader centre",
             "fader a fade down",
             "fader b fade up",
-            "filter a sweep up",
-            "filter a sweep centre",
-            "filter b centre",
+            "filter sweep up",
+            "filter sweep centre",
+            "filter centre",
             "cancel-fades",
             "fade-length halve",
             "fade-length double",
@@ -378,7 +378,7 @@ mod new_gestures {
 
     #[test]
     fn the_sweep_and_fade_gestures_work_as_encoders_too() {
-        for name in ["crossfader fade", "fader a fade", "filter b sweep"] {
+        for name in ["crossfader fade", "fader a fade", "filter sweep"] {
             let toml = format!("{HEAD}[[encoders]]\ninput = \"cc 0 41\"\naction = \"{name}\"\n");
             Mapping::from_toml(&toml).unwrap_or_else(|e| panic!("{name}: {e}"));
         }

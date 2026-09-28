@@ -155,10 +155,11 @@ fn main() {
                 faders: [1.0, 0.7],
                 headphone_cue: [false, true],
                 cue_mix: 0.4,
+                filter: 0.3,
                 strips: [
-                    StripView { trim_db: 0.0, eq_db: [0.0, 0.0, 2.0], kills: [false; 3], filter: 0.0, meter: 0.8,
+                    StripView { trim_db: 0.0, eq_db: [0.0, 0.0, 2.0], kills: [false; 3], meter: 0.8,
                         fade_target: None },
-                    StripView { trim_db: -2.0, eq_db: [0.0, -6.0, 0.0], kills: [true, false, false], filter: 0.3, meter: 0.35,
+                    StripView { trim_db: -2.0, eq_db: [0.0, -6.0, 0.0], kills: [true, false, false], meter: 0.35,
                         fade_target: None },
                 ],
                 master_meter: 0.85,

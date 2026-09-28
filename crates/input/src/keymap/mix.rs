@@ -99,15 +99,15 @@ impl Keymap {
             // Alt on a continuous control's key means do it slowly.
             'o' | 'O' => {
                 if alt {
-                    FilterSweep(d, dir(c == 'O'))
+                    FilterSweep(dir(c == 'O'))
                 } else {
-                    Filter(d, dir(c == 'O'))
+                    Filter(dir(c == 'O'))
                 }
             }
             'x' => CrossfaderCentre,
             'X' => CrossfaderFadeCentre,
-            'v' => FilterCentre(d),
-            'V' => FilterSweepCentre(d),
+            'v' => FilterCentre,
+            'V' => FilterSweepCentre,
             '{' => FadeLength(Dir::Down),
             '}' => FadeLength(Dir::Up),
             '/' => Search,

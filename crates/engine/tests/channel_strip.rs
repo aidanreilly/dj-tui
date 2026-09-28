@@ -67,11 +67,14 @@ fn eq_gain_command_changes_level() {
 }
 
 #[test]
-fn filter_command_low_passes_the_channel() {
+fn the_filter_is_on_the_master_and_not_on_the_cue_bus() {
     let (mut h, mut p) = setup(6000.0);
-    h.send(Command::SetFilter(A, -1.0)).unwrap();
-    let (m, _) = run(&mut p, 0.5);
-    assert!(m < 0.01, "{m}");
+    h.send(Command::SetHeadphoneCue(A, true)).unwrap();
+    h.send(Command::SetCueMix(0.0)).unwrap();
+    h.send(Command::SetFilter(-1.0)).unwrap();
+    let (m, c) = run(&mut p, 0.5);
+    assert!(m < 0.01, "the master is filtered: {m}");
+    assert!(c > 0.4, "the cue bus is tapped before the sum: {c}");
 }
 
 #[test]

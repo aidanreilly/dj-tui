@@ -594,16 +594,21 @@ impl App {
                     d,
                 );
             }
-            Action::FilterSweep(d, dir) => {
+            Action::FilterSweep(dir) => {
                 self.start_fade(
-                    midi::Control::Filter(d),
+                    midi::Control::Filter,
                     end_of_travel(dir),
                     Curve::Position,
-                    d,
+                    self.keymap.focused(),
                 );
             }
-            Action::FilterSweepCentre(d) => {
-                self.start_fade(midi::Control::Filter(d), 0.5, Curve::Position, d);
+            Action::FilterSweepCentre => {
+                self.start_fade(
+                    midi::Control::Filter,
+                    0.5,
+                    Curve::Position,
+                    self.keymap.focused(),
+                );
             }
             Action::FadeLength(dir) => {
                 self.automation.scale_length(dir);
@@ -766,7 +771,6 @@ impl App {
                 trim_db: st.trim_db,
                 eq_db: st.eq_db,
                 kills: st.kills,
-                filter: st.filter,
                 meter: self.meters[i],
                 fade_target: self.automation.target(midi::Control::Fader(if i == 0 {
                     DeckId::A
@@ -783,6 +787,7 @@ impl App {
             .target(midi::Control::Crossfader)
             .map(|t| t * 2.0 - 1.0);
         v.mixer.cue_mix = self.state.cue_mix;
+        v.mixer.filter = self.state.filter;
         v
     }
 
@@ -806,7 +811,7 @@ fn manual_control(action: Action) -> Option<midi::Control> {
     Some(match action {
         Action::Crossfader(..) | Action::CrossfaderCentre => midi::Control::Crossfader,
         Action::Fader(d, _) | Action::FaderEnd(d, _) => midi::Control::Fader(d),
-        Action::Filter(d, _) | Action::FilterCentre(d) => midi::Control::Filter(d),
+        Action::Filter(_) | Action::FilterCentre => midi::Control::Filter,
         Action::Trim(d, _) => midi::Control::Trim(d),
         Action::Tempo(d, ..) => midi::Control::Tempo(d),
         Action::CueMix(_) => midi::Control::CueMix,
@@ -826,13 +831,13 @@ fn fade_label(control: midi::Control, to: f32) -> String {
             let way = if to > 0.5 { "up" } else { "down" };
             format!("Deck {} fader {way}", deck_letter(d))
         }
-        midi::Control::Filter(d) => {
+        midi::Control::Filter => {
             let way = match to {
                 t if t > 0.75 => "to high-pass",
                 t if t < 0.25 => "to low-pass",
                 _ => "back to the middle",
             };
-            format!("Deck {} filter {way}", deck_letter(d))
+            format!("Filter {way}")
         }
         _ => "Fade".into(),
     }

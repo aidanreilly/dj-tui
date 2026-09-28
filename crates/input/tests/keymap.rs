@@ -1,7 +1,7 @@
 //! Focus-based keyboard mapping from spec section 3.8.
 
 use engine::DeckId::{self, A, B};
-use input::{Action, Band, Dir, Key, KeyEvent, Keymap};
+use input::{parse_action, Action, Band, Dir, Key, KeyEvent, Keymap};
 
 fn press(km: &mut Keymap, key: Key) -> Option<Action> {
     km.handle(KeyEvent::press(key))
@@ -108,8 +108,8 @@ fn the_other_stepped_controls_keep_their_keys() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, ch('r')), Some(Action::Trim(A, Dir::Down)));
     assert_eq!(press(&mut km, ch('R')), Some(Action::Trim(A, Dir::Up)));
-    assert_eq!(press(&mut km, ch('o')), Some(Action::Filter(A, Dir::Down)));
-    assert_eq!(press(&mut km, ch('O')), Some(Action::Filter(A, Dir::Up)));
+    assert_eq!(press(&mut km, ch('o')), Some(Action::Filter(Dir::Down)));
+    assert_eq!(press(&mut km, ch('O')), Some(Action::Filter(Dir::Up)));
 }
 
 #[test]
@@ -194,8 +194,21 @@ fn vertical_arrows_are_the_focused_decks_fader() {
 #[test]
 fn v_is_the_filter_centre_and_no_longer_the_fader() {
     let mut km = Keymap::new();
-    assert_eq!(press(&mut km, ch('v')), Some(Action::FilterCentre(A)));
+    assert_eq!(press(&mut km, ch('v')), Some(Action::FilterCentre));
     assert!(!matches!(press(&mut km, ch('V')), Some(Action::Fader(..))));
+}
+
+#[test]
+fn the_filter_keys_do_not_name_a_deck() {
+    let mut km = Keymap::new();
+    assert_eq!(press(&mut km, ch('o')), Some(Action::Filter(Dir::Down)));
+    assert_eq!(press(&mut km, ch('O')), Some(Action::Filter(Dir::Up)));
+    assert_eq!(press(&mut km, ch('v')), Some(Action::FilterCentre));
+    press(&mut km, Key::Tab);
+    assert_eq!(press(&mut km, ch('o')), Some(Action::Filter(Dir::Down)));
+    assert_eq!(parse_action("filter a up"), None);
+    assert_eq!(parse_action("filter up"), Some(Action::Filter(Dir::Up)));
+    assert_eq!(parse_action("filter centre"), Some(Action::FilterCentre));
 }
 
 #[test]
@@ -232,11 +245,11 @@ fn alt_on_a_continuous_control_fades_it() {
     );
     assert_eq!(
         km.handle(KeyEvent::press(ch('o')).alt()),
-        Some(Action::FilterSweep(A, Dir::Down))
+        Some(Action::FilterSweep(Dir::Down))
     );
     assert_eq!(
         km.handle(KeyEvent::press(ch('O')).alt()),
-        Some(Action::FilterSweep(A, Dir::Up))
+        Some(Action::FilterSweep(Dir::Up))
     );
 }
 
@@ -244,7 +257,7 @@ fn alt_on_a_continuous_control_fades_it() {
 fn the_capitals_of_the_centre_keys_fade_to_centre() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, ch('X')), Some(Action::CrossfaderFadeCentre));
-    assert_eq!(press(&mut km, ch('V')), Some(Action::FilterSweepCentre(A)));
+    assert_eq!(press(&mut km, ch('V')), Some(Action::FilterSweepCentre));
 }
 
 #[test]
@@ -376,8 +389,8 @@ mod action_names {
             Some(Action::CrossfaderCentre)
         );
         assert_eq!(
-            parse_action("filter a centre"),
-            Some(Action::FilterCentre(A))
+            parse_action("filter centre"),
+            Some(Action::FilterCentre)
         );
         assert_eq!(
             parse_action("fader b down end"),
@@ -397,12 +410,12 @@ mod action_names {
             Some(Action::FaderFade(A, Dir::Down))
         );
         assert_eq!(
-            parse_action("filter b sweep up"),
-            Some(Action::FilterSweep(B, Dir::Up))
+            parse_action("filter sweep up"),
+            Some(Action::FilterSweep(Dir::Up))
         );
         assert_eq!(
-            parse_action("filter b sweep centre"),
-            Some(Action::FilterSweepCentre(B))
+            parse_action("filter sweep centre"),
+            Some(Action::FilterSweepCentre)
         );
         assert_eq!(
             parse_action("fade-length double"),
@@ -412,10 +425,7 @@ mod action_names {
         assert_eq!(parse_action("browser"), Some(Action::BrowserEnter));
         assert_eq!(parse_action("browser-clear"), Some(Action::BrowserClear));
         // The general forms still reach their own arms.
-        assert_eq!(
-            parse_action("filter a up"),
-            Some(Action::Filter(A, Dir::Up))
-        );
+        assert_eq!(parse_action("filter up"), Some(Action::Filter(Dir::Up)));
         assert_eq!(
             parse_action("fader b down"),
             Some(Action::Fader(B, Dir::Down))

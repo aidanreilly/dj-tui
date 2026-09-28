@@ -16,6 +16,8 @@ pub struct MixerView {
     pub headphone_cue: [bool; 2],
     /// Headphone blend: 0 is the cue bus alone, 1 is the master alone.
     pub cue_mix: f32,
+    /// -1 full low-pass, 0 off, 1 full high-pass.
+    pub filter: f32,
     pub strips: [StripView; 2],
     /// Master bus peak, linear.
     pub master_meter: f32,
@@ -34,6 +36,7 @@ impl Default for MixerView {
             faders: [1.0; 2],
             headphone_cue: [false; 2],
             cue_mix: 0.5,
+            filter: 0.0,
             strips: Default::default(),
             master_meter: 0.0,
             // Zero would draw "fade 0" on any view built without one.
@@ -52,8 +55,6 @@ pub struct StripView {
     pub eq_db: [f32; 3],
     /// Indexed low, mid, high.
     pub kills: [bool; 3],
-    /// -1 full low-pass, 0 off, 1 full high-pass.
-    pub filter: f32,
     /// Channel peak, linear, pre-fader.
     pub meter: f32,
     /// Where a running fader fade is heading, 0 to 1.
@@ -314,12 +315,7 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 eq_cell(b.eq_db[0], b.kills[0]),
                 m.focused,
             ),
-            row(
-                "FLT",
-                filter_cell(a.filter),
-                filter_cell(b.filter),
-                m.focused,
-            ),
+            Line::from(format!("{:<5}{}", "FLT", filter_cell(m.filter))),
             Line::from(""),
             meter_row("PK", a.meter, b.meter, m.focused),
             row(

@@ -64,10 +64,10 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["eq", d, b, way] => Action::Eq(deck(d)?, band(b)?, dir(way)?),
         // Each keyword form goes above the general form of the same length, or the general
         // one swallows the keyword as a direction and the name is rejected.
-        ["filter", d, "centre"] => Action::FilterCentre(deck(d)?),
-        ["filter", d, "sweep", "centre"] => Action::FilterSweepCentre(deck(d)?),
-        ["filter", d, "sweep", way] => Action::FilterSweep(deck(d)?, dir(way)?),
-        ["filter", d, way] => Action::Filter(deck(d)?, dir(way)?),
+        ["filter", "centre"] => Action::FilterCentre,
+        ["filter", "sweep", "centre"] => Action::FilterSweepCentre,
+        ["filter", "sweep", way] => Action::FilterSweep(dir(way)?),
+        ["filter", way] => Action::Filter(dir(way)?),
         ["fader", d, way, "end"] => Action::FaderEnd(deck(d)?, dir(way)?),
         ["fader", d, "fade", way] => Action::FaderFade(deck(d)?, dir(way)?),
         ["fader", d, way] => Action::Fader(deck(d)?, dir(way)?),

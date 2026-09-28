@@ -23,7 +23,7 @@ fn process_with_commands_does_not_allocate_or_free() {
         .unwrap();
     h.send(Command::SetEqKill(A, engine::dsp::EqBand::Low, true))
         .unwrap();
-    h.send(Command::SetFilter(A, -0.6)).unwrap();
+    h.send(Command::SetFilter(-0.6)).unwrap();
     h.send(Command::SetTrim(A, 3.0)).unwrap();
     h.send(Command::SetLoop(A, Some((100.0, 5_000.0)))).unwrap();
     h.send(Command::SetKeyLock(A, true)).unwrap();

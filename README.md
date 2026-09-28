@@ -2,7 +2,7 @@
 
 A two-deck DJ console for the Linux terminal.
 
-Two decks with CDJ-style cueing, hot cues, loops and key lock, a three-band isolator mixer with filter, colour waveforms drawn as real pixels where the terminal allows it, and tempo and key detection that runs as a track loads.
+Two decks with CDJ-style cueing, hot cues, loops and key lock, a three-band isolator mixer with a master filter, colour waveforms drawn as real pixels where the terminal allows it, and tempo and key detection that runs as a track loads.
 
 Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
@@ -64,8 +64,8 @@ One row per key. `Shift +`, `Alt +` or `Ctrl +` change key travel.
 | `x` / `X` | Crossfader back to the middle. Shift fades it there instead. |
 | `r` / `R` | Trim down, and up with Shift. |
 | `t` / `y` / `u` | Kill the highs, mids, lows on deck A. Shift (`T` / `Y` / `U`) kills them on deck B. A press toggles, so pressing again gives the band back. |
-| `o` / `O` | Filter toward low-pass, and toward high-pass with Shift. `Alt` sweeps it there slowly. |
-| `v` / `V` | Filter back to the middle. Shift sweeps it back over the fade length. |
+| `o` / `O` | Master filter toward low-pass, and toward high-pass with Shift. `Alt` sweeps it there slowly. |
+| `v` / `V` | Master filter back to the middle. Shift sweeps it back over the fade length. |
 | `m` | Headphone cue on the focused channel. |
 | `h` / `H` | Headphone mix, from the cue bus toward the master with Shift. |
 | `w` | Waveform colour mode: 3-Band, RGB, Blue. Shift does the same thing. |
@@ -128,8 +128,8 @@ deck has focus.
 | `x` | Crossfader to the middle |
 | `t` / `y` / `u` | Kill the highs, mids, lows on deck A, and with Shift on deck B |
 | `r` / `R` | Trim |
-| `o` / `O` | Filter toward low-pass and high-pass |
-| `v` | Filter back to the middle |
+| `o` / `O` | Master filter toward low-pass and high-pass |
+| `v` | Master filter back to the middle |
 | `m` | Headphone cue on this channel |
 | `h` / `H` | Headphone mix, from the cue bus toward the master |
 
@@ -149,9 +149,9 @@ control's key means do it slowly**, over the fade length.
 | --- | --- |
 | `Alt+←` / `Alt+→` | Crossfader fades to that end |
 | `Alt+↑` / `Alt+↓` | Focused deck's fader fades to full or to silence |
-| `Alt+o` / `Alt+O` | Filter sweeps to that end |
+| `Alt+o` / `Alt+O` | Master filter sweeps to that end |
 | `X` | Crossfader fades to the middle |
-| `V` | Filter sweeps back to the middle |
+| `V` | Master filter sweeps back to the middle |
 | `{` / `}` | Halve and double the fade length |
 | `Esc` | Stop every running fade where it stands |
 

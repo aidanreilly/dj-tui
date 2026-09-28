@@ -115,15 +115,19 @@ fn cancelling_stops_a_fade_where_it_stands() {
 }
 
 #[test]
-fn a_deck_cancel_leaves_the_other_deck_and_the_crossfader_alone() {
+fn a_deck_cancel_leaves_the_other_deck_the_crossfader_and_the_master_filter_alone() {
     let mut a = Automation::new(8.0);
     a.start(Control::Fader(A), 1.0, 0.0, 1.0, Curve::Decibel);
-    a.start(Control::Filter(A), 0.0, 1.0, 1.0, Curve::Position);
+    a.start(Control::Filter, 0.0, 1.0, 1.0, Curve::Position);
     a.start(Control::Fader(B), 0.0, 1.0, 1.0, Curve::Decibel);
     a.start(Control::Crossfader, -1.0, 1.0, 1.0, Curve::Position);
     a.cancel_deck(A);
     assert_eq!(a.target(Control::Fader(A)), None);
-    assert_eq!(a.target(Control::Filter(A)), None);
+    assert_eq!(
+        a.target(Control::Filter),
+        Some(1.0),
+        "the filter is a master control, not one deck's"
+    );
     assert_eq!(a.target(Control::Fader(B)), Some(1.0));
     assert_eq!(a.target(Control::Crossfader), Some(1.0));
 }

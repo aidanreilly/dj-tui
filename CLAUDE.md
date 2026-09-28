@@ -160,7 +160,7 @@ lining up against that frozen phase used to seek the running deck back to the to
 The phase meter takes the same view and goes quiet unless both decks are running.
 
 Horizontal arrows are the crossfader, vertical arrows the focused deck's channel fader, with
-`Shift` going hard to an end. `x`/`X` and `v`/`V` return the crossfader and the filter to
+`Shift` going hard to an end. `x`/`X` and `v`/`V` return the crossfader and the master filter to
 neutral. The channel fader steps in dB, because a linear step is 0.4 dB at the top of the
 travel and 26 dB at the bottom.
 
@@ -186,7 +186,7 @@ and from `App::tick_fades` in tests, so it needs no clock. Values go out through
 MIDI soft takeover working. The engine is not involved.
 
 `Curve::Position` ramps the control's own travel, for the crossfader (whose configured curve is
-already downstream) and the filter. `Curve::Decibel` ramps in dB with a −60 dB floor, for
+already downstream) and for the master filter. `Curve::Decibel` ramps in dB with a −60 dB floor, for
 channel faders, since `SetChannelFader` takes raw amplitude.
 
 Lengths come from the deck's beat grid at its current rate and are fixed when the fade starts.
@@ -225,6 +225,11 @@ out rather than the raw sum. The gain can never rise above what the current samp
 the output cannot pass `LIMIT_CEILING` at all; only the recovery is smoothed. Channel meters
 read pre-limiter, the master meter reads after it. A test that sets a level near full scale
 should measure the cue bus, which is pre-fader and ahead of the limiter.
+
+The filter is one control on the master bus rather than one per channel, sitting immediately
+ahead of the limiter so the limiter still has the last word on level. The headphone cue is
+tapped pre-fader, before the channels are summed onto the master, so it hears the filter only
+through the cue mix, which is what a master filter does on hardware.
 
 ## Track sidecar
 

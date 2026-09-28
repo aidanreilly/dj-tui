@@ -54,15 +54,16 @@ pub struct ControlState {
     pub key_lock: [bool; 2],
     /// Headphone blend: 0 is the cue bus alone, 1 is the master alone.
     pub cue_mix: f32,
+    /// Master filter: -1 full low-pass, 0 off, 1 full high-pass.
+    pub filter: f32,
 }
 
-/// Trim, EQ and filter for one channel. Arrays are indexed by `EqBand as usize`.
+/// Trim and EQ for one channel. Arrays are indexed by `EqBand as usize`.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct StripState {
     pub trim_db: f32,
     pub eq_db: [f32; 3],
     pub kills: [bool; 3],
-    pub filter: f32,
 }
 
 pub const FADER_STEP_DB: f32 = 2.0;
@@ -127,6 +128,7 @@ impl Default for ControlState {
             quantize: [false; 2],
             key_lock: [false; 2],
             cue_mix: 0.5,
+            filter: 0.0,
         }
     }
 }
@@ -205,10 +207,10 @@ pub fn set_control(
             st.strips[d.index()].eq_db[b as usize] = db;
             Command::SetEq(d, b, db)
         }
-        Control::Filter(d) => {
+        Control::Filter => {
             let f = v * 2.0 - 1.0;
-            st.strips[d.index()].filter = f;
-            Command::SetFilter(d, f)
+            st.filter = f;
+            Command::SetFilter(f)
         }
     })
 }
@@ -231,7 +233,7 @@ pub fn control_value(st: &ControlState, c: &Controls, control: Control) -> f32 {
                 0.5 - db / EQ_FLOOR_DB / 2.0
             }
         }
-        Control::Filter(d) => (st.strips[d.index()].filter + 1.0) / 2.0,
+        Control::Filter => (st.filter + 1.0) / 2.0,
     }
     .clamp(0.0, 1.0)
 }
@@ -348,9 +350,9 @@ pub fn apply(
             st.crossfader = 0.0;
             Command::SetCrossfader(0.0)
         }
-        FilterCentre(d) => {
-            st.strips[d.index()].filter = 0.0;
-            Command::SetFilter(d, 0.0)
+        FilterCentre => {
+            st.filter = 0.0;
+            Command::SetFilter(0.0)
         }
         CueMix(dir) => {
             st.cue_mix = step(st.cue_mix, CUE_MIX_STEP * sign(dir), 0.0, 1.0);
@@ -387,14 +389,14 @@ pub fn apply(
             *k = !*k;
             Command::SetEqKill(d, b, *k)
         }
-        Filter(d, dir) => {
-            let f = &mut st.strips[d.index()].filter;
+        Filter(dir) => {
+            let f = &mut st.filter;
             *f = step(*f, FILTER_STEP * sign(dir), -1.0, 1.0);
             // Rounding leaves -0.0 when stepping back from below; keep centre exact.
             if *f == 0.0 {
                 *f = 0.0;
             }
-            Command::SetFilter(d, *f)
+            Command::SetFilter(*f)
         }
         LoopToggle(d) => {
             let i = d.index();
