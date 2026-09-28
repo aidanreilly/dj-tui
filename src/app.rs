@@ -584,7 +584,13 @@ impl App {
                 self.browser.clear_query();
                 self.keymap.set_mode(input::Mode::Browser);
             }
-            Action::BrowserEnter => self.keymap.set_mode(input::Mode::Browser),
+            // `b` is a decision to go and look through the library, so the list gets the
+            // screen. `/` is the way in that leaves the decks visible, and Alt+f moves
+            // between the two without leaving the browser.
+            Action::BrowserEnter => {
+                self.browser.fullscreen = true;
+                self.keymap.set_mode(input::Mode::Browser);
+            }
             Action::BrowserLeave => {
                 // Full screen is a browser-mode affordance; leaving it behind would strand
                 // the person in mix mode with no mixer on screen and no key to bring it back.

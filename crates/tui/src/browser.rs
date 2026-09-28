@@ -41,7 +41,7 @@ pub struct BrowserView {
 /// What browser mode offers, on the panel's own bottom row. Six bindings document themselves
 /// better here than in an overlay nobody opens.
 const HINT: &str =
-    "Esc back  Enter load  Tab deck  Ctrl+u clear  Alt+s sort  Alt+a analyse  Alt+f full";
+    "Esc back  Enter load  Tab deck  Ctrl+u clear  Alt+s sort  Alt+a analyse  Alt+f size";
 
 /// Width of each fixed column, and the gap between them.
 const BPM_WIDTH: usize = 6;

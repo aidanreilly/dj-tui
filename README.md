@@ -225,7 +225,8 @@ Echo and reverb keep ringing after you switch them off, rather than cutting dead
 | `Ctrl+Q` | Quit |
 
 In browser mode letters are letters, so its own commands sit on a modifier: `Alt+s` and
-`Alt+S` sort, `Alt+a` analyses, `Alt+f` goes full screen, `Ctrl+u` clears the filter.
+`Alt+S` sort, `Alt+a` analyses, `Alt+f` swaps between full screen and the panel, `Ctrl+u`
+clears the filter.
 
 ## The browser
 
@@ -236,10 +237,11 @@ Point dj-tui at your music and the bottom panel lists it:
 folders = ["~/Music", "/mnt/crates"]
 ```
 
-`b` gives the browser the keyboard. Its border lights up, its commands appear along the bottom
-of the panel, and typing narrows the list as you go, matching letters in order without needing
-them next to each other, so `whte` finds `Warehouse Tool`. `/` does the same and clears any
-filter first.
+`b` gives the browser the keyboard and the whole screen, and `Esc` brings the decks back in
+one press. Its border lights up, its commands appear along the bottom of the panel, and typing
+narrows the list as you go, matching letters in order without needing them next to each other,
+so `whte` finds `Warehouse Tool`. `/` does the same with the decks still on screen, and clears
+any filter first.
 
 While the browser holds the keyboard, every letter is a letter, so a track called `wave` types
 without cycling the waveform colours. That leaves its own commands on a modifier:
@@ -253,7 +255,7 @@ without cycling the waveform colours. That leaves its own commands on a modifier
 | `Ctrl+u` | Clear the filter |
 | `Alt+s` / `Alt+S` | Sort column, and the direction |
 | `Alt+a` | Analyse everything with no analysis yet |
-| `Alt+f` | Full screen |
+| `Alt+f` | Full screen or the panel beside the decks |
 | `Esc` | Back to mix mode |
 
 `Esc` always leaves in one press, and the filter stays on. It keeps showing under the list, so

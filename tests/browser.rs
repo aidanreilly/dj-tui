@@ -213,17 +213,36 @@ fn the_sort_key_cycles_the_columns_and_reverses() {
 }
 
 #[test]
-fn b_gives_the_browser_the_keyboard_and_alt_f_the_whole_screen() {
+fn b_gives_the_browser_the_keyboard_and_the_whole_screen() {
     let (mut app, _p) = setup();
     assert!(!app.view(String::new()).browser.active);
     press(&mut app, Key::Char('b'));
-    assert!(app.view(String::new()).browser.active);
-    assert!(!app.view(String::new()).browser.fullscreen, "not yet");
+    let view = app.view(String::new());
+    assert!(view.browser.active);
+    assert!(
+        view.browser.fullscreen,
+        "browsing is what the screen is for while you are doing it"
+    );
 
     app.on_key(KeyEvent::press(Key::Char('f')).alt());
-    assert!(app.view(String::new()).browser.fullscreen);
+    assert!(
+        !app.view(String::new()).browser.fullscreen,
+        "alt+f drops back to the panel without leaving the browser"
+    );
     app.on_key(KeyEvent::press(Key::Char('f')).alt());
-    assert!(!app.view(String::new()).browser.fullscreen);
+    assert!(app.view(String::new()).browser.fullscreen);
+}
+
+#[test]
+fn search_keeps_the_decks_on_screen() {
+    let (mut app, _p) = setup();
+    press(&mut app, Key::Char('/'));
+    let view = app.view(String::new());
+    assert!(view.browser.active);
+    assert!(
+        !view.browser.fullscreen,
+        "a search is the one way into the browser that leaves the decks visible"
+    );
 }
 
 #[test]
@@ -376,7 +395,6 @@ mod devices {
 fn leaving_browser_mode_gives_the_mixer_back_even_from_full_screen() {
     let (mut app, _p) = setup();
     press(&mut app, Key::Char('b'));
-    app.on_key(KeyEvent::press(Key::Char('f')).alt());
     assert!(app.view(String::new()).browser.fullscreen);
 
     press(&mut app, Key::Esc);
