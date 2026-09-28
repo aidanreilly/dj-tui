@@ -118,44 +118,10 @@ fn tempo_has_normal_and_fine_steps() {
 }
 
 #[test]
-fn backtick_sends_exactly_one_key_to_the_other_deck() {
-    let mut km = Keymap::new();
-    assert_eq!(press(&mut km, ch('`')), None);
-    assert_eq!(
-        press(&mut km, ch('u')),
-        Some(Action::Eq(B, Band::Low, Dir::Down))
-    );
-    assert_eq!(km.focused(), A);
-    assert_eq!(
-        press(&mut km, ch('u')),
-        Some(Action::Eq(A, Band::Low, Dir::Down))
-    );
-}
-
-#[test]
-fn backtick_before_a_global_key_is_consumed() {
-    let mut km = Keymap::new();
-    press(&mut km, ch('`'));
-    assert_eq!(
-        press(&mut km, Key::Left),
-        Some(Action::Crossfader(Dir::Down, false))
-    );
-    assert_eq!(press(&mut km, Key::Space), Some(Action::PlayPause(A)));
-}
-
-#[test]
-fn double_backtick_cancels() {
-    let mut km = Keymap::new();
-    press(&mut km, ch('`'));
-    press(&mut km, ch('`'));
-    assert_eq!(press(&mut km, Key::Space), Some(Action::PlayPause(A)));
-}
-
-#[test]
-fn enter_loads_into_focused_or_other_deck() {
+fn enter_loads_into_the_focused_deck() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, Key::Enter), Some(Action::Load(A)));
-    press(&mut km, ch('`'));
+    press(&mut km, Key::Tab);
     assert_eq!(press(&mut km, Key::Enter), Some(Action::Load(B)));
 }
 
@@ -171,8 +137,7 @@ fn global_keys() {
         Some(Action::Crossfader(Dir::Down, true))
     );
     assert_eq!(press(&mut km, Key::Up), Some(Action::BrowserMove(Dir::Up)));
-    assert_eq!(press(&mut km, ch('/')), Some(Action::Search));
-    assert_eq!(press(&mut km, ch('b')), Some(Action::BrowserFullscreen));
+    // `/` and `b` hand the keyboard to the browser, which the modes tests cover.
     assert_eq!(press(&mut km, ch('w')), Some(Action::CycleWaveformMode));
     assert_eq!(press(&mut km, ch('W')), Some(Action::CycleWaveformMode));
     assert_eq!(press(&mut km, ch('?')), Some(Action::Help));
@@ -309,5 +274,165 @@ mod action_names {
         assert_eq!(parse_action("fly a"), None);
         assert_eq!(parse_action(""), None);
         assert_eq!(parse_action("play a b"), None, "no trailing rubbish");
+    }
+}
+
+mod modes {
+    use super::*;
+    use input::Mode;
+
+    fn alt(km: &mut Keymap, key: Key) -> Option<Action> {
+        km.handle(KeyEvent::press(key).alt())
+    }
+
+    #[test]
+    fn mix_mode_is_where_it_starts() {
+        assert_eq!(Keymap::new().mode(), Mode::Mix);
+    }
+
+    #[test]
+    fn b_enters_browser_mode_and_esc_leaves_in_one_press() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('b')), Some(Action::BrowserEnter));
+        assert_eq!(km.mode(), Mode::Browser);
+        assert_eq!(press(&mut km, Key::Esc), Some(Action::BrowserLeave));
+        assert_eq!(km.mode(), Mode::Mix);
+    }
+
+    #[test]
+    fn slash_enters_browser_mode_clearing_the_query() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('/')), Some(Action::Search));
+        assert_eq!(km.mode(), Mode::Browser);
+    }
+
+    #[test]
+    fn letters_digits_and_space_type_in_browser_mode() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('b'));
+        assert_eq!(press(&mut km, ch('w')), Some(Action::BrowserType('w')));
+        assert_eq!(press(&mut km, ch('4')), Some(Action::BrowserType('4')));
+        assert_eq!(press(&mut km, Key::Space), Some(Action::BrowserType(' ')));
+        assert_eq!(press(&mut km, ch('/')), Some(Action::BrowserType('/')));
+        assert_eq!(press(&mut km, ch('b')), Some(Action::BrowserType('b')));
+    }
+
+    /// Review Focus 3. Shift plus a letter is a character, not a mix gesture.
+    #[test]
+    fn shift_and_a_letter_types_the_capital() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('b'));
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('B')).shift()),
+            Some(Action::BrowserType('B'))
+        );
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('U')).shift()),
+            Some(Action::BrowserType('U'))
+        );
+    }
+
+    /// Review Focus 2. Browser mode owns the keyboard, so modified keys do not leak.
+    #[test]
+    fn modified_keys_do_not_reach_the_mixer_from_browser_mode() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('b'));
+        assert_eq!(alt(&mut km, Key::Left), None);
+        assert_eq!(km.handle(KeyEvent::press(Key::Up).shift()), None);
+        assert_eq!(km.handle(KeyEvent::press(ch('d')).ctrl()), None);
+        assert_eq!(km.mode(), Mode::Browser, "none of that left the mode");
+    }
+
+    #[test]
+    fn arrows_move_the_list_and_enter_loads_the_focused_deck() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('b'));
+        assert_eq!(
+            press(&mut km, Key::Down),
+            Some(Action::BrowserMove(Dir::Down))
+        );
+        assert_eq!(press(&mut km, Key::Up), Some(Action::BrowserMove(Dir::Up)));
+        assert_eq!(press(&mut km, Key::Enter), Some(Action::Load(A)));
+    }
+
+    #[test]
+    fn tab_stays_live_so_the_destination_deck_can_be_chosen() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('b'));
+        assert_eq!(press(&mut km, Key::Tab), Some(Action::Focus(B)));
+        assert_eq!(km.mode(), Mode::Browser);
+        assert_eq!(press(&mut km, Key::Enter), Some(Action::Load(B)));
+    }
+
+    #[test]
+    fn backspace_and_ctrl_u_edit_the_query() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('b'));
+        assert_eq!(
+            press(&mut km, Key::Backspace),
+            Some(Action::BrowserBackspace)
+        );
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('u')).ctrl()),
+            Some(Action::BrowserClear)
+        );
+    }
+
+    #[test]
+    fn alt_and_a_letter_is_a_browser_command() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('b'));
+        assert_eq!(alt(&mut km, ch('s')), Some(Action::BrowserSort(false)));
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('S')).alt()),
+            Some(Action::BrowserSort(true))
+        );
+        assert_eq!(alt(&mut km, ch('a')), Some(Action::AnalyseLibrary));
+        assert_eq!(alt(&mut km, ch('f')), Some(Action::BrowserFullscreen));
+    }
+
+    #[test]
+    fn ctrl_q_quits_from_any_mode() {
+        let mut km = Keymap::new();
+        press(&mut km, ch('b'));
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('q')).ctrl()),
+            Some(Action::Quit)
+        );
+    }
+
+    #[test]
+    fn ctrl_d_opens_and_closes_the_device_screen() {
+        let mut km = Keymap::new();
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('d')).ctrl()),
+            Some(Action::Devices)
+        );
+        assert_eq!(km.mode(), Mode::Devices);
+        assert_eq!(
+            press(&mut km, Key::Down),
+            Some(Action::DeviceMove(Dir::Down))
+        );
+        assert_eq!(press(&mut km, Key::Enter), Some(Action::DeviceChoose));
+        assert_eq!(km.mode(), Mode::Mix, "choosing closes it");
+        km.handle(KeyEvent::press(ch('d')).ctrl());
+        assert_eq!(press(&mut km, Key::Esc), Some(Action::DeviceClose));
+        assert_eq!(km.mode(), Mode::Mix);
+    }
+
+    #[test]
+    fn letters_do_nothing_in_device_mode() {
+        let mut km = Keymap::new();
+        km.handle(KeyEvent::press(ch('d')).ctrl());
+        assert_eq!(press(&mut km, ch('l')), None);
+        assert_eq!(press(&mut km, Key::Space), None);
+    }
+
+    #[test]
+    fn backtick_is_no_longer_a_key() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('`')), None);
+        // The next key is an ordinary key on the focused deck, not a redirected one.
+        assert_eq!(press(&mut km, Key::Space), Some(Action::PlayPause(A)));
     }
 }

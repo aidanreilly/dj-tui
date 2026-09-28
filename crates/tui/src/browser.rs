@@ -29,8 +29,10 @@ pub struct BrowserView {
     /// Column the list is ordered by, for the title.
     pub sort: &'static str,
     pub ascending: bool,
-    /// The query while it is being typed, shown under the list.
+    /// The query while it is filtering, shown under the list.
     pub search: Option<String>,
+    /// Browser mode holds the keyboard: letters type and Alt plus a letter is a command.
+    pub active: bool,
     pub fullscreen: bool,
     /// What the list holds, or what it is busy doing.
     pub status: String,

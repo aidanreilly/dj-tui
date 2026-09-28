@@ -5,7 +5,7 @@ use crate::apply::{apply, ControlState, Controls};
 use crate::config::Config;
 use crate::view::{screen_view, DeckMeta};
 use engine::{Command, DeckId, EngineHandle, Snapshot};
-use input::{Action, Key, KeyEvent, Keymap};
+use input::{Action, KeyEvent, Keymap};
 use loader::sidecar::Cues;
 use loader::Loader;
 use std::path::PathBuf;
@@ -366,32 +366,6 @@ impl App {
 
     /// Handle one key event. Returns true when the user asked to quit.
     pub fn on_key(&mut self, key: KeyEvent) -> bool {
-        // While the search prompt is open the keyboard belongs to it, so a track called
-        // "wave" can be typed without cycling the waveform colours.
-        if self.browser.typing() {
-            match key.key {
-                Key::Char(c) => self.browser.type_char(c),
-                Key::Space => self.browser.type_char(' '),
-                Key::Backspace => self.browser.backspace(),
-                Key::Enter => self.browser.accept_search(),
-                Key::Esc => self.browser.cancel_search(),
-                Key::Up => self.browser.move_selection(input::Dir::Up),
-                Key::Down => self.browser.move_selection(input::Dir::Down),
-                _ => {}
-            }
-            return false;
-        }
-        if self.device_selected.is_some() {
-            match key.key {
-                Key::Up => self.move_device(-1),
-                Key::Down => self.move_device(1),
-                Key::Enter => self.choose_device(),
-                Key::Esc => self.device_selected = None,
-                Key::Char('d') if key.ctrl => self.device_selected = None,
-                _ => {}
-            }
-            return false;
-        }
         let Some(action) = self.keymap.handle(key) else {
             return false;
         };
@@ -544,7 +518,18 @@ impl App {
             Action::BrowserMove(dir) => self.browser.move_selection(dir),
             Action::BrowserSort(reverse) => self.browser.sort_by(reverse),
             Action::BrowserFullscreen => self.browser.fullscreen = !self.browser.fullscreen,
-            Action::Search => self.browser.start_search(),
+            Action::Search => self.browser.clear_query(),
+            // Entering and leaving are the keymap's business; the app only draws the result.
+            Action::BrowserEnter | Action::BrowserLeave => {}
+            Action::BrowserType(c) => self.browser.type_char(c),
+            Action::BrowserBackspace => self.browser.backspace(),
+            Action::BrowserClear => self.browser.clear_query(),
+            Action::DeviceMove(dir) => self.move_device(match dir {
+                input::Dir::Up => -1,
+                input::Dir::Down => 1,
+            }),
+            Action::DeviceChoose => self.choose_device(),
+            Action::DeviceClose => self.device_selected = None,
             Action::AnalyseLibrary => self.start_analysis(),
             Action::Devices => {
                 // Open on the device in use, so Enter on it changes nothing.
@@ -617,7 +602,9 @@ impl App {
             .find(|&&i| snapshot.decks[i].playing)
             .and_then(|&i| self.metas[i].key.as_deref())
             .and_then(analysis::key::Key::from_camelot);
-        v.browser = self.browser.view(playing);
+        v.browser = self
+            .browser
+            .view(self.keymap.mode() == input::Mode::Browser, playing);
         v.devices = self.device_selected.map(|selected| tui::DeviceView {
             devices: self.devices.clone(),
             selected,

@@ -59,6 +59,18 @@ pub enum Action {
     BrowserSort(bool),
     /// Analyse every track in the browser that has no sidecar yet.
     AnalyseLibrary,
+    /// Give the browser the keyboard.
+    BrowserEnter,
+    /// Hand the keyboard back to mix mode.
+    BrowserLeave,
+    /// A character typed into the browser's query.
+    BrowserType(char),
+    BrowserBackspace,
+    /// Empty the query, leaving the mode alone.
+    BrowserClear,
+    DeviceMove(Dir),
+    DeviceChoose,
+    DeviceClose,
     /// Open the audio device chooser.
     Devices,
     CycleWaveformMode,

@@ -16,9 +16,8 @@ pub struct Browser {
     selected: usize,
     column: Column,
     ascending: bool,
-    /// The query. `typing` says whether the prompt is open.
+    /// The query that narrows the list. The keymap's mode says who owns the keyboard.
     query: String,
-    typing: bool,
     pub fullscreen: bool,
     /// What the panel says about itself: how many tracks, or what it is busy with.
     note: Option<String>,
@@ -99,13 +98,12 @@ impl Browser {
         self.refilter();
     }
 
-    pub fn typing(&self) -> bool {
-        self.typing
+    pub fn query(&self) -> &str {
+        &self.query
     }
 
-    /// Open the search prompt, starting from nothing.
-    pub fn start_search(&mut self) {
-        self.typing = true;
+    /// Empty the query and put the whole list back.
+    pub fn clear_query(&mut self) {
         self.query.clear();
         self.refilter();
     }
@@ -120,25 +118,14 @@ impl Browser {
         self.refilter();
     }
 
-    /// Close the prompt and keep what it found.
-    pub fn accept_search(&mut self) {
-        self.typing = false;
-    }
-
-    /// Close the prompt and forget the query.
-    pub fn cancel_search(&mut self) {
-        self.typing = false;
-        self.query.clear();
-        self.refilter();
-    }
-
     fn refilter(&mut self) {
         self.shown = search(&self.entries, &self.query);
         self.selected = self.selected.min(self.shown.len().saturating_sub(1));
     }
 
-    /// The panel, with `playing` the key of whatever is playing for the highlighting.
-    pub fn view(&self, playing: Option<Key>) -> BrowserView {
+    /// The panel. `active` is true while browser mode holds the keyboard, and `playing` is
+    /// the key of whatever is playing, for the highlighting.
+    pub fn view(&self, active: bool, playing: Option<Key>) -> BrowserView {
         let rows = self
             .shown
             .iter()
@@ -162,7 +149,9 @@ impl Browser {
             selected: self.selected,
             sort: self.column.label(),
             ascending: self.ascending,
-            search: self.typing.then(|| self.query.clone()),
+            // Drawn whenever it is filtering, so leaving the mode cannot hide a filter.
+            search: (active || !self.query.is_empty()).then(|| self.query.clone()),
+            active,
             fullscreen: self.fullscreen,
             status: self.status(),
         }

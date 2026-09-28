@@ -7,5 +7,5 @@ mod names;
 
 pub use action::{Action, Band, Dir};
 pub use control::Control;
-pub use keymap::{Key, KeyEvent, Keymap};
+pub use keymap::{Key, KeyEvent, Keymap, Mode};
 pub use names::parse_action;

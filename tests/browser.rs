@@ -72,6 +72,7 @@ fn the_arrows_move_the_selection_and_stop_at_the_ends() {
     music(dir.path(), &["Alpha.wav", "Beta.wav", "Gamma.wav"]);
     let (mut app, _p) = setup();
     app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
     assert_eq!(app.view(String::new()).browser.selected, 0);
     press(&mut app, Key::Down);
     press(&mut app, Key::Down);
@@ -94,8 +95,9 @@ fn enter_loads_the_selected_track_onto_the_focused_deck() {
     music(dir.path(), &["Alpha.wav", "Beta.wav"]);
     let (mut app, mut p) = setup();
     app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
     press(&mut app, Key::Down);
-    press(&mut app, Key::Tab); // focus deck B
+    press(&mut app, Key::Tab); // focus deck B, without leaving the browser
     press(&mut app, Key::Enter);
 
     let start = Instant::now();
@@ -116,7 +118,7 @@ fn enter_loads_the_selected_track_onto_the_focused_deck() {
 }
 
 #[test]
-fn typing_after_a_slash_filters_the_list_as_it_goes() {
+fn typing_in_browser_mode_filters_the_list_as_it_goes() {
     let dir = tempfile::tempdir().unwrap();
     music(dir.path(), &["Warehouse Tool.wav", "Breakdown Edit.wav"]);
     let (mut app, _p) = setup();
@@ -142,14 +144,14 @@ fn typing_after_a_slash_filters_the_list_as_it_goes() {
         Some("war")
     );
 
-    press(&mut app, Key::Esc);
+    app.on_key(KeyEvent::press(Key::Char('u')).ctrl());
     let view = app.view(String::new());
-    assert!(view.browser.search.is_none(), "the prompt is gone");
+    assert_eq!(view.browser.search.as_deref(), Some(""), "cleared");
     assert_eq!(view.browser.rows.len(), 2, "and the whole list is back");
 }
 
 #[test]
-fn a_search_that_is_accepted_keeps_its_results() {
+fn esc_hands_the_keyboard_back_in_one_press_and_keeps_the_filter() {
     let dir = tempfile::tempdir().unwrap();
     music(dir.path(), &["Warehouse Tool.wav", "Breakdown Edit.wav"]);
     let (mut app, _p) = setup();
@@ -158,14 +160,19 @@ fn a_search_that_is_accepted_keeps_its_results() {
     for c in "ware".chars() {
         press(&mut app, Key::Char(c));
     }
-    press(&mut app, Key::Enter);
+    press(&mut app, Key::Esc);
     let view = app.view(String::new());
-    assert!(view.browser.search.is_none(), "typing is over");
-    assert_eq!(view.browser.rows.len(), 1, "the filter stays");
+    assert!(!view.browser.active, "the browser let go of the keyboard");
+    assert_eq!(
+        view.browser.search.as_deref(),
+        Some("ware"),
+        "a filter that is still on is still shown"
+    );
+    assert_eq!(view.browser.rows.len(), 1, "and still filtering");
 }
 
 #[test]
-fn keys_do_their_usual_work_again_once_the_search_is_over() {
+fn keys_do_their_usual_work_again_once_browser_mode_is_over() {
     let dir = tempfile::tempdir().unwrap();
     music(dir.path(), &["Alpha.wav"]);
     let (mut app, _p) = setup();
@@ -192,8 +199,9 @@ fn the_sort_key_cycles_the_columns_and_reverses() {
     music(dir.path(), &["Alpha.wav"]);
     let (mut app, _p) = setup();
     app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
     assert_eq!(app.view(String::new()).browser.sort, "name");
-    press(&mut app, Key::Char('S'));
+    app.on_key(KeyEvent::press(Key::Char('s')).alt());
     assert_eq!(app.view(String::new()).browser.sort, "BPM");
     assert!(app.view(String::new()).browser.ascending);
     app.on_key(KeyEvent::press(Key::Char('S')).alt());
@@ -205,12 +213,16 @@ fn the_sort_key_cycles_the_columns_and_reverses() {
 }
 
 #[test]
-fn b_gives_the_browser_the_whole_screen_and_gives_it_back() {
+fn b_gives_the_browser_the_keyboard_and_alt_f_the_whole_screen() {
     let (mut app, _p) = setup();
-    assert!(!app.view(String::new()).browser.fullscreen);
+    assert!(!app.view(String::new()).browser.active);
     press(&mut app, Key::Char('b'));
+    assert!(app.view(String::new()).browser.active);
+    assert!(!app.view(String::new()).browser.fullscreen, "not yet");
+
+    app.on_key(KeyEvent::press(Key::Char('f')).alt());
     assert!(app.view(String::new()).browser.fullscreen);
-    press(&mut app, Key::Char('b'));
+    app.on_key(KeyEvent::press(Key::Char('f')).alt());
     assert!(!app.view(String::new()).browser.fullscreen);
 }
 
@@ -230,7 +242,7 @@ fn a_track_that_would_mix_with_the_playing_deck_is_marked() {
 }
 
 #[test]
-fn a_analyses_everything_in_the_list_that_has_no_analysis_yet() {
+fn alt_a_analyses_everything_in_the_list_that_has_no_analysis_yet() {
     let dir = tempfile::tempdir().unwrap();
     beat_music(dir.path(), &["One.wav", "Two.wav"]);
     let (mut app, mut p) = setup();
@@ -244,7 +256,8 @@ fn a_analyses_everything_in_the_list_that_has_no_analysis_yet() {
         "nothing has been analysed"
     );
 
-    press(&mut app, Key::Char('A'));
+    press(&mut app, Key::Char('b'));
+    app.on_key(KeyEvent::press(Key::Char('a')).alt());
     assert!(
         app.view(String::new()).browser.status.contains("nalys"),
         "the panel says what it is doing: {}",
@@ -279,7 +292,8 @@ fn analysis_leaves_tracks_that_already_have_a_tempo_alone() {
     beat_music(dir.path(), &["One.wav"]);
     let (mut app, mut p) = setup();
     app.scan_library(&[dir.path().to_path_buf()]);
-    press(&mut app, Key::Char('A'));
+    press(&mut app, Key::Char('b'));
+    app.on_key(KeyEvent::press(Key::Char('a')).alt());
     let start = Instant::now();
     while app.view(String::new()).browser.status.contains("nalys") {
         app.tick();
@@ -291,7 +305,7 @@ fn analysis_leaves_tracks_that_already_have_a_tempo_alone() {
         std::thread::sleep(Duration::from_millis(10));
     }
 
-    press(&mut app, Key::Char('A'));
+    app.on_key(KeyEvent::press(Key::Char('a')).alt());
     assert!(
         app.message().contains("already"),
         "there is nothing left to do: {}",

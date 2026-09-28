@@ -82,6 +82,7 @@ fn listing() -> BrowserView {
         sort: "name",
         ascending: true,
         search: None,
+        active: false,
         fullscreen: false,
         status: "3 tracks".into(),
     }
