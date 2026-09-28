@@ -67,7 +67,7 @@ One row per key. `Shift +`, `Alt +` or `Ctrl +` change key travel.
 | `↑` / `↓` | The focused deck's channel fader one step, in dB. Shift goes hard to full or to zero, `Alt` fades. |
 | `x` / `X` | Crossfader back to the middle. Shift fades it there instead. |
 | `r` / `R` | Trim down, and up with Shift. |
-| `t` / `y` / `u` | Kill the highs, mids, lows on the focused channel. Shift (`T` / `Y` / `U`) hands that band to the focused deck and takes it off the other one in the same frame. |
+| `t` / `y` / `u` | Kill the highs, mids, lows on deck A. Shift (`T` / `Y` / `U`) kills them on deck B. A press toggles, so pressing again gives the band back. |
 | `o` / `O` | Filter toward low-pass, and toward high-pass with Shift. `Alt` sweeps it there slowly. |
 | `v` / `V` | Filter back to the middle. Shift sweeps it back over the fade length. |
 | `m` | Headphone cue on the focused channel. |
@@ -130,18 +130,16 @@ deck has focus.
 | `↑` / `↓` | Focused deck's channel fader, one step |
 | `Shift+↑` / `Shift+↓` | Focused deck's fader hard to full or to zero |
 | `x` | Crossfader to the middle |
-| `t` / `y` / `u` | Kill the highs, mids, lows on this channel |
-| `T` / `Y` / `U` | Give the highs, mids, lows to the focused deck |
+| `t` / `y` / `u` | Kill the highs, mids, lows on deck A, and with Shift on deck B |
 | `r` / `R` | Trim |
 | `o` / `O` | Filter toward low-pass and high-pass |
 | `v` | Filter back to the middle |
 | `m` | Headphone cue on this channel |
 | `h` / `H` | Headphone mix, from the cue bus toward the master |
 
-A keyboard kills a band well and sweeps a knob badly, so the EQ keys do the two things that
-work. `T` / `Y` / `U` is one press for a move that needs two hands on hardware: `U` restores
-the lows on the focused deck and kills them on the other one in the same frame. It names the
-deck that should own the band rather than toggling, so pressing it twice changes nothing.
+A keyboard kills a band well and sweeps a knob badly, so the EQ keys do the thing that works.
+They name the deck rather than following focus: lower case is deck A, upper case is deck B, so
+both channels are under one hand and a drop does not need a focus change first.
 
 Stepped EQ gain is a MIDI control. `eq a low up` on an encoder and `eq a low` on a knob both
 still work.

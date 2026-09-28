@@ -351,17 +351,6 @@ impl App {
         };
     }
 
-    /// Report a band swap, which moves two channels at once.
-    fn note_eq_swap(&mut self, action: Action) {
-        let Action::EqSwap(d, b) = action else { return };
-        let band = match b {
-            input::Band::High => "highs",
-            input::Band::Mid => "mids",
-            input::Band::Low => "lows",
-        };
-        self.message = format!("{band} on deck {}", deck_letter(d));
-    }
-
     /// Report the headphone blend, which only the person wearing them can hear.
     fn note_cue_mix(&mut self, action: Action) {
         let Action::CueMix(_) = action else { return };
@@ -673,15 +662,14 @@ impl App {
                     self.automation.cancel(control);
                 }
                 let snap = self.handle.snapshot();
-                // A band swap moves two channels, so both commands go in the same frame and
-                // land in the same audio callback.
+                // Riding the global tempo moves two decks, so both commands go in the same
+                // frame and land in the same audio callback.
                 let cmds = apply_many(&mut self.state, &self.controls, &snap, action);
                 self.note_loop_keys(action, cmds.first());
                 self.note_fx_keys(action);
                 self.note_sync_key(action, cmds.first());
                 self.note_key_lock(action);
                 self.note_cue_mix(action);
-                self.note_eq_swap(action);
                 self.note_global_tempo(action, !cmds.is_empty());
                 for cmd in cmds {
                     self.send(cmd);

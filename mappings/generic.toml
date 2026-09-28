@@ -233,7 +233,7 @@ state = "fx b"
 #
 # The per-deck pitch is unchanged: "tempo a up", "tempo a down fine".
 
-# --- Fades and the band swap ---
+# --- Fades ---
 #
 # The keyboard starts these with Alt; a controller button can start them too. The fade length
 # is shared, in beats, and set by [mixer] fade_beats or moved live with { and }.
@@ -249,10 +249,6 @@ state = "fx b"
 # [[buttons]]
 # input = "note 0 42"
 # action = "filter a sweep up"         # also "down" and "centre"
-#
-# [[buttons]]
-# input = "note 0 43"
-# action = "eq a swap low"             # restore the lows here, kill them on the other deck
 #
 # [[buttons]]
 # input = "note 0 44"

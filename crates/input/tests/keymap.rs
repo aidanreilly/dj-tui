@@ -71,14 +71,23 @@ fn digits_trigger_hot_cues_and_alt_digits_clear_them() {
 }
 
 #[test]
-fn the_band_keys_kill_and_swap() {
+fn the_band_keys_are_kill_switches_on_fixed_decks() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, ch('t')), Some(Action::EqKill(A, Band::High)));
     assert_eq!(press(&mut km, ch('y')), Some(Action::EqKill(A, Band::Mid)));
     assert_eq!(press(&mut km, ch('u')), Some(Action::EqKill(A, Band::Low)));
-    assert_eq!(press(&mut km, ch('U')), Some(Action::EqSwap(A, Band::Low)));
+    assert_eq!(press(&mut km, ch('T')), Some(Action::EqKill(B, Band::High)));
+    assert_eq!(press(&mut km, ch('Y')), Some(Action::EqKill(B, Band::Mid)));
+    assert_eq!(press(&mut km, ch('U')), Some(Action::EqKill(B, Band::Low)));
+}
+
+#[test]
+fn the_band_keys_ignore_focus() {
+    let mut km = Keymap::new();
     press(&mut km, Key::Tab);
-    assert_eq!(press(&mut km, ch('T')), Some(Action::EqSwap(B, Band::High)));
+    assert_eq!(km.focused(), B);
+    assert_eq!(press(&mut km, ch('t')), Some(Action::EqKill(A, Band::High)));
+    assert_eq!(press(&mut km, ch('T')), Some(Action::EqKill(B, Band::High)));
 }
 
 #[test]
@@ -380,10 +389,7 @@ mod action_names {
             parse_action("fader b down end"),
             Some(Action::FaderEnd(B, Dir::Down))
         );
-        assert_eq!(
-            parse_action("eq a swap low"),
-            Some(Action::EqSwap(A, Band::Low))
-        );
+        assert_eq!(parse_action("eq a swap low"), None);
         assert_eq!(
             parse_action("crossfader fade up"),
             Some(Action::CrossfaderFade(Dir::Up))

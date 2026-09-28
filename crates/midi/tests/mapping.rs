@@ -340,7 +340,6 @@ mod new_gestures {
             "filter a sweep up",
             "filter a sweep centre",
             "filter b centre",
-            "eq a swap low",
             "cancel-fades",
             "fade-length halve",
             "fade-length double",

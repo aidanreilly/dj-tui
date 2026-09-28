@@ -281,16 +281,6 @@ pub fn apply_many(
     action: Action,
 ) -> Vec<Command> {
     match action {
-        Action::EqSwap(d, b) => {
-            let b = band(b);
-            let (mine, theirs) = (d.index(), 1 - d.index());
-            st.strips[mine].kills[b as usize] = false;
-            st.strips[theirs].kills[b as usize] = true;
-            vec![
-                Command::SetEqKill(d, b, false),
-                Command::SetEqKill(d.other(), b, true),
-            ]
-        }
         // Riding both decks together, the way you would ride two pitch faders on records.
         // The same proportion goes to each, so a beatmatched pair stays exactly matched
         // however far the mix is taken, and a deck with no grid follows too since nothing

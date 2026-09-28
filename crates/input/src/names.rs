@@ -59,10 +59,8 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["tempo", d, way] => Action::Tempo(deck(d)?, dir(way)?, false),
         ["seek", d, tenth] => Action::SeekTenth(deck(d)?, tenth_index(tenth)?),
         ["trim", d, way] => Action::Trim(deck(d)?, dir(way)?),
-        // Before the general form, which would otherwise swallow "kill" and "swap" as band
-        // names.
+        // Before the general form, which would otherwise swallow "kill" as a band name.
         ["eq", d, "kill", b] => Action::EqKill(deck(d)?, band(b)?),
-        ["eq", d, "swap", b] => Action::EqSwap(deck(d)?, band(b)?),
         ["eq", d, b, way] => Action::Eq(deck(d)?, band(b)?, dir(way)?),
         // Each keyword form goes above the general form of the same length, or the general
         // one swallows the keyword as a direction and the name is rejected.
