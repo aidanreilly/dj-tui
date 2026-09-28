@@ -108,6 +108,59 @@ leaves the person's comments and ordering alone.
 
 `cargo test -p backend --test alsa` skips the playback test unless `DJ_TUI_ALSA_TESTS=1`.
 
+## Input layer
+
+`crates/input` decides what every key means, including which mode the keyboard is in:
+`Mode::Mix`, `Mode::Browser` and `Mode::Devices` in `keymap/mod.rs`, with a table per mode in
+`keymap/mix.rs` and `keymap/browser.rs`. `App::on_key` is a dispatcher and holds no modal
+state of its own. Browser mode owns the whole keyboard so letters type a search, which is what
+frees the arrow keys for the faders, and its own commands sit on `Alt` plus a letter. `Esc`
+leaves in one press and the filter stays on, drawn under the list.
+
+Backtick, which sent the next key to the other deck, is removed. `Tab` is the only way to
+reach the other deck. It saved one press per transition and was the keymap's only hidden
+sticky state; the band swap took away its best case. Not worth proposing again.
+
+Horizontal arrows are the crossfader, vertical arrows the focused deck's channel fader, with
+`Shift` going hard to an end. `x`/`X` and `v`/`V` return the crossfader and the filter to
+neutral. The channel fader steps in dB, because a linear step is 0.4 dB at the top of the
+travel and 26 dB at the bottom.
+
+Stepped EQ gain is reachable only from MIDI. `t`/`y`/`u` kill a band and `T`/`Y`/`U` give it to
+the focused deck, which emits two `SetEqKill` commands in one frame and is idempotent, so a
+double press cannot undo a drop. `Action::Eq` and `Control::Eq` are untouched, so encoders and
+knobs behave as before. `apply_many` exists beside `apply` for the actions that move more than
+one control.
+
+`Control` lives in `crates/input`, not `crates/midi`, because both paths name continuous
+controls; `midi` re-exports it so mapping files are unaffected.
+
+The deck and channel without focus are greyed out. The panel is dimmed whole by `grey_out` in
+`tui::deck`, the mixer columns through `column_styles` in `tui::screen`, and the kitty image
+by an `UNFOCUSED` scale inside `WaveformBitmaps::rasterize`, since a terminal attribute cannot
+dim a graphics image. `Wave::focused` is part of `fingerprint`, so moving focus redraws.
+
+## Fades
+
+`src/automation.rs` runs fades on the UI thread, ticked from `App::tick` with the frame delta
+and from `App::tick_fades` in tests, so it needs no clock. Values go out through
+`apply::set_control`, which keeps `ControlState` the only owner of absolute values and leaves
+MIDI soft takeover working. The engine is not involved.
+
+`Curve::Position` ramps the control's own travel, for the crossfader (whose configured curve is
+already downstream) and the filter. `Curve::Decibel` ramps in dB with a −60 dB floor, for
+channel faders, since `SetChannelFader` takes raw amplitude.
+
+Lengths come from the deck's beat grid at its current rate and are fixed when the fade starts.
+`MIN_FADE_SECS` is 0.7 s because `Mixer::process` applies fader gains as plain scalars with no
+per-sample ramp, so a fade is a series of steps and that floor keeps each 30 fps step no larger
+than one manual key press. Per-sample ramps in the engine would remove the floor and were
+deferred, not rejected.
+
+A fade dies on `Esc`, on any manual move of the same control from key or knob
+(`manual_control`, and `set_control` cancels first), on a new track loading onto that deck, and
+when another fade claims the control. At most one fade per control.
+
 ## Browser
 
 `crates/library` is the data layer and has no database behind it: `scan` walks the configured
@@ -115,11 +168,11 @@ folders and every column comes from the sidecar beside each file, so a track tha
 been played still lists. `src/browser.rs` holds what changes as keys are pressed, and
 `tui::BrowserPanel` draws it.
 
-While the search prompt is open `App::on_key` takes the keyboard before the keymap sees it,
-so letters are letters. Playlists are m3u. Key highlighting compares each row against the key
+Browser mode is the keymap's, not the app's: see the input layer section above. Playlists are
+m3u. Key highlighting compares each row against the key
 of whichever deck is playing, deck A first.
 
-`A` analyses everything with no tempo yet, one file at a time through the loader thread so
+`Alt+a` analyses everything with no tempo yet, one file at a time through the loader thread so
 the machine stays usable, with progress in the panel title. Pressing it again stops the run.
 A track counts as analysed once its sidecar holds a grid, so a file the detector could not
 read last time is picked up again: `loader::analyse_file` is the batch entry point and it

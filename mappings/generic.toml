@@ -226,3 +226,32 @@ state = "fx a"
 [[leds]]
 output = "note 1 40"
 state = "fx b"
+
+# --- Fades and the band swap ---
+#
+# The keyboard starts these with Alt; a controller button can start them too. The fade length
+# is shared, in beats, and set by [mixer] fade_beats or moved live with { and }.
+#
+# [[buttons]]
+# input = "note 0 40"
+# action = "crossfader fade up"        # also "down" and "centre"
+#
+# [[buttons]]
+# input = "note 0 41"
+# action = "fader a fade down"         # fade a channel out over the fade length
+#
+# [[buttons]]
+# input = "note 0 42"
+# action = "filter a sweep up"         # also "down" and "centre"
+#
+# [[buttons]]
+# input = "note 0 43"
+# action = "eq a swap low"             # restore the lows here, kill them on the other deck
+#
+# [[buttons]]
+# input = "note 0 44"
+# action = "cancel-fades"              # what Esc does
+#
+# [[encoders]]
+# input = "cc 0 40"
+# action = "fade-length double"        # the other way sends "fade-length halve"

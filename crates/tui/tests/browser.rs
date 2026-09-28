@@ -304,3 +304,16 @@ fn the_panel_says_when_it_holds_the_keyboard() {
     assert!(busy.contains("Esc"), "and so is the way out");
     assert!(busy.contains("ac"), "along with the query");
 }
+
+#[test]
+fn the_help_list_matches_the_keys_that_exist() {
+    let mut view = screen(listing());
+    view.help = true;
+    let shown = text(&draw(&view, 120, 44));
+    for gone in ["send the next key", "channel fader", "Alt to kill"] {
+        assert!(!shown.contains(gone), "stale entry: {gone}");
+    }
+    for present in ["x / X", "t / y / u", "T / Y / U", "{ / }", "Alt+arrows"] {
+        assert!(shown.contains(present), "missing entry: {present}");
+    }
+}

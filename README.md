@@ -32,6 +32,28 @@ the PipeWire package rather than sitting beside it.
 
 Rust 1.88 or newer.
 
+## Terminal requirements
+
+Run dj-tui directly in a terminal emulator. It reads modified arrow keys, asks for key release
+events and draws waveforms as images, and each of those has to reach the terminal unchanged.
+
+| For | It needs | Terminals |
+| --- | --- | --- |
+| Anything below | 24-bit colour and a Unicode font | any modern emulator |
+| Holding `c` to preview from the cue point | key release reporting, through the kitty keyboard protocol | Ghostty, kitty, foot, WezTerm, recent Alacritty |
+| Shift and Alt on the arrow keys, for the fader slams and fades | unambiguous modified keys, from the same protocol | as above, plus xterm |
+| Waveforms drawn as real pixels | the kitty graphics protocol | Ghostty, kitty, WezTerm |
+
+None of it is required. Without key release reporting `c` works as a press and the status line
+says so. Without the graphics protocol the waveforms are drawn with block characters in the
+same colours. Without the modified arrow keys the crossfader and channel faders still step with
+plain arrows, and `x` still centres the crossfader.
+
+**Terminal multiplexers are not supported.** tmux, screen and zellij sit between dj-tui and the
+terminal, block the graphics protocol and interfere with modified key reporting. dj-tui detects
+them and falls back to block-character waveforms; the rest is untested and unsupported. Run it
+in a window of its own.
+
 ## Run
 
 ```sh
@@ -60,9 +82,14 @@ Press `?` for the key list at any time.
 
 ## Keys
 
-Keys act on the **focused deck**, which `Tab` switches. Backtick sends the next key to the
-other deck without moving focus, so dropping the bass on B while A stays focused is `` ` ``
-then `u`. Lowercase turns a control down, Shift turns it up.
+Keys act on the **focused deck**, which `Tab` switches. The deck and channel that do not have
+focus are greyed out, so a glance tells you where the next key will land. Lowercase turns a
+control down, Shift turns it up.
+
+The keyboard has two modes. **Mix mode** is where it starts and where everything below lives.
+**Browser mode**, on `b` or `/`, hands the whole keyboard to the track list so letters type a
+search; `Esc` hands it back in one press. The browser panel lights its border and lists its own
+commands while it holds the keyboard.
 
 ### Transport
 
@@ -96,16 +123,55 @@ with the track and comes back the next time you load it.
 
 ### Mixer
 
+Horizontal arrows are the horizontal fader. Vertical arrows are the vertical fader of whichever
+deck has focus.
+
 | Key | What it does |
 | --- | --- |
-| `v` / `V` | Channel fader |
-| `←` / `→` | Crossfader, `Shift` snaps it to the end |
+| `←` / `→` | Crossfader, one step |
+| `Shift+←` / `Shift+→` | Crossfader hard to that end |
+| `↑` / `↓` | Focused deck's channel fader, one step |
+| `Shift+↑` / `Shift+↓` | Focused deck's fader hard to full or to zero |
+| `x` | Crossfader to the middle |
+| `t` / `y` / `u` | Kill the highs, mids, lows on this channel |
+| `T` / `Y` / `U` | Give the highs, mids, lows to the focused deck |
 | `r` / `R` | Trim |
-| `t` / `T`, `y` / `Y`, `u` / `U` | EQ high, mid, low |
-| `Alt+t`, `Alt+y`, `Alt+u` | Kill a band |
 | `o` / `O` | Filter toward low-pass and high-pass |
+| `v` | Filter back to the middle |
 | `m` | Headphone cue on this channel |
 | `h` / `H` | Headphone mix, from the cue bus toward the master |
+
+A keyboard kills a band well and sweeps a knob badly, so the EQ keys do the two things that
+work. `T` / `Y` / `U` is one press for a move that needs two hands on hardware: `U` restores
+the lows on the focused deck and kills them on the other one in the same frame. It names the
+deck that should own the band rather than toggling, so pressing it twice changes nothing.
+
+Stepped EQ gain is a MIDI control. `eq a low up` on an encoder and `eq a low` on a knob both
+still work.
+
+### Fades
+
+A keyboard cannot sweep a control, so it starts a sweep and walks away. **`Alt` on a continuous
+control's key means do it slowly**, over the fade length.
+
+| Key | What it does |
+| --- | --- |
+| `Alt+←` / `Alt+→` | Crossfader fades to that end |
+| `Alt+↑` / `Alt+↓` | Focused deck's fader fades to full or to silence |
+| `Alt+o` / `Alt+O` | Filter sweeps to that end |
+| `X` | Crossfader fades to the middle |
+| `V` | Filter sweeps back to the middle |
+| `{` / `}` | Halve and double the fade length |
+| `Esc` | Stop every running fade where it stands |
+
+The fade length is in beats, taken from the relevant deck's grid and fixed when the fade
+starts, so moving the tempo fader part way through does not stretch it. It shows on the mixer
+strip next to the crossfader, and `[mixer] fade_beats` sets where it starts. A deck with no
+beat grid counts a beat as half a second.
+
+Several fades run at once, which is what makes fader mixing work: park the crossfader with `x`
+once, then a blend is `Alt+↑` on the incoming deck, `Tab`, `Alt+↓`. Touching a control by key
+or by MIDI knob takes it back from its fade, and loading a track cancels that deck's fades.
 
 ### Effects
 
@@ -124,19 +190,18 @@ Echo and reverb keep ringing after you switch them off, rather than cutting dead
 
 | Key | What it does |
 | --- | --- |
-| `Tab` | Switch focused deck |
-| `` ` `` | Send the next key to the other deck |
+| `Tab` | Switch focused deck, in either mode |
 | `w` | Waveform colour mode: 3-Band, RGB, Blue |
 | Left click on a waveform | Seek there |
-| `↑` / `↓` | Move through the browser |
 | `Enter` | Load the selected track onto the focused deck |
-| `/` | Search the browser |
-| `b` | Browser full screen |
-| `S` / `Alt+S` | Sort column, and the direction |
-| `A` | Analyse every track in the list that has none |
+| `b` | Browser mode, keeping whatever filter is on |
+| `/` | Browser mode, clearing the filter |
 | `Ctrl+D` | Audio device screen |
 | `?` | Key list |
 | `Ctrl+Q` | Quit |
+
+In browser mode letters are letters, so its own commands sit on a modifier: `Alt+s` and
+`Alt+S` sort, `Alt+a` analyses, `Alt+f` goes full screen, `Ctrl+u` clears the filter.
 
 ## The browser
 
@@ -147,22 +212,38 @@ Point dj-tui at your music and the bottom panel lists it:
 folders = ["~/Music", "/mnt/crates"]
 ```
 
-`↑` and `↓` move through the list, `Enter` loads the selected track onto the focused deck,
-and `b` gives the browser the whole screen. `S` cycles the column it is sorted by, name, BPM,
-key and length, and `Alt+S` turns the order around. Tracks with no analysis yet are dimmed,
-and a track whose key would mix with whatever is playing has its key in green.
+`b` gives the browser the keyboard. Its border lights up, its commands appear along the bottom
+of the panel, and typing narrows the list as you go, matching letters in order without needing
+them next to each other, so `whte` finds `Warehouse Tool`. `/` does the same and clears any
+filter first.
 
-`/` starts a search. Type and the list narrows as you go, matching letters in order without
-needing them next to each other, so `whte` finds `Warehouse Tool`. `Enter` keeps the results,
-`Esc` puts the whole list back, and `Backspace` edits. While the prompt is open every key is
-a letter, so a track called `wave` types without cycling the waveform colours.
+While the browser holds the keyboard, every letter is a letter, so a track called `wave` types
+without cycling the waveform colours. That leaves its own commands on a modifier:
+
+| Key | What it does |
+| --- | --- |
+| `↑` / `↓` | Move the selection |
+| `Enter` | Load the selection onto the focused deck |
+| `Tab` | Switch focused deck, to choose where `Enter` sends the track |
+| `Backspace` | Edit the filter |
+| `Ctrl+u` | Clear the filter |
+| `Alt+s` / `Alt+S` | Sort column, and the direction |
+| `Alt+a` | Analyse everything with no analysis yet |
+| `Alt+f` | Full screen |
+| `Esc` | Back to mix mode |
+
+`Esc` always leaves in one press, and the filter stays on. It keeps showing under the list, so
+walking away from a narrowed list cannot hide that it is narrowed.
+
+Tracks with no analysis yet are dimmed, and a track whose key would mix with whatever is
+playing has its key in green.
 
 Everything the list shows comes out of the JSON sidecars beside your files, so it costs
 nothing to display, and a track that has never been played still lists under its own name.
 
-`A` analyses everything that has no sidecar yet, filling in the BPM and key columns for the
+`Alt+a` analyses everything that has no sidecar yet, filling in the BPM and key columns for the
 whole folder. It works through one file at a time in the background, so you can carry on
-mixing while it runs, and pressing `A` again stops it.
+mixing while it runs, and pressing it again stops it.
 
 ## Waveforms
 
@@ -171,6 +252,9 @@ Three colour modes, cycled with `w`:
 - **3-Band** — blue lows, amber mids, white highs layered as on a CDJ-3000.
 - **RGB** — one blended colour per column: red lows, green mids, blue highs.
 - **Blue** — a single blue waveform that brightens toward white as the highs rise.
+
+The deck without focus has its whole panel greyed, waveform included, so `Tab` reads at a
+glance.
 
 In Ghostty, kitty and WezTerm the overviews are drawn as real pixel images through the kitty
 graphics protocol. Inside tmux, screen or zellij, in terminals without it, or with
@@ -229,6 +313,7 @@ tempo_range = 8                 # fader range in percent: 8, 16 or 50
 
 [mixer]
 crossfader_curve = "constant-power"   # "linear", "constant-power" or "cut"
+fade_beats = 8                        # how long an Alt fade runs, 2 to 64
 
 [midi]
 enabled = true
@@ -273,7 +358,8 @@ state = "playing a"
 ```
 
 Buttons and encoders name an action the way the keyboard produces it: `play a`, `cue b`,
-`hotcue a 3`, `loop a`, `fx-next b`, `eq a low up`. Add `hold = true` to a cue button so it
+`hotcue a 3`, `loop a`, `fx-next b`, `eq a low up`, `eq a swap low`, `crossfader fade up`,
+`fader b fade down`, `filter a sweep up`, `fade-length double`, `cancel-fades`. Add `hold = true` to a cue button so it
 previews while held. Knobs name a control they set outright: `fader a`, `crossfader`,
 `eq b mid`, `filter a`, `tempo a`, `fx wet a`, `fx param a 1`. Lights follow `playing a`,
 `cued a`, `loop a`, `fx a`, `sync a`, `keylock a`, `quantize a` or `hotcue a 1`.
