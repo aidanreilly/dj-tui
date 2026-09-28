@@ -602,9 +602,12 @@ impl App {
             .find(|&&i| snapshot.decks[i].playing)
             .and_then(|&i| self.metas[i].key.as_deref())
             .and_then(analysis::key::Key::from_camelot);
-        v.browser = self
-            .browser
-            .view(self.keymap.mode() == input::Mode::Browser, playing);
+        let browsing = self.keymap.mode() == input::Mode::Browser;
+        v.browser = self.browser.view(browsing, playing);
+        // Say which mode holds the keyboard, since that changes what every letter does.
+        if browsing {
+            v.status = format!("BROWSER  {}", v.status);
+        }
         v.devices = self.device_selected.map(|selected| tui::DeviceView {
             devices: self.devices.clone(),
             selected,

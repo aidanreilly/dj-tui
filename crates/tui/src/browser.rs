@@ -38,6 +38,11 @@ pub struct BrowserView {
     pub status: String,
 }
 
+/// What browser mode offers, on the panel's own bottom row. Six bindings document themselves
+/// better here than in an overlay nobody opens.
+const HINT: &str =
+    "Esc back  Enter load  Tab deck  Ctrl+u clear  Alt+s sort  Alt+a analyse  Alt+f full";
+
 /// Width of each fixed column, and the gap between them.
 const BPM_WIDTH: usize = 6;
 const KEY_WIDTH: usize = 3;
@@ -63,22 +68,37 @@ impl Widget for BrowserPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let v = self.view;
         let arrow = if v.ascending { '▲' } else { '▼' };
-        let block =
+        let mut block =
             Block::bordered().title(format!(" BROWSER  {}  by {} {arrow} ", v.status, v.sort));
+        // A lit border is how the panel says the keyboard is its own.
+        if v.active {
+            block = block.border_style(Style::new().fg(Color::Cyan));
+        }
         let inner = block.inner(area);
         block.render(area, buf);
         if inner.height == 0 || inner.width < 12 {
             return;
         }
 
-        // The search line sits at the bottom, so the list gets what is left.
+        // The query line sits at the bottom, with the commands under it while the mode is
+        // active, so the list gets whatever is left above them.
         let searching = v.search.is_some();
-        let list_height = inner.height.saturating_sub(searching as u16) as usize;
+        let rows_below = searching as u16 + v.active as u16;
+        let list_height = inner.height.saturating_sub(rows_below) as usize;
+        if v.active {
+            buf.set_stringn(
+                inner.x,
+                inner.bottom() - 1,
+                HINT,
+                inner.width as usize,
+                Style::new().add_modifier(Modifier::DIM),
+            );
+        }
         if searching {
             let query = v.search.as_deref().unwrap_or_default();
             buf.set_stringn(
                 inner.x,
-                inner.bottom() - 1,
+                inner.bottom() - 1 - v.active as u16,
                 format!("/{query}"),
                 inner.width as usize,
                 Style::new().add_modifier(Modifier::BOLD),

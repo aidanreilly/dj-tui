@@ -284,3 +284,23 @@ mod devices {
         }
     }
 }
+
+#[test]
+fn the_panel_says_when_it_holds_the_keyboard() {
+    let mut view = listing();
+    let quiet = text(&draw(&screen(view.clone()), 120, 44));
+    assert!(
+        !quiet.contains("Alt+s"),
+        "no hint line when it is not active"
+    );
+
+    view.active = true;
+    view.search = Some("ac".into());
+    let busy = text(&draw(&screen(view), 120, 44));
+    assert!(
+        busy.contains("Alt+s"),
+        "the commands are on screen while typing"
+    );
+    assert!(busy.contains("Esc"), "and so is the way out");
+    assert!(busy.contains("ac"), "along with the query");
+}
