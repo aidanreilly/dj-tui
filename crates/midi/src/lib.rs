@@ -9,7 +9,7 @@ mod message;
 pub use message::{Address, Message};
 
 use engine::DeckId;
-use input::{parse_action, Action, Band};
+use input::{parse_action, Action};
 use serde::Deserialize;
 use std::collections::HashMap;
 
