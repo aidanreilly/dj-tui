@@ -39,6 +39,7 @@ fn loaded_view(focused: bool) -> DeckView {
         quantize: false,
         key_lock: false,
         end_warning: false,
+        kills: [false; 3],
     }
 }
 

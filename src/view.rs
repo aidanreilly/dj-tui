@@ -59,6 +59,7 @@ fn deck_view(snap: &Snapshot, rate: f64, id: DeckId, focused: DeckId, meta: &Dec
         quantize: false,
         key_lock: false,
         end_warning: false,
+        kills: [false; 3],
     }
 }
 

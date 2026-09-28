@@ -5,7 +5,7 @@ use ratatui::{
     buffer::Buffer,
     layout::Rect,
     style::{Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, BorderType, Widget},
 };
 
@@ -54,6 +54,8 @@ pub struct DeckView {
     pub key_lock: bool,
     /// Flash phase of the end-of-track warning: true while the unplayed part shows red.
     pub end_warning: bool,
+    /// Which EQ bands are killed on this deck's channel, indexed low, mid, high.
+    pub kills: [bool; 3],
 }
 
 /// Hot cue colours, one per pad, following the CDJ palette's spread of hues.
@@ -134,10 +136,30 @@ impl DeckPanel<'_> {
             (Some(bpm), None) => format!(" {bpm:.2} "),
             _ => String::new(),
         };
+        // The markers go ahead of the BPM, and give way to it when the panel is too narrow
+        // for both: the tempo is what a glance needs most.
+        const MARKERS: [(&str, usize); 3] = [("[hi]", 2), ("[mid]", 1), ("[low]", 0)];
+        let marker_width = 1 + MARKERS.iter().map(|(t, _)| t.len() + 1).sum::<usize>();
+        let mut right: Vec<Span> = Vec::new();
+        if area.width as usize > label.len() + info.len() + marker_width {
+            right.push(Span::raw(" "));
+            for (text, band) in MARKERS {
+                let style = if v.kills[band] {
+                    Style::new()
+                        .fg(ratatui::style::Color::Rgb(90, 84, 110))
+                        .add_modifier(Modifier::DIM)
+                } else {
+                    Style::new()
+                };
+                right.push(Span::styled(text, style));
+                right.push(Span::raw(" "));
+            }
+        }
+        right.push(Span::raw(info));
         let mut block = Block::bordered()
             .border_type(border)
             .title(Line::from(label))
-            .title(Line::from(info).right_aligned());
+            .title(Line::from(right).right_aligned());
         if v.focused {
             block = block.border_style(Style::new().add_modifier(Modifier::BOLD));
         }

@@ -44,6 +44,7 @@ fn deck(id: DeckId, loaded: bool, position_secs: f64) -> DeckView {
         quantize: false,
         key_lock: false,
         end_warning: false,
+        kills: [false; 3],
     }
 }
 

@@ -105,6 +105,7 @@ fn deck(id: DeckId, focused: bool) -> DeckView {
         quantize: false,
         key_lock: false,
         end_warning: false,
+        kills: [false; 3],
     }
 }
 
@@ -483,5 +484,59 @@ fn the_unfocused_channel_is_greyed_out_in_the_mixer() {
     assert!(
         !b_focused[(bx, y)].modifier.contains(Modifier::DIM),
         "B is not"
+    );
+}
+
+/// The deck panel's top border row, where the title and the band markers live.
+fn deck_title_row(kills: [bool; 3]) -> (String, Buffer) {
+    let mut a = deck(DeckId::A, true);
+    a.kills = kills;
+    let view = ScreenView {
+        decks: [a, deck(DeckId::B, false)],
+        mixer: MixerView::default(),
+        status: String::new(),
+        message: String::new(),
+        phase: None,
+        help: false,
+        browser: Default::default(),
+        devices: None,
+    };
+    let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
+    term.draw(|f| render_screen(f, &view)).unwrap();
+    let buf = term.backend().buffer().clone();
+    let (w, h) = (buf.area.width, buf.area.height);
+    let row = (0..h)
+        .find(|&y| (0..w).any(|x| buf[(x, y)].symbol() == "\u{2503}" || buf[(x, y)].symbol() == "\u{250f}"))
+        .expect("a deck panel border row");
+    let text: String = (0..w).map(|x| buf[(x, row)].symbol().to_string()).collect();
+    (text, buf)
+}
+
+#[test]
+fn the_deck_title_names_the_bands() {
+    let (row, _) = deck_title_row([false; 3]);
+    assert!(row.contains("[hi] [mid] [low]"), "{row}");
+}
+
+#[test]
+fn a_killed_band_is_dimmed_in_the_deck_title() {
+    let (row, buf) = deck_title_row([false, true, false]);
+    let y = (0..buf.area.height)
+        .find(|&y| (0..buf.area.width)
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect::<String>()
+            == row)
+        .unwrap();
+    // `row` concatenates one glyph per column, but a glyph like the thick border corners
+    // is multiple bytes, so a substring's byte offset is not its column: count chars instead.
+    let hi = row[..row.find("[hi]").expect("{row}")].chars().count() as u16;
+    let mid = row[..row.find("[mid]").expect("{row}")].chars().count() as u16;
+    assert!(
+        buf[(mid, y)].modifier.contains(Modifier::DIM),
+        "a killed band is dimmed"
+    );
+    assert!(
+        !buf[(hi, y)].modifier.contains(Modifier::DIM),
+        "a live band is not"
     );
 }

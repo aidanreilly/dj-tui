@@ -779,6 +779,7 @@ impl App {
             d.waveform_mode = self.waveform_mode;
             d.quantize = self.state.quantize[i];
             d.key_lock = self.state.key_lock[i];
+            d.kills = self.state.strips[i].kills;
             d.loop_in_secs = self.state.loop_in[i].map(|f| f / self.sample_rate as f64);
             d.end_warning = crate::view::end_warning(
                 d.duration_secs - d.position_secs,

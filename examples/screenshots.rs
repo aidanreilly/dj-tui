@@ -149,6 +149,7 @@ fn main() {
                 quantize: i == 0,
                 key_lock: i == 1,
                 end_warning: i == 1,
+                kills: [[false; 3], [true, false, false]][i],
             }),
             mixer: MixerView {
                 crossfader: -0.3,
