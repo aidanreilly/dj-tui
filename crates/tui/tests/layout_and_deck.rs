@@ -307,3 +307,22 @@ fn a_loop_in_point_waiting_for_its_out_point_shows_dimmed() {
         .modifier
         .contains(Modifier::DIM));
 }
+
+#[test]
+fn the_unfocused_deck_is_greyed_out_so_focus_is_obvious_at_a_glance() {
+    let focused = render(&loaded_view(true), 80, DECK_HEIGHT);
+    let unfocused = render(&loaded_view(false), 80, DECK_HEIGHT);
+
+    // The border, the title and the status row all go dim, not just the border style.
+    for (x, y) in [(0u16, 0u16), (3, 1), (3, DECK_HEIGHT - 1)] {
+        assert!(
+            unfocused[(x, y)].modifier.contains(Modifier::DIM),
+            "unfocused cell at {x},{y} should be dim: {:?}",
+            unfocused[(x, y)].symbol()
+        );
+        assert!(
+            !focused[(x, y)].modifier.contains(Modifier::DIM),
+            "focused cell at {x},{y} should not be dim"
+        );
+    }
+}

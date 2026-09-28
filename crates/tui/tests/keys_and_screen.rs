@@ -3,7 +3,7 @@ use input::{Key, KeyEvent};
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent as CtKey, KeyEventKind, KeyEventState, KeyModifiers,
 };
-use ratatui::{backend::TestBackend, Terminal};
+use ratatui::{backend::TestBackend, buffer::Buffer, style::Modifier, Terminal};
 use tui::{convert_key, render_screen, DeckView, MixerView, ScreenView};
 
 fn ct(code: KeyCode, mods: KeyModifiers, kind: KeyEventKind) -> CtKey {
@@ -409,4 +409,74 @@ fn the_help_overlay_fits_a_small_terminal() {
         let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
         term.draw(|f| render_screen(f, &view)).unwrap();
     }
+}
+
+fn mixer_buffer(m: MixerView, w: u16, h: u16) -> Buffer {
+    let view = ScreenView {
+        decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
+        mixer: m,
+        status: String::new(),
+        message: String::new(),
+        phase: None,
+        help: false,
+        browser: Default::default(),
+        devices: None,
+    };
+    let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+    term.draw(|f| render_screen(f, &view)).unwrap();
+    term.backend().buffer().clone()
+}
+
+/// The VOL row's y, and the x of deck A's and deck B's bars on it. The row is
+/// `{label:<5}{a} {b}` inside a bordered block, so A starts at 1+5 and B a bar and a space on.
+fn vol_row_columns(buf: &Buffer) -> (u16, u16, u16) {
+    let y = (0..buf.area.height)
+        .find(|&y| {
+            (0..buf.area.width - 4).any(|x| {
+                (0..4).all(|i| buf[(x + i, y)].symbol() == ["V", "O", "L", " "][i as usize])
+            })
+        })
+        .expect("a VOL row");
+    let a_x = (0..buf.area.width - 4)
+        .find(|&x| (0..3).all(|i| buf[(x + i, y)].symbol() == ["V", "O", "L"][i as usize]))
+        .expect("the VOL label");
+    (y, a_x + 5, a_x + 5 + 8)
+}
+
+#[test]
+fn the_unfocused_channel_is_greyed_out_in_the_mixer() {
+    let a_focused = mixer_buffer(
+        MixerView {
+            focused: DeckId::A,
+            ..Default::default()
+        },
+        120,
+        44,
+    );
+    let b_focused = mixer_buffer(
+        MixerView {
+            focused: DeckId::B,
+            ..Default::default()
+        },
+        120,
+        44,
+    );
+
+    let (y, ax, bx) = vol_row_columns(&a_focused);
+    assert!(
+        a_focused[(bx, y)].modifier.contains(Modifier::DIM),
+        "B is dim while A has focus"
+    );
+    assert!(
+        !a_focused[(ax, y)].modifier.contains(Modifier::DIM),
+        "A is not"
+    );
+    assert!(
+        b_focused[(ax, y)].modifier.contains(Modifier::DIM),
+        "A is dim while B has focus"
+    );
+    assert!(
+        !b_focused[(bx, y)].modifier.contains(Modifier::DIM),
+        "B is not"
+    );
 }

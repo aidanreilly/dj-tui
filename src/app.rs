@@ -761,6 +761,7 @@ impl App {
             };
         }
         v.mixer.master_meter = self.meters[2];
+        v.mixer.focused = self.keymap.focused();
         v.mixer.fade_beats = self.automation.fade_beats();
         v.mixer.crossfader_fade_target = self
             .automation

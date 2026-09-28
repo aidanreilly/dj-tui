@@ -1,4 +1,5 @@
 use crate::{screen_layout, BrowserPanel, BrowserView, DeckPanel, DeckView};
+use engine::DeckId;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -22,6 +23,8 @@ pub struct MixerView {
     pub fade_beats: f64,
     /// Where a running crossfader fade is heading, -1 to 1.
     pub crossfader_fade_target: Option<f32>,
+    /// Which channel the deck keys act on. The other one is greyed out.
+    pub focused: DeckId,
 }
 
 impl Default for MixerView {
@@ -36,6 +39,7 @@ impl Default for MixerView {
             // Zero would draw "fade 0" on any view built without one.
             fade_beats: 8.0,
             crossfader_fade_target: None,
+            focused: DeckId::A,
         }
     }
 }
@@ -234,34 +238,52 @@ fn meter_spans(level: f32) -> Vec<Span<'static>> {
         .collect()
 }
 
-fn row(label: &str, a: String, b: String) -> Line<'static> {
-    Line::from(format!("{label:<5}{a} {b}"))
+/// Styles for the two channel columns: the unfocused one is dimmed throughout the strip, so
+/// which deck the keys act on reads at a glance.
+fn column_styles(focused: DeckId) -> (Style, Style) {
+    let dim = Style::new().add_modifier(Modifier::DIM);
+    match focused {
+        DeckId::A => (Style::new(), dim),
+        DeckId::B => (dim, Style::new()),
+    }
 }
 
-fn meter_row(label: &str, a: f32, b: f32) -> Line<'static> {
+fn row(label: &str, a: String, b: String, focused: DeckId) -> Line<'static> {
+    let (sa, sb) = column_styles(focused);
+    Line::from(vec![
+        Span::raw(format!("{label:<5}")),
+        Span::styled(a, sa),
+        Span::raw(" "),
+        Span::styled(b, sb),
+    ])
+}
+
+fn meter_row(label: &str, a: f32, b: f32, focused: DeckId) -> Line<'static> {
+    let (sa, sb) = column_styles(focused);
     let mut spans = vec![Span::raw(format!("{label:<5}"))];
-    spans.extend(meter_spans(a));
+    spans.extend(meter_spans(a).into_iter().map(|s| s.patch_style(sa)));
     spans.push(Span::raw(" "));
-    spans.extend(meter_spans(b));
+    spans.extend(meter_spans(b).into_iter().map(|s| s.patch_style(sb)));
     Line::from(spans)
 }
 
 /// The effect each channel is running, dimmed until it is switched on.
-fn fx_row(a: &StripView, b: &StripView) -> Line<'static> {
-    let cell = |s: &StripView| {
+fn fx_row(a: &StripView, b: &StripView, focused: DeckId) -> Line<'static> {
+    let cell = |s: &StripView, column: Style| {
         let name: String = s.fx_name.chars().take(BAR).collect();
         let style = if s.fx_on {
-            Style::new()
+            column
         } else {
-            Style::new().add_modifier(Modifier::DIM)
+            column.add_modifier(Modifier::DIM)
         };
         Span::styled(format!("{name:^w$}", w = BAR), style)
     };
+    let (sa, sb) = column_styles(focused);
     Line::from(vec![
         Span::raw(format!("{:<5}", "FX")),
-        cell(a),
+        cell(a, sa),
         Span::raw(" "),
-        cell(b),
+        cell(b, sb),
     ])
 }
 
@@ -271,37 +293,62 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
     let [a, b] = &m.strips;
     let lines = if inner.height >= 12 {
         vec![
-            Line::from(format!("{:<5}{:^w$} {:^w$}", "", "A", "B", w = BAR)),
+            {
+                let (sa, sb) = column_styles(m.focused);
+                let mark = |d: DeckId, letter: &str| {
+                    if m.focused == d {
+                        format!("{:^w$}", format!("▸{letter}"), w = BAR)
+                    } else {
+                        format!("{letter:^w$}", w = BAR)
+                    }
+                };
+                Line::from(vec![
+                    Span::raw(format!("{:<5}", "")),
+                    Span::styled(mark(DeckId::A, "A"), sa.add_modifier(Modifier::BOLD)),
+                    Span::raw(" "),
+                    Span::styled(mark(DeckId::B, "B"), sb.add_modifier(Modifier::BOLD)),
+                ])
+            },
             row(
                 "TRIM",
                 level_bar((a.trim_db + 12.0) / 24.0),
                 level_bar((b.trim_db + 12.0) / 24.0),
+                m.focused,
             ),
             row(
                 "HI",
                 eq_cell(a.eq_db[2], a.kills[2]),
                 eq_cell(b.eq_db[2], b.kills[2]),
+                m.focused,
             ),
             row(
                 "MID",
                 eq_cell(a.eq_db[1], a.kills[1]),
                 eq_cell(b.eq_db[1], b.kills[1]),
+                m.focused,
             ),
             row(
                 "LOW",
                 eq_cell(a.eq_db[0], a.kills[0]),
                 eq_cell(b.eq_db[0], b.kills[0]),
+                m.focused,
             ),
-            row("FLT", filter_cell(a.filter), filter_cell(b.filter)),
+            row(
+                "FLT",
+                filter_cell(a.filter),
+                filter_cell(b.filter),
+                m.focused,
+            ),
             Line::from(""),
-            fx_row(a, b),
-            row("WET", level_bar(a.fx_wet), level_bar(b.fx_wet)),
+            fx_row(a, b, m.focused),
+            row("WET", level_bar(a.fx_wet), level_bar(b.fx_wet), m.focused),
             Line::from(""),
-            meter_row("PK", a.meter, b.meter),
+            meter_row("PK", a.meter, b.meter, m.focused),
             row(
                 "VOL",
                 fading_level(m.faders[0], a.fade_target),
                 fading_level(m.faders[1], b.fade_target),
+                m.focused,
             ),
             Line::from(format!(
                 "{:<5}{:^w$} {:^w$}",
@@ -310,7 +357,7 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 dot(m.headphone_cue[1]),
                 w = BAR
             )),
-            row("MIX", level_bar(m.cue_mix), String::new()),
+            row("MIX", level_bar(m.cue_mix), String::new(), m.focused),
             Line::from(""),
             Line::from(format!(
                 "A {} B   fade {}",

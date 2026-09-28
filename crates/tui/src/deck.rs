@@ -95,6 +95,26 @@ fn mmss(secs: f64) -> String {
 
 impl Widget for DeckPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let focused = self.view.focused;
+        self.draw(area, buf);
+        if !focused {
+            grey_out(area, buf);
+        }
+    }
+}
+
+/// Grey every cell of `area`. An unfocused deck stays readable and stops competing for the
+/// eye, which matters more now that Tab is the only way to reach the other deck.
+fn grey_out(area: Rect, buf: &mut Buffer) {
+    for y in area.top()..area.bottom().min(buf.area.bottom()) {
+        for x in area.left()..area.right().min(buf.area.right()) {
+            buf[(x, y)].modifier |= Modifier::DIM;
+        }
+    }
+}
+
+impl DeckPanel<'_> {
+    fn draw(self, area: Rect, buf: &mut Buffer) {
         let v = self.view;
         let letter = match v.id {
             DeckId::A => 'A',
@@ -122,6 +142,8 @@ impl Widget for DeckPanel<'_> {
         if inner.height == 0 || inner.width == 0 {
             return;
         }
+        // Everything this panel draws from here on is dimmed afterwards when the deck does
+        // not have focus, which is what makes focus obvious without hunting for the border.
 
         // Title row.
         let Some(title) = &v.title else {

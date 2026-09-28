@@ -164,6 +164,7 @@ fn main() {
                 master_meter: 0.85,
                 fade_beats: 8.0,
                 crossfader_fade_target: None,
+                focused: DeckId::A,
             },
             status: "JACK dj-tui @ 48000 Hz / 256 frames, xruns 0  |  hold-cue on  |  pixel waveforms  |  ? help".into(),
             message: format!("Waveform: {}", match mode { WaveformMode::ThreeBand => "3-Band", WaveformMode::Rgb => "RGB", WaveformMode::Blue => "Blue" }),
