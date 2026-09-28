@@ -118,6 +118,36 @@ fn enter_loads_the_selected_track_onto_the_focused_deck() {
 }
 
 #[test]
+fn the_app_says_which_track_sits_on_each_deck() {
+    let dir = tempfile::tempdir().unwrap();
+    music(dir.path(), &["Alpha.wav", "Beta.wav"]);
+    let (mut app, mut p) = setup();
+    assert_eq!(app.deck_paths(), [None, None], "nothing loaded yet");
+
+    app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
+    press(&mut app, Key::Down);
+    press(&mut app, Key::Enter);
+
+    let start = Instant::now();
+    while app.snapshot().decks[0].track_frames == 0 {
+        app.tick();
+        process(&mut p, 16);
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "{}",
+            app.message()
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(
+        app.deck_paths(),
+        [Some(dir.path().join("Beta.wav")), None],
+        "the path, so a session can be written from it"
+    );
+}
+
+#[test]
 fn typing_in_browser_mode_filters_the_list_as_it_goes() {
     let dir = tempfile::tempdir().unwrap();
     music(dir.path(), &["Warehouse Tool.wav", "Breakdown Edit.wav"]);

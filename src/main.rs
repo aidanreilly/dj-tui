@@ -2,6 +2,7 @@
 
 use backend::JackBackend;
 use dj_tui::log::{log_path, Log};
+use dj_tui::session::{session_path, Session};
 use dj_tui::{
     app::App,
     cli::{parse_args, USAGE},
@@ -23,6 +24,7 @@ use ratatui::crossterm::{
 use ratatui::layout::Rect;
 use std::{
     io::stdout,
+    path::PathBuf,
     process::ExitCode,
     time::{Duration, Instant},
 };
@@ -269,6 +271,33 @@ fn main() -> ExitCode {
             app.load_track(id, track, meta);
         }
     }
+    let session_file = session_path(
+        std::env::var("XDG_STATE_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+    );
+    // Put back what the last session was playing, unless this run was told what to load.
+    // A track that has moved since is worth a line rather than silence: the deck it came
+    // back on would otherwise just be empty.
+    if args.files.is_empty() && !args.demo {
+        let session = session_file
+            .as_deref()
+            .map(Session::read)
+            .unwrap_or_default();
+        let decks = [(DeckId::A, 'A'), (DeckId::B, 'B')];
+        for ((deck, letter), (recorded, present)) in decks
+            .into_iter()
+            .zip(session.decks().into_iter().zip(session.existing()))
+        {
+            match (recorded, present) {
+                (_, Some(path)) => app.load_path(deck, path),
+                (Some(gone), None) => notes.push(format!(
+                    "Deck {letter}'s last track is no longer at {}",
+                    gone.display()
+                )),
+                (None, None) => {}
+            }
+        }
+    }
     for (path, deck) in args.files.into_iter().zip([DeckId::A, DeckId::B]) {
         app.load_path(deck, path);
     }
@@ -363,6 +392,9 @@ fn main() -> ExitCode {
     // activate. Say so once, since an audio thread that is not realtime glitches under load
     // however large the buffer is, and nothing else would tell anyone why.
     let mut sched_reported = false;
+    // What this run has written to the session file. Restored tracks arrive from the loader
+    // thread a moment after startup and land on this as an ordinary change.
+    let mut saved_decks: [Option<PathBuf>; 2] = [None, None];
 
     let result = (|| -> std::io::Result<()> {
         loop {
@@ -461,6 +493,17 @@ fn main() -> ExitCode {
                         app.note(line);
                     }
                 }
+            }
+            // Write the session as the decks change rather than at the end, so a crash
+            // still leaves the next run something to open with.
+            let decks = app.deck_paths();
+            if decks != saved_decks {
+                if let Some(file) = &session_file {
+                    if let Err(e) = Session::of(decks.clone()).write(file) {
+                        log.line(&format!("Could not save the session: {e}"));
+                    }
+                }
+                saved_decks = decks;
             }
             for line in app.take_log() {
                 log.line(&line);

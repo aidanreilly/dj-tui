@@ -225,6 +225,13 @@ impl App {
         }
     }
 
+    /// The file on each deck, deck A first, for writing the session out. It comes from the
+    /// same record the cue saving uses, so it names the track the engine is actually playing
+    /// rather than the last one asked for.
+    pub fn deck_paths(&self) -> [Option<PathBuf>; 2] {
+        [0, 1].map(|i| self.persisted[i].as_ref().map(|p| p.path.clone()))
+    }
+
     fn restore_cues(&mut self, deck: DeckId, path: PathBuf, cues: Cues) {
         let rate = self.sample_rate as f64;
         if let Some(secs) = cues.main_cue_secs {

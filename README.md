@@ -318,6 +318,14 @@ be paged out stalls under memory pressure whatever it is scheduled as.
 Without it, `rtkit` still grants PipeWire's own threads a capped `RR 20`, which is enough for
 playback and thin for mixing with effects under load.
 
+## Starting where you left off
+
+The tracks on the decks are written to `~/.local/state/dj-tui/session.toml`, beside the log,
+and loaded again the next time you start. They come back stopped at the start, with the
+waveform, grid and cues their sidecars hold. Naming files on the command line, or `--demo`,
+takes precedence and leaves the file alone; a track that has moved since is reported on the
+message line and its deck starts empty.
+
 ## When something goes wrong
 
 dj-tui keeps a log at `~/.local/state/dj-tui/dj-tui.log`, or under `$XDG_STATE_HOME` if you

@@ -120,6 +120,21 @@ warnings, and the xrun count at the end. `App::take_log` hands over what happene
 last frame, so anything worth keeping is pushed there rather than only shown in the message
 line. Nothing logs from the audio thread.
 
+## Session file
+
+`src/session.rs` writes `$XDG_STATE_HOME/dj-tui/session.toml`, which holds one path per deck
+and nothing else. `main.rs` reads it after the audio starts, unless files were named on the
+command line or `--demo` was, and loads each path through `App::load_path`, which is the same
+route a browser load takes, so the sidecar comes with it.
+
+Writing happens in the frame loop, whenever `App::deck_paths` differs from what was last
+written, rather than on the way out: a session that ends in a crash is the one that most wants
+its decks back. `deck_paths` reads the same `Persisted` records the cue saving uses, so it
+names what the engine is playing rather than the last thing asked for, and a load that failed
+leaves nothing behind. The decks are named a field at a time because TOML cannot write an
+empty slot inside an array. Nothing here fails loudly: a missing, unreadable or nonsense file
+means empty decks, which is where dj-tui started before the file existed.
+
 ## ALSA backend
 
 `backend::alsa_backend` drives a card directly for running without a sound server, from a
