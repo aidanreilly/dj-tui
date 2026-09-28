@@ -55,7 +55,7 @@ fn the_shipped_mapping_is_valid() {
         !mapping.name().is_empty(),
         "a mapping needs a name to report"
     );
-    assert!(mapping.leds().count() >= 8, "and lights up what it can");
+    assert!(mapping.leds().count() >= 6, "and lights up what it can");
 }
 
 #[test]

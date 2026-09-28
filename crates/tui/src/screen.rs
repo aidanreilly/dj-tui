@@ -56,10 +56,6 @@ pub struct StripView {
     pub filter: f32,
     /// Channel peak, linear, pre-fader.
     pub meter: f32,
-    /// Name of the effect in the slot, empty when the strip has no slot.
-    pub fx_name: &'static str,
-    pub fx_on: bool,
-    pub fx_wet: f32,
     /// Where a running fader fade is heading, 0 to 1.
     pub fade_target: Option<f32>,
 }
@@ -108,9 +104,6 @@ const HELP: &[(&str, &str)] = &[
     ("i / I", "loop in and out by hand"),
     ("[ / ]", "halve and double the loop"),
     ("j / J", "beat jump back and forward"),
-    ("f / F", "effect on and off, next effect"),
-    ("9 / 0", "effect wet down and up"),
-    ("p / P  d / D", "the effect's two knobs"),
     ("r / R", "trim"),
     ("t / y / u", "kill the highs, mids, lows on deck A"),
     ("T / Y / U", "kill the highs, mids, lows on deck B"),
@@ -275,26 +268,6 @@ fn meter_row(label: &str, a: f32, b: f32, focused: DeckId) -> Line<'static> {
     Line::from(spans)
 }
 
-/// The effect each channel is running, dimmed until it is switched on.
-fn fx_row(a: &StripView, b: &StripView, focused: DeckId) -> Line<'static> {
-    let cell = |s: &StripView, column: Style| {
-        let name: String = s.fx_name.chars().take(BAR).collect();
-        let style = if s.fx_on {
-            column
-        } else {
-            column.add_modifier(Modifier::DIM)
-        };
-        Span::styled(format!("{name:^w$}", w = BAR), style)
-    };
-    let (sa, sb) = column_styles(focused);
-    Line::from(vec![
-        Span::raw(format!("{:<5}", "FX")),
-        cell(a, sa),
-        Span::raw(" "),
-        cell(b, sb),
-    ])
-}
-
 fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
     let block = Block::bordered().title(" MIXER ");
     let inner = block.inner(area);
@@ -347,9 +320,6 @@ fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 filter_cell(b.filter),
                 m.focused,
             ),
-            Line::from(""),
-            fx_row(a, b, m.focused),
-            row("WET", level_bar(a.fx_wet), level_bar(b.fx_wet), m.focused),
             Line::from(""),
             meter_row("PK", a.meter, b.meter, m.focused),
             row(

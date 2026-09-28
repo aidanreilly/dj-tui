@@ -22,12 +22,6 @@ const TRACKED: &[Control] = &[
     Control::Trim(DeckId::B),
     Control::Filter(DeckId::A),
     Control::Filter(DeckId::B),
-    Control::FxWet(DeckId::A),
-    Control::FxWet(DeckId::B),
-    Control::FxParam(DeckId::A, 0),
-    Control::FxParam(DeckId::A, 1),
-    Control::FxParam(DeckId::B, 0),
-    Control::FxParam(DeckId::B, 1),
     Control::Eq(DeckId::A, input::Band::Low),
     Control::Eq(DeckId::A, input::Band::Mid),
     Control::Eq(DeckId::A, input::Band::High),
@@ -99,7 +93,6 @@ impl Controller {
                 .hot_cues
                 .get(n)
                 .is_some_and(|c| c.is_some()),
-            LedState::Fx(d) => app.fx_on(d),
             LedState::KeyLock(d) => app.key_lock(d),
             LedState::Quantize(d) => app.quantize(d),
             // Sync is a press, not a state the deck holds; the light follows the tempo

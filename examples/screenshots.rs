@@ -5,7 +5,6 @@
 //! would send (`<mode>_deck<N>.rgba`, raw RGBA with a `w h` header line).
 //! `scripts/screenshots.py` turns these into PNGs.
 
-use engine::fx::FxKind;
 use engine::{DeckId, Track};
 use loader::{band_envelope, waveform_envelope, ENVELOPE_POINTS};
 use ratatui::{backend::TestBackend, layout::Rect, Terminal};
@@ -158,9 +157,9 @@ fn main() {
                 cue_mix: 0.4,
                 strips: [
                     StripView { trim_db: 0.0, eq_db: [0.0, 0.0, 2.0], kills: [false; 3], filter: 0.0, meter: 0.8,
-                        fx_name: FxKind::Echo.name(), fx_on: true, fx_wet: 0.6, fade_target: None },
+                        fade_target: None },
                     StripView { trim_db: -2.0, eq_db: [0.0, -6.0, 0.0], kills: [true, false, false], filter: 0.3, meter: 0.35,
-                        fx_name: FxKind::Reverb.name(), fx_on: false, fx_wet: 0.0, fade_target: None },
+                        fade_target: None },
                 ],
                 master_meter: 0.85,
                 fade_beats: 8.0,

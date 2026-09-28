@@ -311,59 +311,6 @@ fn phase_meter_shows_the_offset_between_decks() {
 }
 
 #[test]
-fn the_mixer_names_each_effect_and_shows_how_wet_it_is() {
-    use engine::fx::FxKind;
-    let mut m = MixerView::default();
-    m.strips[0].fx_name = FxKind::Echo.name();
-    m.strips[0].fx_on = true;
-    m.strips[0].fx_wet = 1.0;
-    m.strips[1].fx_name = FxKind::Bitcrusher.name();
-    m.strips[1].fx_on = false;
-    m.strips[1].fx_wet = 0.0;
-    let text = mixer_text(m, 120, 44);
-    assert!(text.contains("FX"), "an FX row\n{text}");
-    assert!(text.contains("Echo"), "the effect on deck A\n{text}");
-    assert!(
-        text.contains("Bitcr") || text.contains("Bitcrusher"),
-        "the effect on deck B, room permitting\n{text}"
-    );
-    let wet_row = text.lines().find(|l| l.contains("WET")).unwrap();
-    assert!(wet_row.contains('█'), "deck A is fully wet: {wet_row}");
-    assert!(wet_row.contains('▯'), "deck B is dry: {wet_row}");
-}
-
-#[test]
-fn an_effect_that_is_off_is_dimmed() {
-    use ratatui::style::Modifier;
-    let view = |on: bool| {
-        let mut m = MixerView::default();
-        m.strips[0].fx_name = "Echo";
-        m.strips[0].fx_on = on;
-        let screen = ScreenView {
-            decks: [deck(DeckId::A, true), deck(DeckId::B, false)],
-            mixer: m,
-            status: String::new(),
-            message: String::new(),
-            phase: None,
-            help: false,
-            browser: Default::default(),
-            devices: None,
-        };
-        let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
-        term.draw(|f| render_screen(f, &screen)).unwrap();
-        let buf = term.backend().buffer().clone();
-        let (w, h) = (buf.area.width, buf.area.height);
-        (0..h)
-            .flat_map(|y| (0..w).map(move |x| (x, y)))
-            .find(|&(x, y)| buf[(x, y)].symbol() == "E" && buf[(x + 1, y)].symbol() == "c")
-            .map(|(x, y)| buf[(x, y)].modifier.contains(Modifier::DIM))
-            .expect("the effect name is on screen")
-    };
-    assert!(view(false), "an effect that is not running is dimmed");
-    assert!(!view(true), "and stands out once it is");
-}
-
-#[test]
 fn the_help_overlay_lists_the_keys_over_the_screen() {
     let mut view = ScreenView {
         decks: [deck(DeckId::A, true), deck(DeckId::B, false)],

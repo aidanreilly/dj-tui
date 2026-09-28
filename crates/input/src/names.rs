@@ -85,10 +85,6 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["cue-mix", way] => Action::CueMix(dir(way)?),
         ["crossfader", way, "end"] => Action::Crossfader(dir(way)?, true),
         ["crossfader", way] => Action::Crossfader(dir(way)?, false),
-        ["fx", d] => Action::FxToggle(deck(d)?),
-        ["fx-next", d] => Action::FxNext(deck(d)?),
-        ["fx", "wet", d, way] => Action::FxWet(deck(d)?, dir(way)?),
-        ["fx", "param", d, knob, way] => Action::FxParam(deck(d)?, knob_index(knob)?, dir(way)?),
         ["waveform"] => Action::CycleWaveformMode,
         ["browser", way] => Action::BrowserMove(dir(way)?),
         ["load", d] => Action::Load(deck(d)?),
@@ -108,11 +104,6 @@ pub fn parse_action(text: &str) -> Option<Action> {
 fn pad_index(text: &str) -> Option<usize> {
     let n: usize = text.parse().ok()?;
     (1..=engine::HOT_CUES).contains(&n).then_some(n - 1)
-}
-
-fn knob_index(text: &str) -> Option<usize> {
-    let n: usize = text.parse().ok()?;
-    (1..=2).contains(&n).then_some(n - 1)
 }
 
 fn tenth_index(text: &str) -> Option<u8> {

@@ -2,14 +2,13 @@
 
 Spec and milestone plan: `docs/spec.md`. M0 through M3 are done, and M4 analyses tempo and key
 on load in `crates/analysis`. M5 brought loops, beat jump and quantize, with cues kept in the
-track sidecar rather than the SQLite store the spec describes. M6 has all four effects with
-their keys and knobs, M7 has sync, nudge and key lock, and M9 has mappings, soft takeover, LED
-feedback and hotplug through JACK MIDI.
+track sidecar rather than the SQLite store the spec describes. M7 has sync, nudge and key lock,
+and M9 has mappings, soft takeover, LED feedback and hotplug through JACK MIDI.
 
 M8 has the browser with search,
 sorting and batch analysis, and M10 has the raw ALSA backend and the device screen. Out of
-scope, so not worth proposing again: jog scratching, two-card output, SysEx handshakes in mappings, and the
-hour-long stress run.
+scope, so not worth proposing again: jog scratching, two-card output, SysEx handshakes in mappings, the
+hour-long stress run, and the effect slot, which was removed.
 
 ## Rules
 
@@ -45,22 +44,6 @@ UI-side snap of loop in points and jumps to the nearest beat, not something the 
 about. Both renderers draw the loop green: a tint plus edge lines in `tui::pixel`, a lit
 background and brackets in `tui::deck`. `i` marks a loop in point and `I` closes the loop at
 the playhead, which also sets the length the halve and double keys work from.
-
-## Effects
-
-`engine::fx` holds one `FxSlot` per channel, between the filter and the fader. Nothing
-allocates after `FxSlot::new`, so the slot is safe on the audio thread, and the no-alloc test
-drives it. `f` switches the slot on, `F` cycles Echo, Flanger, Reverb and Bitcrusher, and
-`9`/`0` set the wet mix. `p`/`P` and `d`/`D` turn the slot's two knobs, which each unit
-reads its own way: echo time and feedback, flanger sweep and depth, reverb size and damping,
-crusher bit depth and sample rate. The knobs keep their positions when the unit changes, and
-times map geometrically so the centre lands on the default.
-
-Echo and flanger take their time from the beat length the UI sends on load, divided by the
-deck rate, so both stay in time when the tempo fader moves. Tails work by gating the input
-rather than cutting the output: what is already inside an echo or a reverb plays out, and
-`FxSlot::is_ringing` is true until it is silent. Gains ride a `Ramp` that snaps within 80 dB
-of its target, which is what makes a bypass bit-exact.
 
 ## Key lock
 

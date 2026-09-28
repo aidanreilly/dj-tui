@@ -272,21 +272,6 @@ fn deck_toggles_and_loops() {
         Some(Action::BeatJump(d, Dir::Down))
     );
     assert_eq!(press(&mut km, ch('>')), Some(Action::Nudge(d, Dir::Up)));
-    assert_eq!(press(&mut km, ch('f')), Some(Action::FxToggle(d)));
-    assert_eq!(press(&mut km, ch('F')), Some(Action::FxNext(d)));
-    assert_eq!(
-        press(&mut km, ch('p')),
-        Some(Action::FxParam(d, 0, Dir::Down))
-    );
-    assert_eq!(
-        press(&mut km, ch('P')),
-        Some(Action::FxParam(d, 0, Dir::Up))
-    );
-    assert_eq!(
-        press(&mut km, ch('D')),
-        Some(Action::FxParam(d, 1, Dir::Up))
-    );
-    assert_eq!(press(&mut km, ch('0')), Some(Action::FxWet(d, Dir::Up)));
     assert_eq!(press(&mut km, ch('m')), Some(Action::HeadphoneCue(d)));
     assert_eq!(press(&mut km, ch('h')), Some(Action::CueMix(Dir::Down)));
     assert_eq!(press(&mut km, ch('H')), Some(Action::CueMix(Dir::Up)));
@@ -313,6 +298,14 @@ fn g_followed_by_a_non_digit_is_dropped() {
 fn unmapped_keys_do_nothing() {
     let mut km = Keymap::new();
     assert_eq!(press(&mut km, ch('z')), None);
+}
+
+#[test]
+fn the_effect_keys_do_nothing() {
+    let mut km = Keymap::new();
+    for key in ['f', 'F', 'p', 'P', 'd', 'D', '9', '0'] {
+        assert_eq!(press(&mut km, ch(key)), None, "{key} is still bound");
+    }
 }
 
 mod action_names {
@@ -355,10 +348,13 @@ mod action_names {
             parse_action("nudge a down"),
             Some(Action::Nudge(A, Dir::Down))
         );
-        assert_eq!(
-            parse_action("fx param a 2 up"),
-            Some(Action::FxParam(A, 1, Dir::Up))
-        );
+    }
+
+    #[test]
+    fn effect_names_are_rejected() {
+        for name in ["fx a", "fx-next a", "fx wet a up", "fx param a 1 up"] {
+            assert_eq!(parse_action(name), None, "{name} still parses");
+        }
     }
 
     #[test]
@@ -368,8 +364,6 @@ mod action_names {
         assert_eq!(parse_action("quantize a"), Some(Action::Quantize(A)));
         assert_eq!(parse_action("loop a"), Some(Action::LoopToggle(A)));
         assert_eq!(parse_action("loop-in a"), Some(Action::LoopIn(A)));
-        assert_eq!(parse_action("fx a"), Some(Action::FxToggle(A)));
-        assert_eq!(parse_action("fx-next a"), Some(Action::FxNext(A)));
         assert_eq!(parse_action("waveform"), Some(Action::CycleWaveformMode));
         assert_eq!(parse_action("cue-mix up"), Some(Action::CueMix(Dir::Up)));
         assert_eq!(parse_action("headphones a"), Some(Action::HeadphoneCue(A)));

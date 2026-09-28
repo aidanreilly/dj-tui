@@ -5,7 +5,6 @@
 //! Actions for features not built yet produce no command.
 
 use engine::dsp::{EqBand, EQ_MAX_DB, TRIM_RANGE_DB};
-use engine::fx::{FxKind, FX_PARAMS};
 use engine::{Command, DeckId, Snapshot};
 use input::{Action, Dir};
 use midi::Control;
@@ -55,28 +54,6 @@ pub struct ControlState {
     pub key_lock: [bool; 2],
     /// Headphone blend: 0 is the cue bus alone, 1 is the master alone.
     pub cue_mix: f32,
-    pub fx: [FxState; 2],
-}
-
-/// The effect slot for one channel, as the UI holds it.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FxState {
-    pub kind: FxKind,
-    pub on: bool,
-    pub wet: f32,
-    /// The two knobs, which keep their positions when the unit changes.
-    pub params: [f32; FX_PARAMS],
-}
-
-impl Default for FxState {
-    fn default() -> Self {
-        Self {
-            kind: FxKind::default(),
-            on: false,
-            wet: 0.0,
-            params: [0.5; FX_PARAMS],
-        }
-    }
 }
 
 /// Trim, EQ and filter for one channel. Arrays are indexed by `EqBand as usize`.
@@ -96,8 +73,6 @@ pub const EQ_STEP_DB: f32 = 2.0;
 /// Lowest EQ knob position short of a kill.
 pub const EQ_FLOOR_DB: f32 = -26.0;
 pub const FILTER_STEP: f32 = 0.1;
-pub const FX_WET_STEP: f32 = 0.1;
-pub const FX_PARAM_STEP: f32 = 0.05;
 pub const CUE_MIX_STEP: f32 = 0.1;
 /// How far one nudge moves the playhead. Small enough to beatmatch by ear.
 pub const NUDGE_SECS: f64 = 0.01;
@@ -152,7 +127,6 @@ impl Default for ControlState {
             quantize: [false; 2],
             key_lock: [false; 2],
             cue_mix: 0.5,
-            fx: [FxState::default(); 2],
         }
     }
 }
@@ -236,15 +210,6 @@ pub fn set_control(
             st.strips[d.index()].filter = f;
             Command::SetFilter(d, f)
         }
-        Control::FxWet(d) => {
-            st.fx[d.index()].wet = v;
-            Command::SetFxWet(d, v)
-        }
-        Control::FxParam(d, index) => {
-            let knob = st.fx[d.index()].params.get_mut(index)?;
-            *knob = v;
-            Command::SetFxParam(d, index, v)
-        }
     })
 }
 
@@ -267,8 +232,6 @@ pub fn control_value(st: &ControlState, c: &Controls, control: Control) -> f32 {
             }
         }
         Control::Filter(d) => (st.strips[d.index()].filter + 1.0) / 2.0,
-        Control::FxWet(d) => st.fx[d.index()].wet,
-        Control::FxParam(d, index) => st.fx[d.index()].params.get(index).copied().unwrap_or(0.0),
     }
     .clamp(0.0, 1.0)
 }
@@ -472,27 +435,6 @@ pub fn apply(
             let by = st.loop_beats[i] * beat * sign(dir) as f64;
             let frames = snap.decks[i].track_frames as f64;
             Command::Seek(d, (from_here(st, snap, i) + by).clamp(0.0, frames))
-        }
-        FxToggle(d) => {
-            let fx = &mut st.fx[d.index()];
-            fx.on = !fx.on;
-            Command::SetFxOn(d, fx.on)
-        }
-        FxNext(d) => {
-            let fx = &mut st.fx[d.index()];
-            fx.kind = fx.kind.next();
-            Command::SetFxKind(d, fx.kind)
-        }
-        FxParam(d, index, dir) => {
-            let fx = &mut st.fx[d.index()];
-            let knob = fx.params.get_mut(index)?;
-            *knob = step(*knob, FX_PARAM_STEP * sign(dir), 0.0, 1.0);
-            Command::SetFxParam(d, index, *knob)
-        }
-        FxWet(d, dir) => {
-            let fx = &mut st.fx[d.index()];
-            fx.wet = step(fx.wet, FX_WET_STEP * sign(dir), 0.0, 1.0);
-            Command::SetFxWet(d, fx.wet)
         }
         Nudge(d, dir) => {
             let i = d.index();

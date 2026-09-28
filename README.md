@@ -2,7 +2,7 @@
 
 A two-deck DJ console for the Linux terminal.
 
-Two decks with CDJ-style cueing, hot cues, loops and key lock, a three-band isolator mixer with filter and effects, colour waveforms drawn as real pixels where the terminal allows it, and tempo and key detection that runs as a track loads.
+Two decks with CDJ-style cueing, hot cues, loops and key lock, a three-band isolator mixer with filter, colour waveforms drawn as real pixels where the terminal allows it, and tempo and key detection that runs as a track loads.
 
 Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
@@ -59,10 +59,6 @@ One row per key. `Shift +`, `Alt +` or `Ctrl +` change key travel.
 | `i` / `I` | Mark the loop in point. Shift closes the loop where the playhead is, which also sets the length. |
 | `[` / `]` | Halve and double the loop, keeping the in point. Shift (`{` / `}`) halves and doubles the fade length instead. |
 | `j` / `J` | Beat jump back by the loop length, forward with Shift. |
-| `f` / `F` | Effect on and off. Shift moves to the next one: Echo, Flanger, Reverb, Bitcrusher. |
-| `9` / `0` | Effect wet mix down and up. |
-| `p` / `P` | The effect's first knob, down and up with Shift: echo time, flanger sweep, reverb size, crusher bit depth. |
-| `d` / `D` | The effect's second knob, down and up with Shift: echo feedback, flanger depth, reverb damping, crusher rate. |
 | `←` / `→` | Crossfader one step. Shift takes it hard to that end, `Alt` fades it there over the fade length. |
 | `↑` / `↓` | The focused deck's channel fader one step, in dB. Shift goes hard to full or to zero, `Alt` fades. |
 | `x` / `X` | Crossfader back to the middle. Shift fades it there instead. |
@@ -159,19 +155,6 @@ control's key means do it slowly**, over the fade length.
 | `{` / `}` | Halve and double the fade length |
 | `Esc` | Stop every running fade where it stands |w
 
-### Effects
-
-| Key | What it does |
-| --- | --- |
-| `f` | Effect on and off |
-| `F` | Next effect: Echo, Flanger, Reverb, Bitcrusher |
-| `9` / `0` | Wet down and up |
-| `p` / `P` | First knob: echo time, flanger sweep, reverb size, crusher bit depth |
-| `d` / `D` | Second knob: echo feedback, flanger depth, reverb damping, crusher rate |
-
-Echo and flanger take their timing from the track's beat grid and follow the tempo fader.
-Echo and reverb keep ringing after you switch them off, rather than cutting dead.
-
 ### Everything else
 
 | Key | What it does |
@@ -239,7 +222,7 @@ line says `realtime`. That group is what `/etc/security/limits.d` grants `rtprio
 be paged out stalls under memory pressure whatever it is scheduled as.
 
 Without it, `rtkit` still grants PipeWire's own threads a capped `RR 20`, which is enough for
-playback and thin for mixing with effects under load.
+playback and thin for mixing under load.
 
 ## Errors
 

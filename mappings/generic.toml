@@ -157,40 +157,6 @@ control = "tempo a"
 input = "pitchbend 1"
 control = "tempo b"
 
-# --- Effects ---
-
-[[buttons]]
-input = "note 0 40"
-action = "fx a"
-
-[[buttons]]
-input = "note 1 40"
-action = "fx b"
-
-[[buttons]]
-input = "note 0 41"
-action = "fx-next a"
-
-[[buttons]]
-input = "note 1 41"
-action = "fx-next b"
-
-[[knobs]]
-input = "cc 0 42"
-control = "fx wet a"
-
-[[knobs]]
-input = "cc 1 42"
-control = "fx wet b"
-
-[[knobs]]
-input = "cc 0 43"
-control = "fx param a 1"
-
-[[knobs]]
-input = "cc 1 43"
-control = "fx param b 1"
-
 # --- Lights ---
 
 [[leds]]
@@ -216,14 +182,6 @@ state = "loop a"
 [[leds]]
 output = "note 1 30"
 state = "loop b"
-
-[[leds]]
-output = "note 0 40"
-state = "fx a"
-
-[[leds]]
-output = "note 1 40"
-state = "fx b"
 
 # --- Riding both decks at once ---
 #

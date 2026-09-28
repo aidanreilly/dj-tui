@@ -66,7 +66,6 @@ pub enum LedState {
     /// Sitting on the main cue, paused.
     Cued(DeckId),
     Loop(DeckId),
-    Fx(DeckId),
     Sync(DeckId),
     KeyLock(DeckId),
     Quantize(DeckId),
@@ -86,7 +85,6 @@ impl LedState {
             ["playing", d] => LedState::Playing(deck(d)?),
             ["cued", d] => LedState::Cued(deck(d)?),
             ["loop", d] => LedState::Loop(deck(d)?),
-            ["fx", d] => LedState::Fx(deck(d)?),
             ["sync", d] => LedState::Sync(deck(d)?),
             ["keylock", d] => LedState::KeyLock(deck(d)?),
             ["quantize", d] => LedState::Quantize(deck(d)?),

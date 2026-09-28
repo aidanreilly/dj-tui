@@ -141,9 +141,7 @@ impl Automation {
             | Control::Filter(d)
             | Control::Trim(d)
             | Control::Tempo(d)
-            | Control::Eq(d, _)
-            | Control::FxWet(d)
-            | Control::FxParam(d, _) => d != deck,
+            | Control::Eq(d, _) => d != deck,
             Control::Crossfader | Control::CueMix => true,
         });
     }

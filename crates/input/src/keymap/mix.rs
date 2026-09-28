@@ -1,4 +1,4 @@
-//! Mix mode: the whole keyboard is transport, mixer and effects, acting on the focused deck.
+//! Mix mode: the whole keyboard is transport and mixer, acting on the focused deck.
 
 use super::{Key, KeyEvent, Keymap, CUE_KEY, SEEK_KEY};
 use crate::{Action, Band, Dir};
@@ -65,7 +65,6 @@ impl Keymap {
                     HotCue(d, n)
                 }
             }
-            '9' | '0' => FxWet(d, dir(c == '0')),
             CUE_KEY => {
                 // Auto-repeat arrives as more presses. Pressing cue again while it is held
                 // would re-seek to the cue point over and over.
@@ -94,10 +93,6 @@ impl Keymap {
             'l' => LoopToggle(d),
             'i' => LoopIn(d),
             'I' => LoopOut(d),
-            'f' => FxToggle(d),
-            'p' | 'P' => FxParam(d, 0, dir(c == 'P')),
-            'd' | 'D' => FxParam(d, 1, dir(c == 'D')),
-            'F' => FxNext(d),
             'm' => HeadphoneCue(d),
             'h' | 'H' => CueMix(dir(c == 'H')),
             'r' | 'R' => Trim(d, dir(c == 'R')),

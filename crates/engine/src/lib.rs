@@ -2,7 +2,6 @@
 
 mod deck;
 pub mod dsp;
-pub mod fx;
 mod mixer;
 mod rt;
 mod stretch;

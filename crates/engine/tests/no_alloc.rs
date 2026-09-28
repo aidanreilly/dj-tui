@@ -26,11 +26,6 @@ fn process_with_commands_does_not_allocate_or_free() {
     h.send(Command::SetFilter(A, -0.6)).unwrap();
     h.send(Command::SetTrim(A, 3.0)).unwrap();
     h.send(Command::SetLoop(A, Some((100.0, 5_000.0)))).unwrap();
-    h.send(Command::SetBeatFrames(A, 24_000.0)).unwrap();
-    h.send(Command::SetFxKind(A, engine::fx::FxKind::Echo))
-        .unwrap();
-    h.send(Command::SetFxWet(A, 0.8)).unwrap();
-    h.send(Command::SetFxOn(A, true)).unwrap();
     h.send(Command::SetKeyLock(A, true)).unwrap();
     h.send(Command::SetRate(A, 1.08)).unwrap();
     assert_no_alloc(|| p.process(&mut master, &mut cue));
@@ -41,8 +36,5 @@ fn process_with_commands_does_not_allocate_or_free() {
     drop(t1);
     assert_no_alloc(|| p.process(&mut master, &mut cue));
     assert_no_alloc(|| p.process(&mut master[..256], &mut cue[..256]));
-    // The echo tail keeps running after the slot is switched off.
-    h.send(Command::SetFxOn(A, false)).unwrap();
-    assert_no_alloc(|| p.process(&mut master, &mut cue));
     h.collect_garbage();
 }

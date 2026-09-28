@@ -438,16 +438,6 @@ fn sync_without_a_grid_says_so() {
 }
 
 #[test]
-fn the_effect_knobs_report_what_they_do_in_the_unit_they_are_turning() {
-    let (mut app, _p) = setup();
-    app.on_key(KeyEvent::press(Key::Char('P')));
-    assert!(app.message().contains("Echo time"), "{}", app.message());
-    app.on_key(KeyEvent::press(Key::Char('F')));
-    app.on_key(KeyEvent::press(Key::Char('d')));
-    assert!(app.message().contains("Flanger depth"), "{}", app.message());
-}
-
-#[test]
 fn a_controller_drives_the_same_actions_the_keys_do() {
     use input::Action;
     use midi::Control;

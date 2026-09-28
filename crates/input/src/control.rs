@@ -13,13 +13,11 @@ pub enum Control {
     Trim(DeckId),
     Eq(DeckId, Band),
     Filter(DeckId),
-    FxWet(DeckId),
-    FxParam(DeckId, usize),
     CueMix,
 }
 
 impl Control {
-    /// Parse a control name: `fader a`, `eq b mid`, `fx param a 2`, `crossfader`.
+    /// Parse a control name: `fader a`, `eq b mid`, `filter a`, `crossfader`.
     pub fn parse(text: &str) -> Option<Control> {
         let lower = text.to_ascii_lowercase();
         let words: Vec<&str> = lower.split_whitespace().collect();
@@ -42,11 +40,6 @@ impl Control {
             ["trim", d] => Control::Trim(deck(d)?),
             ["filter", d] => Control::Filter(deck(d)?),
             ["eq", d, b] => Control::Eq(deck(d)?, band(b)?),
-            ["fx", "wet", d] => Control::FxWet(deck(d)?),
-            ["fx", "param", d, knob] => {
-                let n: usize = knob.parse().ok()?;
-                Control::FxParam(deck(d)?, (1..=2).contains(&n).then(|| n - 1)?)
-            }
             _ => return None,
         })
     }

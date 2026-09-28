@@ -12,16 +12,19 @@ fn controls_read_as_words() {
     assert_eq!(Control::parse("trim a"), Some(Control::Trim(A)));
     assert_eq!(Control::parse("filter b"), Some(Control::Filter(B)));
     assert_eq!(Control::parse("eq b mid"), Some(Control::Eq(B, Band::Mid)));
-    assert_eq!(Control::parse("fx wet a"), Some(Control::FxWet(A)));
-    assert_eq!(Control::parse("fx param a 2"), Some(Control::FxParam(A, 1)));
 }
 
 #[test]
 fn nonsense_is_rejected_rather_than_guessed_at() {
     assert_eq!(Control::parse("fader c"), None);
     assert_eq!(Control::parse("eq a sideways"), None);
-    assert_eq!(Control::parse("fx param a 3"), None);
     assert_eq!(Control::parse(""), None);
+}
+
+#[test]
+fn effect_controls_are_rejected() {
+    assert_eq!(Control::parse("fx wet a"), None);
+    assert_eq!(Control::parse("fx param a 1"), None);
 }
 
 #[test]

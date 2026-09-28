@@ -257,17 +257,17 @@ input = "cc 0 2"
 control = "eq b mid"
 [[knobs]]
 input = "cc 0 3"
-control = "fx wet b"
+control = "filter b"
 [[knobs]]
 input = "cc 0 4"
-control = "fx param a 2"
+control = "trim a"
 "#,
     )
     .unwrap();
     assert_eq!(m.control_for("cc 0 1"), Some(Control::Crossfader));
     assert_eq!(m.control_for("cc 0 2"), Some(Control::Eq(B, Band::Mid)));
-    assert_eq!(m.control_for("cc 0 3"), Some(Control::FxWet(B)));
-    assert_eq!(m.control_for("cc 0 4"), Some(Control::FxParam(A, 1)));
+    assert_eq!(m.control_for("cc 0 3"), Some(Control::Filter(B)));
+    assert_eq!(m.control_for("cc 0 4"), Some(Control::Trim(A)));
 }
 
 #[test]

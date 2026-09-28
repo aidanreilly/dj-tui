@@ -125,9 +125,6 @@ impl App {
         self.state.beat_frames[i] = meta.grid.map(|g| g.beat_secs() * rate);
         self.state.first_beat_frames[i] = meta.grid.map_or(0.0, |g| g.first_beat_secs * rate);
         self.state.loop_in[i] = None;
-        if let Some(beat) = self.state.beat_frames[i] {
-            self.send(Command::SetBeatFrames(deck, beat as f32));
-        }
         self.metas[i] = DeckMeta {
             loading: false,
             ..meta
@@ -395,31 +392,6 @@ impl App {
         };
     }
 
-    /// Report what the effect keys did, since an effect at zero wet makes no sound yet.
-    fn note_fx_keys(&mut self, action: Action) {
-        let (Action::FxToggle(d)
-        | Action::FxNext(d)
-        | Action::FxWet(d, _)
-        | Action::FxParam(d, _, _)) = action
-        else {
-            return;
-        };
-        let fx = self.state.fx[d.index()];
-        let letter = deck_letter(d);
-        if let Action::FxParam(_, index, _) = action {
-            let name = fx_param_name(fx.kind, index);
-            let value = (fx.params[index] * 100.0).round() as u32;
-            self.message = format!("{} {name} {value}% on deck {letter}", fx.kind.name());
-            return;
-        }
-        let wet = (fx.wet * 100.0).round() as u32;
-        self.message = if fx.on {
-            format!("{} on deck {letter}, {wet}% wet", fx.kind.name())
-        } else {
-            format!("{} off on deck {letter}", fx.kind.name())
-        };
-    }
-
     /// Handle one key event. Returns true when the user asked to quit.
     pub fn on_key(&mut self, key: KeyEvent) -> bool {
         let Some(action) = self.keymap.handle(key) else {
@@ -519,10 +491,6 @@ impl App {
         {
             self.send(cmd);
         }
-    }
-
-    pub fn fx_on(&self, deck: DeckId) -> bool {
-        self.state.fx[deck.index()].on
     }
 
     pub fn key_lock(&self, deck: DeckId) -> bool {
@@ -666,7 +634,6 @@ impl App {
                 // frame and land in the same audio callback.
                 let cmds = apply_many(&mut self.state, &self.controls, &snap, action);
                 self.note_loop_keys(action, cmds.first());
-                self.note_fx_keys(action);
                 self.note_sync_key(action, cmds.first());
                 self.note_key_lock(action);
                 self.note_cue_mix(action);
@@ -795,16 +762,12 @@ impl App {
             .zip(&self.state.strips)
             .enumerate()
         {
-            let fx = self.state.fx[i];
             *view = tui::StripView {
                 trim_db: st.trim_db,
                 eq_db: st.eq_db,
                 kills: st.kills,
                 filter: st.filter,
                 meter: self.meters[i],
-                fx_name: fx.kind.name(),
-                fx_on: fx.on,
-                fx_wet: fx.wet,
                 fade_target: self.automation.target(midi::Control::Fader(if i == 0 {
                     DeckId::A
                 } else {
@@ -847,8 +810,6 @@ fn manual_control(action: Action) -> Option<midi::Control> {
         Action::Trim(d, _) => midi::Control::Trim(d),
         Action::Tempo(d, ..) => midi::Control::Tempo(d),
         Action::CueMix(_) => midi::Control::CueMix,
-        Action::FxWet(d, _) => midi::Control::FxWet(d),
-        Action::FxParam(d, i, _) => midi::Control::FxParam(d, i),
         _ => return None,
     })
 }
@@ -882,21 +843,6 @@ fn mode_name(m: WaveformMode) -> &'static str {
         WaveformMode::ThreeBand => "3-Band",
         WaveformMode::Rgb => "RGB",
         WaveformMode::Blue => "Blue",
-    }
-}
-
-/// What each knob does in a given unit, for the status line.
-fn fx_param_name(kind: engine::fx::FxKind, index: usize) -> &'static str {
-    use engine::fx::FxKind::*;
-    match (kind, index) {
-        (Echo, 0) => "time",
-        (Echo, _) => "feedback",
-        (Flanger, 0) => "sweep",
-        (Flanger, _) => "depth",
-        (Reverb, 0) => "size",
-        (Reverb, _) => "damping",
-        (Bitcrusher, 0) => "bits",
-        (Bitcrusher, _) => "rate",
     }
 }
 

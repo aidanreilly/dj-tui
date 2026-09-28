@@ -21,7 +21,6 @@ fn led_states_name_what_the_deck_is_doing() {
     assert_eq!(LedState::parse("playing a"), Some(LedState::Playing(A)));
     assert_eq!(LedState::parse("cued b"), Some(LedState::Cued(B)));
     assert_eq!(LedState::parse("loop a"), Some(LedState::Loop(A)));
-    assert_eq!(LedState::parse("fx a"), Some(LedState::Fx(A)));
     assert_eq!(LedState::parse("sync a"), Some(LedState::Sync(A)));
     assert_eq!(LedState::parse("keylock b"), Some(LedState::KeyLock(B)));
     assert_eq!(LedState::parse("hotcue a 4"), Some(LedState::HotCue(A, 3)));
