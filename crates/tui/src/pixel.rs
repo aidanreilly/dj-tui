@@ -17,6 +17,10 @@ pub const PLAYHEAD_WIDTH: u32 = 2;
 /// How bright the played portion is relative to the rest.
 const DIM: f32 = 0.4;
 
+/// How far an unfocused deck's whole waveform is pulled down. The glyph renderer dims its
+/// panel with a terminal attribute; an image has to be drawn darker to match.
+const UNFOCUSED: f32 = 0.45;
+
 /// Same contrast curve as the glyph renderer, so both modes read alike.
 fn shape(peak: f32) -> f32 {
     peak.clamp(0.0, 1.0).powf(1.5)
@@ -90,6 +94,21 @@ pub struct Wave<'a> {
     pub warning: bool,
     /// Pixel columns `[start, end)` of the active loop, from [`loop_columns`].
     pub loop_cols: Option<(u32, u32)>,
+    /// False on the deck the keys are not acting on, which draws it darker throughout.
+    pub focused: bool,
+}
+
+impl Default for Wave<'_> {
+    fn default() -> Self {
+        Self {
+            ranges: &[],
+            bands: &[],
+            mode: WaveformMode::ThreeBand,
+            warning: false,
+            loop_cols: None,
+            focused: true,
+        }
+    }
 }
 
 /// Exponent that pushes weaker bands toward zero in RGB mode, so hues stay clear
@@ -230,6 +249,13 @@ impl WaveformBitmaps {
                 }
             }
         }
+        if !wave.focused {
+            for q in normal.pixels_mut() {
+                for c in 0..3 {
+                    q[c] = (q[c] as f32 * UNFOCUSED).round() as u8;
+                }
+            }
+        }
         let mut dimmed = normal.clone();
         for p in dimmed.pixels_mut() {
             for c in 0..3 {
@@ -349,6 +375,8 @@ fn fingerprint(wave: &Wave) -> u64 {
     {
         v.to_bits().hash(&mut h);
     }
+    // Focus changes the colours, so it has to force a new rasterization.
+    wave.focused.hash(&mut h);
     h.finish()
 }
 

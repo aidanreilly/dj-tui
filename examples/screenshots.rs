@@ -202,6 +202,7 @@ fn main() {
                 warning: i == 1,
                 // The same loop the deck view shows, so both renderers appear in a shot.
                 loop_cols: loop_columns(view.decks[i].loop_secs, decks[i].secs, w),
+                focused: view.decks[i].focused,
             };
             let pal = Palette::default();
             let img = WaveformBitmaps::rasterize(&wave, w, h, &pal).compose_with(

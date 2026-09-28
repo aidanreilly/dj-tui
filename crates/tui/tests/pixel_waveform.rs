@@ -22,6 +22,7 @@ fn blue(ranges: &[[f32; 2]]) -> Wave<'_> {
         mode: WaveformMode::Blue,
         warning: false,
         loop_cols: None,
+        focused: true,
     }
 }
 
@@ -137,6 +138,7 @@ fn three_band_image_uses_only_the_three_band_colours_inside() {
         mode: WaveformMode::ThreeBand,
         warning: false,
         loop_cols: None,
+        focused: true,
     };
     let b = WaveformBitmaps::rasterize(&wave, 10, H, &p);
     let mut seen = std::collections::HashSet::new();
@@ -166,6 +168,7 @@ fn rgb_image_colours_a_bass_column_red() {
         mode: WaveformMode::Rgb,
         warning: false,
         loop_cols: None,
+        focused: true,
     };
     let b = WaveformBitmaps::rasterize(&wave, 10, H, &pal());
     let px = b.normal().get_pixel(5, H / 2);
@@ -184,6 +187,7 @@ fn changing_mode_rasterises_again() {
             mode: WaveformMode::ThreeBand,
             warning: false,
             loop_cols: None,
+            focused: true,
         },
         (W, H),
         None,
@@ -196,6 +200,7 @@ fn changing_mode_rasterises_again() {
             mode: WaveformMode::Rgb,
             warning: false,
             loop_cols: None,
+            focused: true,
         },
         (W, H),
         None,
@@ -442,4 +447,54 @@ fn the_loop_still_shows_in_the_part_already_played() {
         &p.playhead,
         "the playhead stays on top"
     );
+}
+
+#[test]
+fn an_unfocused_decks_waveform_is_rasterized_darker() {
+    let p = Palette::default();
+    let ranges = flat(1.0, 10);
+    let lit = WaveformBitmaps::rasterize(&blue(&ranges), 10, H, &p);
+    let grey = WaveformBitmaps::rasterize(
+        &Wave {
+            focused: false,
+            ..blue(&ranges)
+        },
+        10,
+        H,
+        &p,
+    );
+
+    let brightness = |img: &image::RgbaImage| -> u32 {
+        img.pixels()
+            .map(|q| q[0] as u32 + q[1] as u32 + q[2] as u32)
+            .sum()
+    };
+    let (a, b) = (brightness(lit.normal()), brightness(grey.normal()));
+    assert!(a > 0, "the focused deck drew something");
+    assert!(
+        b * 2 < a,
+        "the unfocused deck is clearly darker: {b} against {a}"
+    );
+}
+
+#[test]
+fn moving_focus_redraws_the_image() {
+    let p = Palette::default();
+    let ranges = flat(1.0, 10);
+    let mut pw = PixelWaveform::default();
+    assert!(pw.update(&blue(&ranges), (10, H), None, &p).is_some());
+    assert_eq!(pw.rasterizations(), 1);
+    // Focus is part of what the bitmap depends on, so losing it has to redraw.
+    assert!(pw
+        .update(
+            &Wave {
+                focused: false,
+                ..blue(&ranges)
+            },
+            (10, H),
+            None,
+            &p
+        )
+        .is_some());
+    assert_eq!(pw.rasterizations(), 2);
 }
