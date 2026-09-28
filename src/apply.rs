@@ -19,7 +19,6 @@ pub struct Controls {
     pub tempo_step: f64,
     pub tempo_fine_step: f64,
     pub crossfader_step: f32,
-    pub fader_step: f32,
 }
 
 impl Controls {
@@ -32,7 +31,6 @@ impl Controls {
             tempo_step: 0.005,
             tempo_fine_step: 0.0005,
             crossfader_step: 0.1,
-            fader_step: 0.05,
         }
     }
 }
@@ -90,6 +88,9 @@ pub struct StripState {
     pub filter: f32,
 }
 
+pub const FADER_STEP_DB: f32 = 2.0;
+/// Lowest fader position short of silence, and where the first step up from silence lands.
+pub const FADER_FLOOR_DB: f32 = -40.0;
 pub const TRIM_STEP_DB: f32 = 1.0;
 pub const EQ_STEP_DB: f32 = 2.0;
 /// Lowest EQ knob position short of a kill.
@@ -111,6 +112,24 @@ fn band(b: input::Band) -> EqBand {
         input::Band::Mid => EqBand::Mid,
         input::Band::High => EqBand::High,
     }
+}
+
+pub fn db_to_amp(db: f32) -> f32 {
+    10f32.powf(db / 20.0)
+}
+
+/// Step a fader in dB. A linear step is 0.4 dB at the top of the travel and 26 dB at the
+/// bottom, which is backwards for a fader: the ear hears decibels.
+fn step_fader_db(v: f32, dir: Dir) -> f32 {
+    let up = matches!(dir, Dir::Up);
+    if v <= 0.0 {
+        return if up { db_to_amp(FADER_FLOOR_DB) } else { 0.0 };
+    }
+    let db = 20.0 * v.log10() + FADER_STEP_DB * sign(dir);
+    if db < FADER_FLOOR_DB {
+        return if up { db_to_amp(FADER_FLOOR_DB) } else { 0.0 };
+    }
+    db_to_amp(db.min(0.0))
 }
 
 /// Step `v` and round to the step grid, so stepping back always lands exactly.
@@ -311,8 +330,24 @@ pub fn apply(
         }
         Fader(d, dir) => {
             let v = &mut st.faders[d.index()];
-            *v = (*v + c.fader_step * sign(dir)).clamp(0.0, 1.0);
+            *v = step_fader_db(*v, dir);
             Command::SetChannelFader(d, *v)
+        }
+        FaderEnd(d, dir) => {
+            let v = &mut st.faders[d.index()];
+            *v = match dir {
+                Dir::Up => 1.0,
+                Dir::Down => 0.0,
+            };
+            Command::SetChannelFader(d, *v)
+        }
+        CrossfaderCentre => {
+            st.crossfader = 0.0;
+            Command::SetCrossfader(0.0)
+        }
+        FilterCentre(d) => {
+            st.strips[d.index()].filter = 0.0;
+            Command::SetFilter(d, 0.0)
         }
         CueMix(dir) => {
             st.cue_mix = step(st.cue_mix, CUE_MIX_STEP * sign(dir), 0.0, 1.0);

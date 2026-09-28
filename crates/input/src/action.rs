@@ -48,6 +48,11 @@ pub enum Action {
     EqSwap(DeckId, Band),
     Filter(DeckId, Dir),
     Fader(DeckId, Dir),
+    /// Send the fader hard to an end.
+    FaderEnd(DeckId, Dir),
+    /// Put a bipolar control back at neutral.
+    FilterCentre(DeckId),
+    CrossfaderCentre,
     HeadphoneCue(DeckId),
     /// Blend the headphones between the cue bus and the master.
     CueMix(Dir),

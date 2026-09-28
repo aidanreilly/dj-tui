@@ -76,14 +76,79 @@ fn crossfader_steps_accumulate_without_waiting_for_the_engine() {
     assert_eq!(st.crossfader, -1.0);
 }
 
+fn fader(cmd: Option<Command>, deck: engine::DeckId) -> f32 {
+    match cmd {
+        Some(Command::SetChannelFader(d, v)) if d == deck => v,
+        other => panic!("expected a channel fader for {deck:?}, got {other:?}"),
+    }
+}
+
 #[test]
-fn channel_fader_steps_within_range() {
+fn the_fader_steps_in_decibels() {
     let mut st = ControlState::default();
     let s = Snapshot::default();
-    let cmd = run(&mut st, &s, Action::Fader(A, Dir::Up));
-    assert!(matches!(cmd, Some(Command::SetChannelFader(A, v)) if v == 1.0));
-    let cmd = run(&mut st, &s, Action::Fader(A, Dir::Down));
-    assert!(matches!(cmd, Some(Command::SetChannelFader(A, v)) if (v - 0.95).abs() < 1e-6));
+    // Unity is the top of the travel, so up from there changes nothing.
+    assert_eq!(fader(run(&mut st, &s, Action::Fader(A, Dir::Up)), A), 1.0);
+    // One step down is 2 dB, which is about 0.794 in amplitude.
+    let v = fader(run(&mut st, &s, Action::Fader(A, Dir::Down)), A);
+    assert!((v - 0.794).abs() < 1e-3, "got {v}");
+    // Twenty steps reach the floor, and the next one is silence.
+    for _ in 0..19 {
+        run(&mut st, &s, Action::Fader(A, Dir::Down));
+    }
+    let floor = st.faders[0];
+    assert!((floor - 0.01).abs() < 1e-3, "-40 dB, got {floor}");
+    assert_eq!(fader(run(&mut st, &s, Action::Fader(A, Dir::Down)), A), 0.0);
+}
+
+#[test]
+fn stepping_up_from_silence_returns_to_the_floor() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    st.faders[0] = 0.0;
+    let v = fader(run(&mut st, &s, Action::Fader(A, Dir::Up)), A);
+    assert!((v - 0.01).abs() < 1e-3, "-40 dB, got {v}");
+}
+
+#[test]
+fn stepping_up_stops_at_unity() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    st.faders[0] = 0.0;
+    for _ in 0..40 {
+        run(&mut st, &s, Action::Fader(A, Dir::Up));
+    }
+    assert_eq!(st.faders[0], 1.0);
+}
+
+#[test]
+fn shift_sends_the_fader_to_an_end() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    assert_eq!(
+        fader(run(&mut st, &s, Action::FaderEnd(A, Dir::Down)), A),
+        0.0
+    );
+    assert_eq!(
+        fader(run(&mut st, &s, Action::FaderEnd(A, Dir::Up)), A),
+        1.0
+    );
+}
+
+#[test]
+fn x_centres_the_crossfader_and_v_centres_the_filter() {
+    let mut st = ControlState::default();
+    let s = Snapshot::default();
+    st.crossfader = -1.0;
+    assert!(matches!(
+        run(&mut st, &s, Action::CrossfaderCentre),
+        Some(Command::SetCrossfader(x)) if x == 0.0
+    ));
+    st.strips[0].filter = 0.7;
+    assert!(matches!(
+        run(&mut st, &s, Action::FilterCentre(A)),
+        Some(Command::SetFilter(A, f)) if f == 0.0
+    ));
 }
 
 #[test]

@@ -62,8 +62,13 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["eq", d, "kill", b] => Action::EqKill(deck(d)?, band(b)?),
         ["eq", d, "swap", b] => Action::EqSwap(deck(d)?, band(b)?),
         ["eq", d, b, way] => Action::Eq(deck(d)?, band(b)?, dir(way)?),
+        // Each keyword form goes above the general form of the same length, or the general
+        // one swallows the keyword as a direction and the name is rejected.
+        ["filter", d, "centre"] => Action::FilterCentre(deck(d)?),
         ["filter", d, way] => Action::Filter(deck(d)?, dir(way)?),
+        ["fader", d, way, "end"] => Action::FaderEnd(deck(d)?, dir(way)?),
         ["fader", d, way] => Action::Fader(deck(d)?, dir(way)?),
+        ["crossfader", "centre"] => Action::CrossfaderCentre,
         ["headphones", d] => Action::HeadphoneCue(deck(d)?),
         ["cue-mix", way] => Action::CueMix(dir(way)?),
         ["crossfader", way, "end"] => Action::Crossfader(dir(way)?, true),

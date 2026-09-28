@@ -25,10 +25,14 @@ impl Keymap {
         match e.key {
             Key::Space => Some(Action::PlayPause(target)),
             Key::Enter => Some(Action::Load(target)),
+            // Horizontal arrows are the horizontal fader, vertical arrows the vertical one
+            // belonging to whichever deck has focus. Shift goes hard to an end.
             Key::Left => Some(Action::Crossfader(Dir::Down, e.shift)),
             Key::Right => Some(Action::Crossfader(Dir::Up, e.shift)),
-            Key::Up => Some(Action::BrowserMove(Dir::Up)),
-            Key::Down => Some(Action::BrowserMove(Dir::Down)),
+            Key::Up if e.shift => Some(Action::FaderEnd(target, Dir::Up)),
+            Key::Down if e.shift => Some(Action::FaderEnd(target, Dir::Down)),
+            Key::Up => Some(Action::Fader(target, Dir::Up)),
+            Key::Down => Some(Action::Fader(target, Dir::Down)),
             Key::Esc | Key::Backspace | Key::Tab => None,
             Key::Char(c) => self.char_action(c, e.alt, target),
         }
@@ -95,11 +99,10 @@ impl Keymap {
             'h' | 'H' => CueMix(dir(c == 'H')),
             'r' | 'R' => Trim(d, dir(c == 'R')),
             'o' | 'O' => Filter(d, dir(c == 'O')),
-            'v' | 'V' => Fader(d, dir(c == 'V')),
+            'x' => CrossfaderCentre,
+            'v' => FilterCentre(d),
             '/' => Search,
             'b' => BrowserEnter,
-            'S' => BrowserSort(alt),
-            'A' => AnalyseLibrary,
             'w' | 'W' => CycleWaveformMode,
             '?' => Help,
             _ => return None,

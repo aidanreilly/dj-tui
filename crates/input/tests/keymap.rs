@@ -139,8 +139,8 @@ fn global_keys() {
         km.handle(KeyEvent::press(Key::Left).shift()),
         Some(Action::Crossfader(Dir::Down, true))
     );
-    assert_eq!(press(&mut km, Key::Up), Some(Action::BrowserMove(Dir::Up)));
-    // `/` and `b` hand the keyboard to the browser, which the modes tests cover.
+    // `/` and `b` hand the keyboard to the browser, which the modes tests cover, and the
+    // arrows are the faders, which the arrow tests cover.
     assert_eq!(press(&mut km, ch('w')), Some(Action::CycleWaveformMode));
     assert_eq!(press(&mut km, ch('W')), Some(Action::CycleWaveformMode));
     assert_eq!(press(&mut km, ch('?')), Some(Action::Help));
@@ -148,6 +148,59 @@ fn global_keys() {
         km.handle(KeyEvent::press(ch('q')).ctrl()),
         Some(Action::Quit)
     );
+}
+
+#[test]
+fn horizontal_arrows_are_the_crossfader() {
+    let mut km = Keymap::new();
+    assert_eq!(
+        press(&mut km, Key::Right),
+        Some(Action::Crossfader(Dir::Up, false))
+    );
+    assert_eq!(
+        press(&mut km, Key::Left),
+        Some(Action::Crossfader(Dir::Down, false))
+    );
+    assert_eq!(
+        km.handle(KeyEvent::press(Key::Left).shift()),
+        Some(Action::Crossfader(Dir::Down, true))
+    );
+    assert_eq!(press(&mut km, ch('x')), Some(Action::CrossfaderCentre));
+}
+
+#[test]
+fn vertical_arrows_are_the_focused_decks_fader() {
+    let mut km = Keymap::new();
+    assert_eq!(press(&mut km, Key::Up), Some(Action::Fader(A, Dir::Up)));
+    assert_eq!(press(&mut km, Key::Down), Some(Action::Fader(A, Dir::Down)));
+    assert_eq!(
+        km.handle(KeyEvent::press(Key::Down).shift()),
+        Some(Action::FaderEnd(A, Dir::Down))
+    );
+    press(&mut km, Key::Tab);
+    assert_eq!(press(&mut km, Key::Up), Some(Action::Fader(B, Dir::Up)));
+}
+
+#[test]
+fn v_is_the_filter_centre_and_no_longer_the_fader() {
+    let mut km = Keymap::new();
+    assert_eq!(press(&mut km, ch('v')), Some(Action::FilterCentre(A)));
+    assert!(!matches!(press(&mut km, ch('V')), Some(Action::Fader(..))));
+}
+
+#[test]
+fn the_browser_no_longer_moves_from_mix_mode() {
+    let mut km = Keymap::new();
+    assert!(!matches!(
+        press(&mut km, Key::Up),
+        Some(Action::BrowserMove(_))
+    ));
+    assert_eq!(
+        press(&mut km, ch('S')),
+        None,
+        "sort is a browser command now"
+    );
+    assert_eq!(press(&mut km, ch('A')), None, "so is analysing");
 }
 
 #[test]
@@ -268,6 +321,39 @@ mod action_names {
         assert_eq!(parse_action("waveform"), Some(Action::CycleWaveformMode));
         assert_eq!(parse_action("cue-mix up"), Some(Action::CueMix(Dir::Up)));
         assert_eq!(parse_action("headphones a"), Some(Action::HeadphoneCue(A)));
+    }
+
+    #[test]
+    fn the_new_gestures_have_names_a_mapping_can_use() {
+        assert_eq!(
+            parse_action("crossfader centre"),
+            Some(Action::CrossfaderCentre)
+        );
+        assert_eq!(
+            parse_action("filter a centre"),
+            Some(Action::FilterCentre(A))
+        );
+        assert_eq!(
+            parse_action("fader b down end"),
+            Some(Action::FaderEnd(B, Dir::Down))
+        );
+        assert_eq!(
+            parse_action("eq a swap low"),
+            Some(Action::EqSwap(A, Band::Low))
+        );
+        // The general forms still reach their own arms.
+        assert_eq!(
+            parse_action("filter a up"),
+            Some(Action::Filter(A, Dir::Up))
+        );
+        assert_eq!(
+            parse_action("fader b down"),
+            Some(Action::Fader(B, Dir::Down))
+        );
+        assert_eq!(
+            parse_action("crossfader up"),
+            Some(Action::Crossfader(Dir::Up, false))
+        );
     }
 
     #[test]
