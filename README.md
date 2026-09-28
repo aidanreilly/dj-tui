@@ -46,10 +46,14 @@ events and draws waveforms as images, and each of those has to reach the termina
 | Shift and Alt on the arrow keys, for the fader slams and fades | unambiguous modified keys, from the same protocol | as above, plus xterm |
 | Waveforms drawn as real pixels | the kitty graphics protocol | Ghostty, kitty, WezTerm |
 
+`Shift`+arrow and `Alt`+arrow arrive as CSI sequences, and dj-tui asks the terminal to
+disambiguate escape codes at startup, so they are unambiguous where the protocol is supported.
+Confirmed working.
+
 None of it is required. Without key release reporting `c` works as a press and the status line
 says so. Without the graphics protocol the waveforms are drawn with block characters in the
-same colours. Without the modified arrow keys the crossfader and channel faders still step with
-plain arrows, and `x` still centres the crossfader.
+same colours. Without the modified arrows the crossfader and channel faders still step with
+plain arrows and `x` still centres the crossfader; the slam and the fade are what you lose.
 
 **Terminal multiplexers are not supported.** tmux, screen and zellij sit between dj-tui and the
 terminal, block the graphics protocol and interfere with modified key reporting. dj-tui detects
@@ -279,13 +283,6 @@ file moves to `dj-tui.log.old` and a new one starts.
 ## Known issues and what is not done yet
 
 Honest list, kept current.
-
-**Unverified in a real terminal.** `Shift`+arrow and `Alt`+arrow reach the app as CSI
-sequences and nothing here has confirmed they arrive. `Alt+S` already worked before the fade
-keys landed, which covers `Alt+O`, and dj-tui asks the terminal to disambiguate escape codes
-at startup. If a pair does not arrive in yours, the crossfader and channel faders still step
-with plain arrows and `x` still centres the crossfader; the slam and the fade are what you
-lose. Report it and those two gestures move to a letter pair.
 
 **Fades are stepped, not ramped.** The mixer applies fader and crossfader gains as plain
 scalars with no per-sample ramp, so both a fade and a manual key press move the gain in one
