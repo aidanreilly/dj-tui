@@ -291,7 +291,57 @@ pub fn apply_many(
                 Command::SetEqKill(d.other(), b, true),
             ]
         }
+        // Riding both decks together, the way you would ride two pitch faders on records.
+        // The same proportion goes to each, so a beatmatched pair stays exactly matched
+        // however far the mix is taken, and a deck with no grid follows too since nothing
+        // here needs to know the BPM.
+        Action::GlobalTempo(dir, fine) => {
+            let step = if fine {
+                c.tempo_fine_step
+            } else {
+                c.tempo_step
+            };
+            // Down is the reciprocal of up rather than `1 - step`, so riding up and back
+            // returns to where it started instead of creeping down a little each round trip.
+            // No rounding: the factor is the same for both decks, so the ratio between them
+            // is preserved exactly and a beatmatched pair cannot drift apart.
+            let by = match dir {
+                Dir::Up => 1.0 + step,
+                Dir::Down => 1.0 / (1.0 + step),
+            };
+            let loaded: Vec<usize> = (0..2)
+                .filter(|&i| snap.decks[i].track_frames > 0 || st.beat_frames[i].is_some())
+                .collect();
+            let range = 1.0 - c.tempo_range..=1.0 + c.tempo_range;
+            // Refuse the whole move rather than clamp one deck and let the pair come apart.
+            let wanted: Vec<(usize, f64)> = loaded
+                .iter()
+                .map(|&i| {
+                    let r = st.rates[i] * by;
+                    // Snap the centre so a ride back to normal speed reads as exactly 1.
+                    (i, if (r - 1.0).abs() < 1e-9 { 1.0 } else { r })
+                })
+                .collect();
+            if wanted.iter().any(|(_, r)| !range.contains(r)) {
+                return Vec::new();
+            }
+            wanted
+                .into_iter()
+                .map(|(i, r)| {
+                    st.rates[i] = r;
+                    Command::SetRate(deck_of(i), r)
+                })
+                .collect()
+        }
         other => apply(st, c, snap, other).into_iter().collect(),
+    }
+}
+
+fn deck_of(index: usize) -> DeckId {
+    if index == 0 {
+        DeckId::A
+    } else {
+        DeckId::B
     }
 }
 

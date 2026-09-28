@@ -227,6 +227,14 @@ state = "fx a"
 output = "note 1 40"
 state = "fx b"
 
+# --- Riding both decks at once ---
+#
+# [[encoders]]
+# input = "cc 0 50"
+# action = "master-tempo"              # up and down are appended as it turns
+#
+# The per-deck pitch is unchanged: "tempo a up", "tempo a down fine".
+
 # --- Fades and the band swap ---
 #
 # The keyboard starts these with Alt; a controller button can start them too. The fade length

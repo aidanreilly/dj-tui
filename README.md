@@ -108,11 +108,22 @@ the keyboard the same way. `Esc` returns from either in one press.
 | `1`–`8` | Hot cue: jump to it, or set it if the pad is empty |
 | `Alt+1`–`8` | Clear a hot cue |
 | `g` then `0`–`9` | Seek to a tenth of the track |
-| `-` / `+` | Tempo down and up, `Alt` for a fine step |
-| `,` / `.` | Nudge the playhead back and forward, for beatmatching by ear |
+| `-` / `+` | Ride both decks' tempo together, `Alt` for a fine step |
+| `,` / `.` | The focused deck's pitch, `Alt` for a fine step |
+| `<` / `>` | Nudge the playhead back and forward, for beatmatching by ear |
 | `s` | Sync: first press matches the other deck's tempo, second lines the beats up |
 | `k` | Key lock: hold the pitch while the tempo fader moves |
 | `q` | Quantize: snap loops and jumps to the beat grid |
+
+`-` and `+` ride both decks at once, by the same proportion, the way you would ride two pitch
+faders on a pair of records: a beatmatched pair stays matched however far you take the mix, and
+riding back up returns to exactly where you started. A deck with no beat grid follows too. If
+one deck would leave its tempo range the whole move is refused rather than letting the pair
+come apart, and the status line says so. `,` and `.` are the focused deck's own pitch, which is
+what you beatmatch with.
+
+Sync needs something running to follow. When the other deck's track ends it stops being a
+timing reference, and the deck still playing keeps its own time.
 
 Holding `c` to preview needs a terminal that reports key releases (kitty, foot, WezTerm,
 recent Alacritty). Elsewhere cue works as a press, and the status line says so.
@@ -124,7 +135,7 @@ recent Alacritty). Elsewhere cue works as a press, and the status line says so.
 | `l` | Four-beat loop on and off |
 | `i` / `I` | Mark the loop in point, then close the loop where the playhead is |
 | `[` / `]` | Halve and double the loop, keeping the in point |
-| `<` / `>` | Beat jump back and forward by the loop length |
+| `j` / `J` | Beat jump back and forward by the loop length |
 
 A loop marked by hand needs no beat grid, so it works on anything. The running loop is saved
 with the track and comes back the next time you load it.

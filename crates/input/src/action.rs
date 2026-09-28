@@ -23,6 +23,9 @@ pub enum Action {
     ClearHotCue(DeckId, usize),
     /// Direction and whether this is a fine step.
     Tempo(DeckId, Dir, bool),
+    /// Move both decks' tempo by the same proportion, so a matched pair stays matched.
+    /// Direction and whether this is a fine step.
+    GlobalTempo(Dir, bool),
     Nudge(DeckId, Dir),
     Sync(DeckId),
     Quantize(DeckId),

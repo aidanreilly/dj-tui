@@ -316,6 +316,34 @@ impl App {
         };
     }
 
+    /// Report a global tempo ride in BPM, since that is what the person is thinking in even
+    /// though the step is a proportion. A refused move says why rather than going quiet.
+    fn note_global_tempo(&mut self, action: Action, moved: bool) {
+        let Action::GlobalTempo(..) = action else {
+            return;
+        };
+        if !moved {
+            self.message =
+                "Both decks cannot go further without one leaving its tempo range".into();
+            return;
+        }
+        let bpm = |i: usize| {
+            self.metas[i]
+                .bpm
+                .map(|b| format!("{:.2}", b * self.state.rates[i]))
+        };
+        self.message = match (bpm(0), bpm(1)) {
+            (Some(a), Some(b)) => format!("Tempo: A {a} BPM, B {b} BPM"),
+            (Some(a), None) => format!("Tempo: A {a} BPM"),
+            (None, Some(b)) => format!("Tempo: B {b} BPM"),
+            // Nothing analysed, so say it as the faders read.
+            (None, None) => format!(
+                "Tempo: {:+.1}% on both decks",
+                (self.state.rates[0] - 1.0) * 100.0
+            ),
+        };
+    }
+
     /// Report a band swap, which moves two channels at once.
     fn note_eq_swap(&mut self, action: Action) {
         let Action::EqSwap(d, b) = action else { return };
@@ -641,6 +669,7 @@ impl App {
                 self.note_key_lock(action);
                 self.note_cue_mix(action);
                 self.note_eq_swap(action);
+                self.note_global_tempo(action, !cmds.is_empty());
                 for cmd in cmds {
                     self.send(cmd);
                 }

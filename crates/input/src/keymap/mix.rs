@@ -82,10 +82,13 @@ impl Keymap {
                 self.pending_seek = Some(d);
                 return None;
             }
-            '+' | '=' => Tempo(d, Dir::Up, alt),
-            '-' => Tempo(d, Dir::Down, alt),
-            ',' | '.' => Nudge(d, dir(c == '.')),
-            '<' | '>' => BeatJump(d, dir(c == '>')),
+            // The unmodified pair rides both decks together, the way you would ride two
+            // pitch faders; the focused deck's own pitch is one key to the left.
+            '+' | '=' => GlobalTempo(Dir::Up, alt),
+            '-' => GlobalTempo(Dir::Down, alt),
+            ',' | '.' => Tempo(d, dir(c == '.'), alt),
+            '<' | '>' => Nudge(d, dir(c == '>')),
+            'j' | 'J' => BeatJump(d, dir(c == 'J')),
             '[' => LoopHalve(d),
             ']' => LoopDouble(d),
             's' => Sync(d),

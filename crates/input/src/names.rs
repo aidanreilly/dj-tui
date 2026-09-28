@@ -53,6 +53,8 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["loop-double", d] => Action::LoopDouble(deck(d)?),
         ["beatjump", d, way] => Action::BeatJump(deck(d)?, dir(way)?),
         ["nudge", d, way] => Action::Nudge(deck(d)?, dir(way)?),
+        ["master-tempo", way, "fine"] => Action::GlobalTempo(dir(way)?, true),
+        ["master-tempo", way] => Action::GlobalTempo(dir(way)?, false),
         ["tempo", d, way, "fine"] => Action::Tempo(deck(d)?, dir(way)?, true),
         ["tempo", d, way] => Action::Tempo(deck(d)?, dir(way)?, false),
         ["seek", d, tenth] => Action::SeekTenth(deck(d)?, tenth_index(tenth)?),

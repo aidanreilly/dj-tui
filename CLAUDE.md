@@ -148,6 +148,19 @@ Backtick, which sent the next key to the other deck, is removed. `Tab` is the on
 reach the other deck. It saved one press per transition and was the keymap's only hidden
 sticky state; the band swap took away its best case. Not worth proposing again.
 
+`-`/`+` ride both decks' tempo by the same proportion, so a beatmatched pair stays matched
+exactly: `Dir::Down` is the reciprocal of `Dir::Up` rather than `1 - step`, which is what makes
+riding up and back return to where it started instead of creeping down each round trip, and
+there is no rounding because the ratio between the decks has to survive. A move that would take
+either deck out of its tempo range is refused whole, since clamping one and not the other is
+how a matched pair comes apart. `,`/`.` are the focused deck's own pitch, `<`/`>` nudge, and
+beat jump is on `j`/`J`.
+
+Sync's phase alignment needs the other deck to be playing. A deck whose track has ended keeps
+its grid with its position pinned at the end, so it is still a grid but no longer a clock;
+lining up against that frozen phase used to seek the running deck back to the top of its track.
+The phase meter takes the same view and goes quiet unless both decks are running.
+
 Horizontal arrows are the crossfader, vertical arrows the focused deck's channel fader, with
 `Shift` going hard to an end. `x`/`X` and `v`/`V` return the crossfader and the filter to
 neutral. The channel fader steps in dB, because a linear step is 0.4 dB at the top of the

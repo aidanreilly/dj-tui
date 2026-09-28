@@ -106,16 +106,17 @@ fn the_other_stepped_controls_keep_their_keys() {
 #[test]
 fn tempo_has_normal_and_fine_steps() {
     let mut km = Keymap::new();
+    // The focused deck's own pitch; `+`/`-` ride both decks and the global tests cover them.
     assert_eq!(
-        press(&mut km, ch('+')),
+        press(&mut km, ch('.')),
         Some(Action::Tempo(A, Dir::Up, false))
     );
     assert_eq!(
-        press(&mut km, ch('-')),
+        press(&mut km, ch(',')),
         Some(Action::Tempo(A, Dir::Down, false))
     );
     assert_eq!(
-        km.handle(KeyEvent::press(ch('+')).alt()),
+        km.handle(KeyEvent::press(ch('.')).alt()),
         Some(Action::Tempo(A, Dir::Up, true))
     );
 }
@@ -258,10 +259,10 @@ fn deck_toggles_and_loops() {
     assert_eq!(press(&mut km, ch('[')), Some(Action::LoopHalve(d)));
     assert_eq!(press(&mut km, ch(']')), Some(Action::LoopDouble(d)));
     assert_eq!(
-        press(&mut km, ch('<')),
+        press(&mut km, ch('j')),
         Some(Action::BeatJump(d, Dir::Down))
     );
-    assert_eq!(press(&mut km, ch('.')), Some(Action::Nudge(d, Dir::Up)));
+    assert_eq!(press(&mut km, ch('>')), Some(Action::Nudge(d, Dir::Up)));
     assert_eq!(press(&mut km, ch('f')), Some(Action::FxToggle(d)));
     assert_eq!(press(&mut km, ch('F')), Some(Action::FxNext(d)));
     assert_eq!(
@@ -624,5 +625,88 @@ mod review_fixes {
         );
         // And it arms again after the release.
         assert_eq!(press(&mut km, ch('c')), Some(Action::CuePress(A)));
+    }
+}
+
+mod global_tempo {
+    use super::*;
+    use input::parse_action;
+
+    #[test]
+    fn plus_and_minus_move_both_decks_together() {
+        let mut km = Keymap::new();
+        assert_eq!(
+            press(&mut km, ch('+')),
+            Some(Action::GlobalTempo(Dir::Up, false))
+        );
+        assert_eq!(
+            press(&mut km, ch('=')),
+            Some(Action::GlobalTempo(Dir::Up, false))
+        );
+        assert_eq!(
+            press(&mut km, ch('-')),
+            Some(Action::GlobalTempo(Dir::Down, false))
+        );
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('-')).alt()),
+            Some(Action::GlobalTempo(Dir::Down, true)),
+            "Alt is still the fine step"
+        );
+    }
+
+    #[test]
+    fn comma_and_full_stop_are_the_focused_decks_pitch() {
+        let mut km = Keymap::new();
+        assert_eq!(
+            press(&mut km, ch(',')),
+            Some(Action::Tempo(A, Dir::Down, false))
+        );
+        assert_eq!(
+            press(&mut km, ch('.')),
+            Some(Action::Tempo(A, Dir::Up, false))
+        );
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('.')).alt()),
+            Some(Action::Tempo(A, Dir::Up, true))
+        );
+        press(&mut km, Key::Tab);
+        assert_eq!(
+            press(&mut km, ch(',')),
+            Some(Action::Tempo(B, Dir::Down, false))
+        );
+    }
+
+    #[test]
+    fn the_shifted_pair_nudges_the_playhead() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('<')), Some(Action::Nudge(A, Dir::Down)));
+        assert_eq!(press(&mut km, ch('>')), Some(Action::Nudge(A, Dir::Up)));
+    }
+
+    #[test]
+    fn beat_jump_moves_to_j() {
+        let mut km = Keymap::new();
+        assert_eq!(
+            press(&mut km, ch('j')),
+            Some(Action::BeatJump(A, Dir::Down))
+        );
+        assert_eq!(press(&mut km, ch('J')), Some(Action::BeatJump(A, Dir::Up)));
+    }
+
+    #[test]
+    fn the_global_step_has_a_mapping_name() {
+        assert_eq!(
+            parse_action("master-tempo up"),
+            Some(Action::GlobalTempo(Dir::Up, false))
+        );
+        assert_eq!(
+            parse_action("master-tempo down fine"),
+            Some(Action::GlobalTempo(Dir::Down, true))
+        );
+        // The per-deck name is unchanged.
+        assert_eq!(
+            parse_action("tempo a up"),
+            Some(Action::Tempo(A, Dir::Up, false))
+        );
     }
 }

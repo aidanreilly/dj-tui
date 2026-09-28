@@ -889,3 +889,109 @@ mod sync_against_a_stopped_deck {
         );
     }
 }
+
+/// `+`/`-` ride both decks together, the way you would ride two pitch faders on records.
+mod global_tempo {
+    use super::*;
+
+    fn matched() -> ControlState {
+        ControlState {
+            beat_frames: [Some(24_000.0), Some(24_000.0)],
+            ..Default::default()
+        }
+    }
+
+    fn rates(cmds: &[Command]) -> Vec<(engine::DeckId, f64)> {
+        cmds.iter()
+            .map(|c| match c {
+                Command::SetRate(d, r) => (*d, *r),
+                other => panic!("expected a rate, got {other:?}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn one_press_moves_both_decks_by_the_same_proportion() {
+        let mut st = matched();
+        let s = Snapshot::default();
+        let cmds = apply_many(&mut st, &ctl(), &s, Action::GlobalTempo(Dir::Up, false));
+        let got = rates(&cmds);
+        assert_eq!(got.len(), 2, "both decks move: {got:?}");
+        assert!((got[0].1 - 1.005).abs() < 1e-9, "{got:?}");
+        assert!((got[1].1 - 1.005).abs() < 1e-9, "{got:?}");
+    }
+
+    #[test]
+    fn a_matched_pair_stays_matched_however_far_it_is_ridden() {
+        let mut st = matched();
+        // Deck B was beatmatched to a slightly different cut, so the rates differ.
+        st.rates = [1.0, 1.02];
+        let s = Snapshot::default();
+        let before = st.rates[1] / st.rates[0];
+        for _ in 0..8 {
+            apply_many(&mut st, &ctl(), &s, Action::GlobalTempo(Dir::Up, false));
+        }
+        let after = st.rates[1] / st.rates[0];
+        assert!(
+            (after - before).abs() < 1e-12,
+            "the ratio between the decks drifted: {before} to {after}"
+        );
+    }
+
+    #[test]
+    fn riding_up_and_back_returns_to_where_it_started() {
+        let mut st = matched();
+        st.rates = [1.0, 1.02];
+        let s = Snapshot::default();
+        for _ in 0..6 {
+            apply_many(&mut st, &ctl(), &s, Action::GlobalTempo(Dir::Up, false));
+        }
+        for _ in 0..6 {
+            apply_many(&mut st, &ctl(), &s, Action::GlobalTempo(Dir::Down, false));
+        }
+        assert_eq!(st.rates[0], 1.0, "normal speed reads as exactly normal");
+        assert!((st.rates[1] - 1.02).abs() < 1e-12, "got {}", st.rates[1]);
+    }
+
+    #[test]
+    fn the_fine_step_is_smaller() {
+        let mut coarse = matched();
+        let mut fine = matched();
+        let s = Snapshot::default();
+        apply_many(&mut coarse, &ctl(), &s, Action::GlobalTempo(Dir::Up, false));
+        apply_many(&mut fine, &ctl(), &s, Action::GlobalTempo(Dir::Up, true));
+        assert!(fine.rates[0] > 1.0);
+        assert!(fine.rates[0] < coarse.rates[0]);
+    }
+
+    /// The whole move is refused rather than clamping one deck and letting the pair come
+    /// apart, which would be worse than not moving at all.
+    #[test]
+    fn the_move_is_refused_when_either_deck_would_hit_its_range() {
+        let mut st = matched();
+        // Deck B is already at the top of a +/-8% fader; deck A has room.
+        st.rates = [1.0, 1.08];
+        let s = Snapshot::default();
+        let before = st.rates;
+        let cmds = apply_many(&mut st, &ctl(), &s, Action::GlobalTempo(Dir::Up, false));
+        assert!(cmds.is_empty(), "nothing is sent: {cmds:?}");
+        assert_eq!(st.rates, before, "and nothing moves");
+
+        // Downward still works, since that is away from the limit.
+        let cmds = apply_many(&mut st, &ctl(), &s, Action::GlobalTempo(Dir::Down, false));
+        assert_eq!(cmds.len(), 2, "{cmds:?}");
+    }
+
+    #[test]
+    fn a_deck_with_no_track_does_not_hold_the_other_one_back() {
+        // Riding the tempo should work with one deck loaded, which is most of a set.
+        let mut st = ControlState {
+            beat_frames: [Some(24_000.0), None],
+            ..Default::default()
+        };
+        let mut s = Snapshot::default();
+        s.decks[0].track_frames = 480_000;
+        let cmds = apply_many(&mut st, &ctl(), &s, Action::GlobalTempo(Dir::Up, false));
+        assert_eq!(rates(&cmds), vec![(A, 1.005)], "only the loaded deck moves");
+    }
+}
