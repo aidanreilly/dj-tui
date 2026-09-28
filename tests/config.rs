@@ -226,3 +226,59 @@ fn a_fade_length_outside_the_range_is_rejected_by_name() {
 fn the_fade_length_defaults_to_eight_beats() {
     assert_eq!(Config::default().mixer.fade_beats, 8.0);
 }
+
+/// The example file is the documentation of the whole config, so it has to hold every key,
+/// and every value in it has to be the one dj-tui uses when the key is absent. A default
+/// that moves without the example moving is what this catches.
+#[test]
+fn the_example_config_lists_every_key_at_its_default() {
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/config.toml.example"))
+        .expect("config.toml.example is in the project root");
+    let parsed = Config::from_toml(&text).expect("the example file parses");
+    assert_eq!(
+        parsed,
+        Config::default(),
+        "the example has drifted from the defaults"
+    );
+
+    // Every key, not just the ones with interesting defaults: nothing is left to be found
+    // out by reading the source.
+    for key in [
+        "backend",
+        "device",
+        "sample_rate",
+        "buffer_frames",
+        "client_name",
+        "routing",
+        "master_ports",
+        "cue_ports",
+        "waveform_mode",
+        "end_warning_secs",
+        "graphics",
+        "tempo_range",
+        "crossfader_curve",
+        "fade_beats",
+        "enabled",
+        "mappings",
+        "soft_takeover",
+        "folders",
+    ] {
+        assert!(
+            text.lines().any(|l| l.trim_start().starts_with(key)),
+            "{key} is not set in the example"
+        );
+    }
+    for section in [
+        "[audio]",
+        "[ui]",
+        "[deck]",
+        "[mixer]",
+        "[midi]",
+        "[library]",
+    ] {
+        assert!(
+            text.contains(section),
+            "{section} is missing from the example"
+        );
+    }
+}

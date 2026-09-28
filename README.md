@@ -381,7 +381,9 @@ stereo card they share, as they do under JACK.
 
 ## Configuration
 
-`~/.config/dj-tui/config.toml`, every key optional:
+`~/.config/dj-tui/config.toml`, every key optional. `config.toml.example` in the repository
+root carries every key with a comment on what it does, at the value dj-tui uses without it,
+so copying it into place changes nothing until you edit it:
 
 ```toml
 [audio]

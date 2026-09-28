@@ -1,0 +1,102 @@
+# dj-tui configuration.
+#
+# Copy this to ~/.config/dj-tui/config.toml, or to $XDG_CONFIG_HOME/dj-tui/config.toml if you
+# set one, and change what you want. Every key below is at the value dj-tui uses when the key
+# is absent, so a copy of this file behaves exactly like no file at all.
+#
+# Every key is optional and whole sections can be left out. A key dj-tui does not recognise is
+# an error rather than something it ignores, so a typo is reported at startup instead of
+# quietly doing nothing.
+
+[audio]
+
+# Where the audio goes. "jack" talks to JACK or PipeWire's JACK layer. "alsa" drives a card
+# directly, for a machine with no sound server running.
+backend = "jack"
+
+# Which card the ALSA backend opens: "default", or something like "hw:0,0" for a card of your
+# own. The JACK backend ignores this. Ctrl+D in the app lists what is there and writes your
+# choice back into this file.
+device = "default"
+
+# Sample rate in Hz, used only by backends that pick their own. JACK's server rate always
+# wins, so this is an ALSA setting in practice.
+sample_rate = 48000
+
+# Frames per period. Smaller is lower latency and more work per second. A power of two from
+# 16 to 4096. JACK takes its buffer size from the server, so this is an ALSA setting too.
+buffer_frames = 256
+
+# The name dj-tui registers under, which is what you will see in a patchbay.
+client_name = "dj-tui"
+
+# Where the master and headphone cue outputs are connected at startup.
+#   "auto"      connect master to the first stereo pair the system offers, cue to the next
+#   "off"       connect nothing and leave the patching to you
+#   "split"     mono master to output 1, mono cue to output 2, for a Y-splitter on one
+#               stereo card
+#   "explicit"  use master_ports and cue_ports below
+routing = "auto"
+
+# Read only when routing = "explicit". Exactly two port names, left then right.
+# master_ports = ["system:playback_1", "system:playback_2"]
+master_ports = []
+
+# Read only when routing = "explicit". Exactly two port names, or empty for no cue output.
+# cue_ports = ["system:playback_3", "system:playback_4"]
+cue_ports = []
+
+[ui]
+
+# How the waveforms are coloured. "3band" tints by low, mid and high content, "rgb" gives each
+# band its own channel, "blue" is a plain single colour. `w` cycles them while running.
+waveform_mode = "3band"
+
+# How many seconds before the end of a track the deck starts warning you. 0 turns it off.
+end_warning_secs = 30
+
+# Pixel waveforms through the kitty graphics protocol, which Ghostty, kitty and WezTerm
+# support. "auto" uses them where they work and falls back to block characters everywhere
+# else. "off" forces the block characters.
+graphics = "auto"
+
+[deck]
+
+# Tempo fader range in percent, either side of the track's own tempo: 8, 16 or 50.
+tempo_range = 8
+
+[mixer]
+
+# How the crossfader hands over.
+#   "linear"          level moves in a straight line, so the middle is quiet
+#   "constant-power"  level holds up through the middle, for long blends
+#   "cut"             both channels full except right at the ends, for scratch mixing
+crossfader_curve = "constant-power"
+
+# How long an Alt fade runs, in beats of the deck it started from. From 2 to 64. `{` and `}`
+# change it while running.
+fade_beats = 8.0
+
+[midi]
+
+# Look for controllers at all. Turning this off skips the MIDI ports entirely.
+enabled = true
+
+# Which mapping files to load, from the `mappings` directory beside this file. An empty list
+# loads every mapping file found there. Copy `mappings/generic.toml` from the repository as a
+# starting point.
+# mappings = ["generic.toml"]
+mappings = []
+
+# Wait for a knob to reach the value on screen before it takes control, so a controller whose
+# knobs are somewhere else cannot jump a fader on the first touch. Turning this off trusts
+# the controller's positions from the start.
+soft_takeover = true
+
+[library]
+
+# Folders the browser lists, searched all the way down. A leading ~ is your home directory.
+# With none listed the browser has nothing to show, and tracks named on the command line are
+# the only way in.
+# folders = ["~/Music", "/mnt/crates"]
+folders = []
