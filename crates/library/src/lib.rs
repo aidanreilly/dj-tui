@@ -15,6 +15,7 @@ const AUDIO: [&str; 7] = ["flac", "wav", "mp3", "m4a", "aac", "ogg", "aiff"];
 pub struct Entry {
     path: PathBuf,
     display: String,
+    folded_display: Vec<char>,
     bpm: Option<f64>,
     key: Option<Key>,
     duration_secs: Option<f64>,
@@ -39,10 +40,12 @@ impl Entry {
             Some(artist) => format!("{artist} - {title}"),
             None => title,
         };
+        let folded_display = display.to_lowercase().chars().collect();
         let bpm = analysis.and_then(|a| a.grid.map(|g| g.bpm));
         Entry {
             path: path.to_path_buf(),
             display,
+            folded_display,
             bpm,
             key: analysis.and_then(|a| a.key),
             duration_secs: info.and_then(|i| i.duration_secs),
@@ -60,9 +63,11 @@ impl Entry {
         key: Option<Key>,
         duration_secs: Option<f64>,
     ) -> Entry {
+        let folded_display = display.to_lowercase().chars().collect();
         Entry {
             path: path.to_path_buf(),
             display,
+            folded_display,
             bpm,
             key,
             duration_secs,
@@ -208,41 +213,68 @@ pub fn search(list: &[Entry], query: &str) -> Vec<usize> {
     if query.trim().is_empty() {
         return (0..list.len()).collect();
     }
+    let query = SearchQuery::new(query);
     let mut scored: Vec<(i32, usize)> = list
         .iter()
         .enumerate()
-        .filter_map(|(i, entry)| score(query, entry.display()).map(|s| (s, i)))
+        .filter_map(|(i, entry)| query.score_entry(entry).map(|s| (s, i)))
         .collect();
     // Best score first, and the earlier entry wins a tie so the order stays predictable.
     scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     scored.into_iter().map(|(_, i)| i).collect()
 }
 
+/// A prepared fuzzy-search query. Build it once and score many entries without repeatedly
+/// lowercasing the query or each entry's display name.
+#[derive(Debug, Clone)]
+pub struct SearchQuery {
+    needle: Vec<char>,
+}
+
+impl SearchQuery {
+    pub fn new(query: &str) -> SearchQuery {
+        SearchQuery {
+            needle: query
+                .to_lowercase()
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .collect(),
+        }
+    }
+
+    pub fn score_entry(&self, entry: &Entry) -> Option<i32> {
+        self.score_chars(&entry.folded_display)
+    }
+
+    fn score_text(&self, text: &str) -> Option<i32> {
+        let folded: Vec<char> = text.to_lowercase().chars().collect();
+        self.score_chars(&folded)
+    }
+
+    fn score_chars(&self, haystack: &[char]) -> Option<i32> {
+        if self.needle.is_empty() {
+            return Some(0);
+        }
+        let mut total = 0;
+        let mut run = 0;
+        let mut at = 0;
+        for want in &self.needle {
+            let found = haystack[at..].iter().position(|c| c == want)? + at;
+            let starts_word = found == 0 || !haystack[found - 1].is_alphanumeric();
+            run = if found == at && at > 0 { run + 1 } else { 0 };
+            total += 10 + run * 5 + if starts_word { 8 } else { 0 };
+            // A match near the front of the name is usually the one meant.
+            total -= (found as i32).min(20) / 4;
+            at = found + 1;
+        }
+        Some(total)
+    }
+}
+
 /// How well `text` matches `query`, or `None` if it does not. Letters in a row and letters
 /// starting a word both count for more, which puts the obvious match at the top.
 pub fn score(query: &str, text: &str) -> Option<i32> {
-    let needle: Vec<char> = query
-        .to_lowercase()
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
-    if needle.is_empty() {
-        return Some(0);
-    }
-    let haystack: Vec<char> = text.to_lowercase().chars().collect();
-    let mut total = 0;
-    let mut run = 0;
-    let mut at = 0;
-    for want in needle {
-        let found = haystack[at..].iter().position(|c| *c == want)? + at;
-        let starts_word = found == 0 || !haystack[found - 1].is_alphanumeric();
-        run = if found == at && at > 0 { run + 1 } else { 0 };
-        total += 10 + run * 5 + if starts_word { 8 } else { 0 };
-        // A match near the front of the name is usually the one meant.
-        total -= (found as i32).min(20) / 4;
-        at = found + 1;
-    }
-    Some(total)
+    SearchQuery::new(query).score_text(text)
 }
 
 /// True when two keys sit next to each other on the Camelot wheel, or are the relative

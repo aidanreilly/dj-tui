@@ -174,9 +174,10 @@ one control.
 controls; `midi` re-exports it so mapping files are unaffected.
 
 The deck and channel without focus are greyed out. The panel is dimmed whole by `grey_out` in
-`tui::deck`, the mixer columns through `column_styles` in `tui::screen`, and the kitty image
-by an `UNFOCUSED` scale inside `WaveformBitmaps::rasterize`, since a terminal attribute cannot
-dim a graphics image. `Wave::focused` is part of `fingerprint`, so moving focus redraws.
+`tui::deck`, and the mixer columns through `column_styles` in `tui::screen`. Kitty waveforms
+keep constant brightness when focus changes because changing an image retransmits the full
+waveform; the thick title and border mark focus. `PixelWaveform` still supports focus dimming,
+but `Graphics` renders both waveforms at full brightness.
 
 ## Fades
 

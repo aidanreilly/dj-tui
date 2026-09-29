@@ -68,7 +68,9 @@ impl Graphics {
                 mode: dv.waveform_mode,
                 warning: dv.end_warning,
                 loop_cols: loop_columns(dv.loop_secs, dv.duration_secs, px.0),
-                focused: dv.focused,
+                // Keep the image stable across Tab. The deck border and title show focus;
+                // changing Kitty image brightness would retransmit both full waveforms.
+                focused: true,
             };
             match deck.pixel.update(&wave, px, playhead, &self.palette) {
                 Some(img) => {

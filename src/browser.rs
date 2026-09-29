@@ -4,9 +4,13 @@
 
 use analysis::key::Key;
 use input::Dir;
-use library::{compatible, scan, search, sort, Column, Entry};
+use library::{compatible, scan, search, sort, Column, Entry, SearchQuery};
 use std::path::{Path, PathBuf};
 use tui::{BrowserRow, BrowserView};
+
+/// A terminal can show only a small part of the library at once. Keep the per-frame view
+/// bounded, centred on the selection, instead of formatting every track on every frame.
+const BROWSER_VIEW_ROWS: usize = 256;
 
 #[derive(Default)]
 pub struct Browser {
@@ -110,7 +114,23 @@ impl Browser {
 
     pub fn type_char(&mut self, c: char) {
         self.query.push(c);
-        self.refilter();
+        // Every match for the longer query must also match the query before this character.
+        // Re-score those candidates instead of scanning the whole library for every key.
+        let matches = {
+            let entries = &self.entries;
+            let query = SearchQuery::new(&self.query);
+            let mut scored: Vec<(i32, usize)> = self
+                .shown
+                .iter()
+                .filter_map(|&i| query.score_entry(&entries[i]).map(|s| (s, i)))
+                .collect();
+            scored.sort_by(|(a_score, a_index), (b_score, b_index)| {
+                b_score.cmp(a_score).then(a_index.cmp(b_index))
+            });
+            scored.into_iter().map(|(_, i)| i).collect()
+        };
+        self.shown = matches;
+        self.selected = self.selected.min(self.shown.len().saturating_sub(1));
     }
 
     pub fn backspace(&mut self) {
@@ -126,9 +146,13 @@ impl Browser {
     /// The panel. `active` is true while browser mode holds the keyboard, and `playing` is
     /// the key of whatever is playing, for the highlighting.
     pub fn view(&self, active: bool, playing: Option<Key>) -> BrowserView {
-        let rows = self
-            .shown
+        let first = self
+            .selected
+            .saturating_sub(BROWSER_VIEW_ROWS / 2)
+            .min(self.shown.len().saturating_sub(BROWSER_VIEW_ROWS));
+        let rows = self.shown[first..]
             .iter()
+            .take(BROWSER_VIEW_ROWS)
             .map(|&i| {
                 let entry = &self.entries[i];
                 BrowserRow {
@@ -146,7 +170,7 @@ impl Browser {
             .collect();
         BrowserView {
             rows,
-            selected: self.selected,
+            selected: self.selected - first,
             sort: self.column.label(),
             ascending: self.ascending,
             // Drawn whenever it is filtering, so leaving the mode cannot hide a filter.

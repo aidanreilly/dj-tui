@@ -398,7 +398,8 @@ fn main() -> ExitCode {
 
     let result = (|| -> std::io::Result<()> {
         loop {
-            if event::poll(FRAME)? {
+            let mut events_pending = event::poll(FRAME)?;
+            while events_pending {
                 match event::read()? {
                     Event::Key(k) => {
                         if tui::convert_key(k).is_some_and(|k| app.on_key(k)) {
@@ -433,6 +434,9 @@ fn main() -> ExitCode {
                     }
                     _ => {}
                 }
+                // A redraw can be expensive, especially when a terminal is receiving a
+                // waveform image. Apply every event already waiting before starting one.
+                events_pending = event::poll(Duration::ZERO)?;
             }
             if let Audio::Jack(running) = &mut audio {
                 if !controllers.is_empty() {
