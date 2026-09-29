@@ -4,7 +4,7 @@ use engine::DeckId;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Widget},
 };
@@ -164,7 +164,7 @@ impl DeckPanel<'_> {
             .title(Line::from(label))
             .title(Line::from(right).right_aligned());
         if v.focused {
-            block = block.border_style(Style::new().add_modifier(Modifier::BOLD));
+            block = block.border_style(Style::new().fg(Color::Red).add_modifier(Modifier::BOLD));
         }
         let inner = block.inner(area);
         block.render(area, buf);
