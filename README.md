@@ -6,7 +6,8 @@ Two decks with CDJ-style cueing, hot cues, loops and key lock, a three-band isol
 
 Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
-<img width="900" alt="image" src="https://github.com/user-attachments/assets/69a1e174-d15f-4ebb-8d2c-49c6d8669dab" />
+<img width="900" alt="image" src="https://github.com/user-attachments/assets/9c1181ed-dad9-4d8b-a94d-afc257da22a3" />
+
 
 ## Install
 
