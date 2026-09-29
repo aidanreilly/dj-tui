@@ -164,7 +164,9 @@ impl DeckPanel<'_> {
             .title(Line::from(label))
             .title(Line::from(right).right_aligned());
         if v.focused {
-            block = block.border_style(Style::new().fg(Color::Red).add_modifier(Modifier::BOLD));
+            block = block
+                .border_style(Style::new().fg(Color::Red).add_modifier(Modifier::BOLD))
+                .title_style(Style::new().fg(Color::Gray));
         }
         let inner = block.inner(area);
         block.render(area, buf);
