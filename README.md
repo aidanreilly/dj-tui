@@ -13,7 +13,7 @@ Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
 ## Install
 
-### A built binary
+### From the binary
 
 Every tag publishes an x86_64 Linux tarball on the
 [releases page](https://github.com/aidanreilly/dj-tui/releases):
