@@ -48,7 +48,7 @@ dependencies = [
 
 [[package]]
 name = "analysis"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "engine",
  "realfft",
@@ -98,7 +98,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "backend"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "alsa",
  "engine",
@@ -432,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "discogs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "dj-tui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "analysis",
  "backend",
@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "engine"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "assert_no_alloc",
  "rtrb",
@@ -778,7 +778,7 @@ dependencies = [
 
 [[package]]
 name = "input"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "engine",
  "midi",
@@ -897,7 +897,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "library"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "analysis",
  "loader",
@@ -933,7 +933,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
 name = "loader"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "analysis",
  "engine",
@@ -1001,7 +1001,7 @@ dependencies = [
 
 [[package]]
 name = "midi"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "engine",
  "input",
@@ -2449,7 +2449,7 @@ dependencies = [
 
 [[package]]
 name = "tui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "engine",
  "image",
