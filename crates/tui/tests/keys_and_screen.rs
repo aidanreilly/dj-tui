@@ -232,7 +232,10 @@ fn the_mixer_shows_the_headphone_mix() {
         .lines()
         .find(|l| l.contains("MIX ") && !l.contains("MIXER"))
         .expect("a headphone mix row");
-    assert!(row.contains('█'), "all the way to master: {row}");
+    assert!(
+        row.contains(tui::mixer::RUN),
+        "all the way to master: {row}"
+    );
 
     let m = MixerView {
         cue_mix: 0.0,
@@ -243,7 +246,22 @@ fn the_mixer_shows_the_headphone_mix() {
         .lines()
         .find(|l| l.contains("MIX ") && !l.contains("MIXER"))
         .unwrap();
-    assert!(!row.contains('█'), "all the way to the cue bus: {row}");
+    assert!(
+        !row.contains(tui::mixer::RUN),
+        "all the way to the cue bus: {row}"
+    );
+}
+
+#[test]
+fn the_fade_length_fits_inside_the_mixer_panel() {
+    // The crossfader row is the widest thing in the strip. It used to run three spaces
+    // before "fade", which put the beat count past the right border and left the bare word.
+    let text = mixer_text(MixerView::default(), 120, 44);
+    let row = text
+        .lines()
+        .find(|l| l.contains("\u{2502}A \u{2501}"))
+        .expect("the crossfader row");
+    assert!(row.contains("fade 8"), "the beat count was cut off: {row}");
 }
 
 #[test]

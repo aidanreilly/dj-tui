@@ -48,6 +48,26 @@ the colour rules that turn those bands into 3-Band, RGB or Blue. Downsampling av
 the same way it averages peaks, and a cell takes its colour from the row centres it covers.
 `w` cycles the modes, and `[ui] waveform_mode` sets the one the app starts in.
 
+## Mixer
+
+`tui::mixer` owns the strip and its own tests. Every control is a rail with a lit run on it,
+drawn from one glyph family: `┄` unlit, `━` lit, `╋` for a neutral point, `╸` for the end of a
+run that grows from one end, `╎` for where a running fade is heading. Six rows of a block bar
+filled from the left read as one slab, which is what the rails replaced.
+
+A quantity grows from the point it is measured against. Trim, the EQ bands and the master
+filter have a neutral position, so their run leaves the centre tick and its side says which
+way the control went. The faders and the headphone mix run up from nothing, so they fill from
+the left and end in a cap. The EQ's two directions are scaled separately, because the band
+takes 26 dB of cut against 6 dB of boost and one scale across the pair would put 0 dB off
+centre and draw a flat EQ as a cut.
+
+Meters keep their `▮`/`▯` pips and their colour. A level is a different reading from a control
+position, and it is the one place the blockiness does work. The rail and the centre tick are
+drawn in `BASE01` so an untouched row recedes and a moved control is what the eye lands on.
+
+The crossfader row is the widest thing in the panel and fits its 24 columns exactly.
+
 ## Loops
 
 Loop lengths are counted in beats, so `ControlState` carries each deck's beat grid in frames

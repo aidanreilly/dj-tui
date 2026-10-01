@@ -5,6 +5,7 @@ mod deck;
 mod graphics;
 mod keys;
 mod layout;
+pub mod mixer;
 pub mod pixel;
 mod screen;
 pub mod theme;
@@ -18,4 +19,5 @@ pub use deck::{
 pub use graphics::{detect_graphics, multiplexer_detected, Graphics};
 pub use keys::convert_key;
 pub use layout::{screen_layout, ScreenLayout, DECK_HEIGHT};
-pub use screen::{render_screen, DeviceView, MixerView, ScreenView, StripView};
+pub use mixer::{MixerView, StripView};
+pub use screen::{render_screen, DeviceView, ScreenView};
