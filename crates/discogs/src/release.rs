@@ -59,7 +59,7 @@ pub fn parse_search(json: &str) -> Result<Vec<Release>, serde_json::Error> {
 
 /// Lowercase, drop everything that is not a letter or a digit, and cut a feature credit off
 /// the end. Two names that survive this the same way are the same record.
-fn normalise(text: &str) -> String {
+pub(crate) fn normalise(text: &str) -> String {
     let text = text.to_lowercase();
     let text = ["feat.", "feat ", "ft.", "ft ", "featuring"]
         .iter()

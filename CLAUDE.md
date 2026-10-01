@@ -287,11 +287,27 @@ Genre is metadata and never comes from analysis: a file's own tag, or a Discogs 
 matched on the artist and title that tag gave. A tag always wins, and a load keeps a stored
 genre where the file is silent, so a lookup result is not wiped by playing the track.
 
+Answers are cached in `$XDG_STATE_HOME/dj-tui/discogs.json`, beside the log and the session
+file, keyed on the normalised artist and title. The sidecar's `discogs_checked` covers one
+file; the cache covers the question, so the same record ripped twice or moved is one lookup.
+A remembered miss is an answer worth keeping, or every run sends the same fruitless request
+again. It is written after each answer rather than at the end, so a run that is stopped keeps
+what it asked, and a missing or corrupt file is an empty cache rather than a failure to start.
+
+The lookup pass re-checks each job as it is dispatched. Every job list is built when the run
+starts, before the tag pass has read anything, so a lookup queued then is often answered by a
+tag before it is sent; sending it anyway is a third-party request for a settled question.
+
 `crates/discogs` is pure except for `client.rs`, and its suite never touches the network: the
 live test is behind `DJ_TUI_DISCOGS_TESTS=1`. Styles beat genres there, since Discogs calls a
 techno twelve inch Electronic. `best_match` needs the artist and the title to agree, because
 a search returns something whatever it is asked and a wrong genre filters a track out of the
 list it belonged in.
+
+Only a result whose path matches the queue's front job belongs to the run. An `Alt+d` lookup
+and a result still in flight from a stopped run both arrive at the same handler, and charging
+either against the front pops a job that was never sent: the queue then drains faster than
+results arrive and the run reports itself finished with files untouched.
 
 `Alt+a` runs tags, then lookups, then analysis. The tag pass exists because analysis skips
 anything with a grid, so a library analysed before today would never pick a genre up. An

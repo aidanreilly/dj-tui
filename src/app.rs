@@ -9,7 +9,7 @@ use engine::{Command, DeckId, EngineHandle, Snapshot};
 use input::{Action, KeyEvent, Keymap};
 use loader::sidecar::Cues;
 use loader::Loader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tui::pixel::WaveformMode;
 use tui::ScreenView;
@@ -194,6 +194,31 @@ impl App {
             }
         }
         while let Some(done) = self.loader.try_recv_analysed() {
+            // Only a result from the job at the front belongs to this run. An Alt+d lookup
+            // and a result still in flight from a run that was stopped both arrive here, and
+            // charging either against the front job pops a job that was never sent: the
+            // queue then drains twice as fast as results arrive, and a stop_pass from a
+            // one-off lookup would take a whole analysis pass down with it.
+            let mine = self.analysing.front().is_some_and(|j| j.path == done.path);
+            if !mine {
+                match done.error {
+                    Some(e) => {
+                        let line = format!("Could not read {}: {e}", done.path.display());
+                        self.log.push(line.clone());
+                        self.message = line;
+                    }
+                    // A one-off Alt+d. Say what came back: a hung request and a release that
+                    // did not match otherwise look identical from the message line.
+                    None => {
+                        self.browser.refresh(&done.path);
+                        self.message = match self.browser.genre_of(&done.path) {
+                            Some(genre) => format!("Discogs: {genre}"),
+                            None => "Discogs had no match for that one".into(),
+                        };
+                    }
+                }
+                continue;
+            }
             let pass = self.analysing.front().map(|j| j.pass);
             self.analysing.pop_front();
             match done.error {
@@ -485,6 +510,14 @@ impl App {
         self.chosen_device = Some(name.clone());
     }
 
+    /// Whether a queued lookup for `path` is still worth sending. Every job list is built
+    /// when the run starts, before the tag pass has read anything, so a lookup queued then
+    /// may have been answered by a tag since. Asking anyway sends the artist and title of a
+    /// file to a third party for a question the file already answered.
+    pub fn lookup_still_wanted(&self, path: &Path) -> bool {
+        self.browser.still_needs_lookup(path)
+    }
+
     /// Which deck the browser measures against: whichever is playing, deck A first. Both
     /// the key highlighting and the filters follow this one rule.
     fn playing_deck(&self) -> Option<usize> {
@@ -500,9 +533,12 @@ impl App {
             .and_then(analysis::key::Key::from_camelot)
     }
 
-    /// The tempo of whichever deck is playing, under the same rule.
+    /// The tempo of whichever deck is playing, under the same rule. The grid tempo times
+    /// the deck's rate, which is what the panel shows and what the record is coming out at:
+    /// a window around the unpitched grid would throw away the tracks that beatmatch.
     fn playing_bpm(&self) -> Option<f64> {
-        self.playing_deck().and_then(|i| self.metas[i].bpm)
+        self.playing_deck()
+            .and_then(|i| Some(self.metas[i].bpm? * self.state.rates[i]))
     }
 
     /// Work through the library, one file at a time so the machine stays usable. Tags first,
@@ -549,6 +585,16 @@ impl App {
 
     /// Send the next job to the loader and say how far along the run is.
     fn next_analysis(&mut self) {
+        // Every job list is built when the run starts, before the tag pass has read
+        // anything, so a queued lookup may have been answered by a tag since. Drop those
+        // rather than send a question to a third party that the file already answered.
+        while self
+            .analysing
+            .front()
+            .is_some_and(|job| job.pass == Pass::Lookup && !self.lookup_still_wanted(&job.path))
+        {
+            self.analysing.pop_front();
+        }
         let Some(job) = self.analysing.front().cloned() else {
             self.browser.set_note(None);
             self.analysis_total = 0;

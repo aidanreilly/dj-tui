@@ -741,3 +741,121 @@ fn a_lookup_with_the_switch_off_says_how_to_turn_it_on() {
     let message = app.view(String::new()).message;
     assert!(message.contains("discogs = true"), "{message}");
 }
+
+#[test]
+fn the_bpm_filter_follows_the_tempo_fader_not_the_grid() {
+    // Every tempo the app shows is the grid tempo times the deck's rate: the panel reads
+    // 130.2 for a 124 BPM track at +5 %. A window centred on 124 would throw away the very
+    // records that would beatmatch and keep ones seven percent out.
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("host", Some(124.0), None, None),
+            ("matches the pitched tempo", Some(130.0), None, None),
+            ("matches the grid only", Some(124.0), None, None),
+        ],
+    );
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    play(&mut app, &mut p, &dir.path().join("host.wav"));
+    // Ride the focused deck's pitch up. `.` is a step up, and the panel's BPM follows it.
+    for _ in 0..40 {
+        press(&mut app, Key::Char('.'));
+    }
+    process(&mut p, 256);
+    let shown = app.view(String::new()).decks[0]
+        .bpm
+        .expect("a tempo on screen");
+    assert!(shown > 127.0, "the deck is pitched up: {shown}");
+
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('b'));
+    let names = rows(&app);
+    assert!(
+        names.contains(&"matches the pitched tempo".to_string()),
+        "the window follows what is playing: {names:?}"
+    );
+    assert!(
+        !names.contains(&"matches the grid only".to_string()),
+        "124 is not what the deck is playing at: {names:?}"
+    );
+}
+
+#[test]
+fn the_lookup_pass_skips_what_the_tag_pass_answered() {
+    // All three job lists are built when Alt+a starts, before any tags have been read, so
+    // every file looks like it needs a lookup. Sending those is a request per file to a
+    // third party for a question the file's own tag already answered.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("tagged.wav");
+    common::write_tagged_wav(
+        &path,
+        &stereo(&common::sine(440.0, 1.0, RATE, 0.4)),
+        RATE,
+        "Bicep",
+        "Glue",
+        "Electronic",
+    );
+    let (mut app, mut _p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    // A lookup job is queued before the tag pass runs, so by the time it is dispatched its
+    // file may already have an answer. Sending it anyway is a request to a third party for
+    // a question the file's own tag settled.
+    assert!(
+        app.lookup_still_wanted(&path),
+        "nothing is known about it yet, so a lookup is worth sending"
+    );
+    let deadline = Instant::now() + Duration::from_secs(20);
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('a'));
+    while app.view(String::new()).browser.rows[0].genre.is_none() {
+        app.tick();
+        process(&mut _p, 256);
+        assert!(Instant::now() < deadline, "the tag pass never finished");
+    }
+    assert!(
+        !app.lookup_still_wanted(&path),
+        "its tag answered, so there is nothing left to ask Discogs"
+    );
+}
+
+#[test]
+fn a_run_stopped_and_restarted_still_finishes_every_track() {
+    // Stopping clears the queue but not the job already with the loader. That result then
+    // arrives against a queue that has been refilled. Charged against whichever job is at
+    // the front, it pops one that was never sent, and the run reports itself finished with
+    // files still unanalysed.
+    let dir = tempfile::tempdir().unwrap();
+    beat_music(dir.path(), &["One.wav", "Two.wav", "Three.wav", "Four.wav"]);
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
+
+    press_alt(&mut app, Key::Char('a'));
+    // Stop and restart before the first result can come back.
+    press_alt(&mut app, Key::Char('a'));
+    press_alt(&mut app, Key::Char('a'));
+
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while !app.view(String::new()).browser.status.contains("tracks") {
+        app.tick();
+        process(&mut p, 16);
+        assert!(
+            Instant::now() < deadline,
+            "the run never finished: {}",
+            app.view(String::new()).browser.status
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let rows = app.view(String::new()).browser.rows;
+    let missed: Vec<&str> = rows
+        .iter()
+        .filter(|r| !r.analysed)
+        .map(|r| r.name.as_str())
+        .collect();
+    assert!(
+        missed.is_empty(),
+        "the run said it was done, but {missed:?} never were"
+    );
+}

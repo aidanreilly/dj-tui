@@ -7,8 +7,10 @@
 //! Nothing here looks at audio. A genre is what a catalogue entry says, matched on the
 //! artist and title a file's own tags gave.
 
+mod cache;
 mod client;
 mod release;
 
+pub use cache::Cache;
 pub use client::{Client, Error, MIN_REQUEST_GAP};
 pub use release::{best_match, parse_search, Release};

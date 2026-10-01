@@ -292,3 +292,17 @@ fn the_discogs_lookup_is_off_unless_it_is_switched_on() {
     let on: Config = toml::from_str("[library]\nfolders = []\ndiscogs = true\n").unwrap();
     assert!(on.library.discogs);
 }
+
+#[test]
+fn the_discogs_cache_sits_with_the_rest_of_the_state() {
+    // Beside the log and the session file, not next to the music: it is about questions
+    // asked, not about any one track, and it survives a library moving.
+    let path = dj_tui::discogs_cache_path(Some("/state"), Some("/home/dj")).unwrap();
+    assert_eq!(path, PathBuf::from("/state/dj-tui/discogs.json"));
+    let fallback = dj_tui::discogs_cache_path(None, Some("/home/dj")).unwrap();
+    assert_eq!(
+        fallback,
+        PathBuf::from("/home/dj/.local/state/dj-tui/discogs.json")
+    );
+    assert!(dj_tui::discogs_cache_path(None, None).is_none());
+}

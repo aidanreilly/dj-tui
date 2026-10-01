@@ -89,8 +89,10 @@ pub fn write_tags(path: &Path, tags: &Tags, checked_discogs: bool) -> std::io::R
         .unwrap_or_default();
     info.title = tags.title.clone().or(info.title);
     info.artist = tags.artist.clone().or(info.artist);
-    // A tag always wins over a lookup, and neither overwrites a genre already stored.
-    info.genre = info.genre.or_else(|| tags.genre.clone());
+    // A tag wins over whatever is stored, which is how a retagged file corrects an earlier
+    // answer. A lookup writes through here too, and passes the genre it found only when the
+    // file's own tags were silent, so it cannot overwrite a tag.
+    info.genre = tags.genre.clone().or(info.genre);
     info.tags_read = true;
     info.discogs_checked = info.discogs_checked || checked_discogs;
     let file = sidecar::Sidecar {
@@ -371,6 +373,13 @@ impl Loader {
                             }
                         }
                         Request::Lookup(path, artist, title) => {
+                            // Ahead of the call, not after it: a gap on the way out delays
+                            // whatever is queued behind this, and a deck load is queued on
+                            // the same thread. A cached answer skips it entirely.
+                            let cached = discogs.as_ref().is_some_and(|c| c.knows(&artist, &title));
+                            if !cached {
+                                std::thread::sleep(discogs::MIN_REQUEST_GAP);
+                            }
                             let (error, stop_pass) = match &discogs {
                                 None => (Some("Discogs lookup is off".to_string()), true),
                                 Some(client) => match client.genre(&artist, &title) {
@@ -389,8 +398,11 @@ impl Loader {
                                     Err(e) => (Some(e.to_string()), e.stops_the_pass()),
                                 },
                             };
-                            // Spaced so a batch stays inside the rate limit.
-                            std::thread::sleep(discogs::MIN_REQUEST_GAP);
+                            // Written after every answer rather than at the end: a run that
+                            // is stopped or crashes still keeps what it already asked.
+                            if let Some(client) = &discogs {
+                                client.save_cache();
+                            }
                             let done = Analysed {
                                 path,
                                 error,

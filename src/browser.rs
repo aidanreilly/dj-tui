@@ -180,6 +180,23 @@ impl Browser {
         Some(split_display(entry.display()))
     }
 
+    /// What is known about `path`'s genre now.
+    pub fn genre_of(&self, path: &Path) -> Option<String> {
+        self.entries
+            .iter()
+            .find(|e| e.path() == path)
+            .and_then(|e| e.genre().map(str::to_string))
+    }
+
+    /// Whether `path` still has nothing to show for itself, read now rather than when the
+    /// run's job list was built.
+    pub fn still_needs_lookup(&self, path: &Path) -> bool {
+        self.entries
+            .iter()
+            .find(|e| e.path() == path)
+            .is_some_and(|e| e.needs_lookup())
+    }
+
     /// The same for a path the backfill is working through.
     pub fn artist_and_title_of(&self, path: &Path) -> Option<(String, String)> {
         let entry = self.entries.iter().find(|e| e.path() == path)?;

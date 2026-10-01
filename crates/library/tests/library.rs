@@ -404,3 +404,22 @@ fn a_query_with_no_field_tokens_scores_as_it_always_did() {
         library::score("glue", "Bicep - Glue")
     );
 }
+
+#[test]
+fn a_bpm_that_is_not_a_real_number_is_a_word_not_a_filter() {
+    // "nan" and "inf" both parse as f64. A NaN range matches everything and an infinite one
+    // matches nothing, which is exactly the unexplained empty list the fallback exists for.
+    for text in ["bpm:nan", "bpm:inf", "bpm:-inf"] {
+        let q = Query::parse(text);
+        assert!(
+            q.score_entry(&track("a", Some(124.0), None, None))
+                .is_none(),
+            "{text} should match nothing but the word itself"
+        );
+        assert!(
+            q.score_entry(&track(text, Some(124.0), None, None))
+                .is_some(),
+            "{text} should match a name containing it"
+        );
+    }
+}

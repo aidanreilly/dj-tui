@@ -357,12 +357,15 @@ fn parse_field(token: &str) -> Option<Field> {
 
 /// `124` is the tempo it rounds to; `124-128` is the range it names.
 fn parse_bpm(value: &str) -> Option<(f64, f64)> {
+    // `nan` and `inf` both parse as numbers. A NaN range matches everything and an infinite
+    // one matches nothing, which is the empty list with no explanation this set out to
+    // avoid; they go down the bare-word path instead.
+    let number = |text: &str| text.parse::<f64>().ok().filter(|n| n.is_finite());
     if let Some((low, high)) = value.split_once('-') {
-        let low: f64 = low.parse().ok()?;
-        let high: f64 = high.parse().ok()?;
+        let (low, high) = (number(low)?, number(high)?);
         return (low <= high).then_some((low, high));
     }
-    let exact: f64 = value.parse().ok()?;
+    let exact = number(value)?;
     Some((exact - 0.5, exact + 0.5))
 }
 
