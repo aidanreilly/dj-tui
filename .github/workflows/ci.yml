@@ -1,4 +1,6 @@
 name: ci
+# A bare `push` already covers tags as well as branches, so every job below runs for a new
+# tag too and `release` is the one that only runs then.
 on: [push, pull_request]
 
 jobs:
@@ -53,3 +55,65 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check licenses bans sources
+
+  # Builds the tarball a tag is worth having, and attaches it to a GitHub release. Gated on
+  # `test` and `licences` passing, so a tag that does not build never gets published.
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [test, licences]
+    # Not ubuntu-latest: the runner's glibc becomes the floor for everyone downloading this,
+    # and 24.04 produces a binary that will not start on Debian 12 or Ubuntu 22.04.
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev libjack-jackd2-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+
+      - name: What the binary needs at runtime
+        # JACK is dlopened rather than linked, so the only hard dependencies are libasound
+        # and libc. If that ever stops being true the tarball stops being portable, and this
+        # is where it shows.
+        run: |
+          ldd target/release/dj-tui
+          ! ldd target/release/dj-tui | grep -q libjack \
+            || (echo "libjack is linked, not dlopened: the tarball is no longer portable"; exit 1)
+
+      - name: Pack
+        run: |
+          name="dj-tui-${GITHUB_REF_NAME}-x86_64-linux"
+          mkdir "$name"
+          cp target/release/dj-tui README.md LICENSE config.toml.example "$name"/
+          cp -r mappings "$name"/
+          tar czf "$name.tar.gz" "$name"
+          sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A file rather than --notes, so this block's own indentation stays out of them.
+          cat > notes.md <<'NOTES'
+          Built from the tagged commit.
+
+          **Requires** glibc 2.35 or newer and `libasound2`. JACK is optional and loaded at
+          runtime, so the same binary works with or without it.
+
+          Run it directly in a terminal, not inside a multiplexer. Waveforms use the kitty
+          graphics protocol where the terminal has it, and fall back to block characters
+          everywhere else.
+
+          ```sh
+          tar xzf dj-tui-*-x86_64-linux.tar.gz
+          cd dj-tui-*-x86_64-linux
+          ./dj-tui --demo
+          ```
+          NOTES
+          sed -i 's/^          //' notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            --title "dj-tui $GITHUB_REF_NAME" \
+            --notes-file notes.md \
+            --verify-tag \
+            dj-tui-*.tar.gz dj-tui-*.tar.gz.sha256
