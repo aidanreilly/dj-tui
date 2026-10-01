@@ -369,13 +369,18 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
             )),
             row("MIX", fill_bar(m.cue_mix, BAR), String::new(), m.focused),
             Line::from(""),
-            Line::from(format!(
-                "A {} B",
-                crossfader_bar(m.crossfader, m.crossfader_fade_target)
-            )),
-            // Its own labelled row, in the column every other label sits in. Riding on the
-            // end of the crossfader row put it outside that column and ran it to the border.
-            Line::from(format!("{:<5}{}", "FADE", m.fade_beats)),
+            {
+                // The fade belongs with the crossfader: both are about the move between the
+                // decks. Right-aligned into what the bar leaves, so the longest count the
+                // keys reach still lands inside the border.
+                let bar = crossfader_bar(m.crossfader, m.crossfader_fade_target);
+                let used = 2 + XFADE_WIDTH + 2;
+                let room = (MASTER_WIDTH + 5).saturating_sub(used);
+                Line::from(format!(
+                    "A {bar} B{:>room$}",
+                    format!("FADE {}", m.fade_beats)
+                ))
+            },
             {
                 let mut spans = vec![Span::raw(format!("{:<5}", "MSTR"))];
                 spans.extend(meter_spans(m.master_meter));

@@ -342,32 +342,43 @@ fn a_faders_marker_is_brighter_than_the_rail_it_sits_on() {
 }
 
 #[test]
-fn the_fade_length_is_a_labelled_row_like_the_rest() {
-    // It used to ride on the end of the crossfader row as "fade 8", which put it outside the
-    // column every other label sits in.
+fn the_fade_length_rides_the_crossfader_row() {
+    // It belongs with the crossfader: both are about the move between the decks. A row of
+    // its own put it in the label gutter with the per-channel controls, where it is not one.
     let text = mixer_text(MixerView::default(), 120, 44);
-    // Columns, not byte offsets: the deck panel to the left of the mixer draws box-drawing
-    // characters that are three bytes each.
-    let column = |label: &str| {
-        let row = text
-            .lines()
-            .find(|l| l.contains(label))
-            .unwrap_or_else(|| panic!("a {label} row"));
-        let at = row.find(label).unwrap();
-        row[..at].chars().count()
-    };
-    assert_eq!(column("FADE"), column("MSTR"), "{text}");
-    assert_eq!(column("FADE"), column("TRIM"), "{text}");
-
-    let row = text.lines().find(|l| l.contains("FADE")).unwrap();
+    let row = text
+        .lines()
+        .find(|l| l.contains("FADE"))
+        .expect("a row with the fade length");
     assert!(
-        row.contains("FADE 8"),
-        "the length is on its own row: {row}"
+        row.contains("A \u{2501}"),
+        "it rides the crossfader row: {row}"
     );
+    assert!(row.contains("FADE 8"), "{row}");
     assert!(
         !text.contains("fade"),
         "the old lowercase label is gone: {text}"
     );
+}
+
+#[test]
+fn the_longest_fade_length_still_fits_the_panel() {
+    // The crossfader row is the widest thing in the strip, and 64 beats is the longest fade
+    // the keys reach. A two-digit count used to run past the right border.
+    let m = MixerView {
+        fade_beats: 64.0,
+        ..Default::default()
+    };
+    let buf = mixer_buffer(m, 120, 44);
+    let row = (0..buf.area.height)
+        .map(|y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+        })
+        .find(|l| l.contains("FADE"))
+        .expect("a row with the fade length");
+    assert!(row.contains("FADE 64"), "the count was cut off: {row}");
 }
 
 #[test]
