@@ -1,8 +1,9 @@
+use crate::theme;
 use crate::{screen_layout, BrowserPanel, BrowserView, DeckPanel, DeckView};
 use engine::DeckId;
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Clear, Paragraph},
     Frame,
@@ -231,9 +232,9 @@ fn meter_spans(level: f32) -> Vec<Span<'static>> {
     (0..BAR)
         .map(|i| {
             let color = match i {
-                i if i + 1 == BAR => Color::Red,
-                i if i + 3 >= BAR => Color::Yellow,
-                _ => Color::Green,
+                i if i + 1 == BAR => theme::colour(theme::METER_CLIP),
+                i if i + 3 >= BAR => theme::colour(theme::METER_HOT),
+                _ => theme::colour(theme::METER_OK),
             };
             if i < lit {
                 Span::styled("▮", Style::new().fg(color))
@@ -392,9 +393,9 @@ fn render_phase(f: &mut Frame, area: Rect, phase: Option<f64>) {
                 .collect();
             let aligned = p.abs() < 0.02;
             let style = if aligned {
-                Style::new().fg(Color::Green)
+                Style::new().fg(theme::colour(theme::GREEN))
             } else {
-                Style::new().fg(Color::Yellow)
+                Style::new().fg(theme::colour(theme::YELLOW))
             };
             Line::from(vec![
                 Span::raw(" PHASE  B "),

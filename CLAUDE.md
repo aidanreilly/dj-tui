@@ -22,6 +22,19 @@ hour-long stress run, and the effect slot, which was removed.
   sends absolute `Set*` commands.
 - User-facing text follows the style of the existing messages: plain, specific, no jargon.
 
+## Colours
+
+`tui::theme` is the only place a colour is written down. The palette is Solarized, and the
+constants under the sixteen values name roles rather than hues, so a widget asks for
+`FOCUS_BORDER` and the mapping stays in one file. Nothing sets a background: the app draws on
+whatever the terminal has, which is what keeps a light terminal usable. `crates/tui/tests/
+solarized.rs` pins the values and the roles, so a colour written by hand somewhere else fails
+there rather than only looking slightly wrong on screen.
+
+The waveform palette reads the CDJ-3000's scheme through Solarized: blue lows, yellow mids,
+pale highs. Blue mode's bright end is the warm light base rather than a blue-white, so only
+its dark end carries the hue.
+
 ## Waveform rendering
 
 `tui::pixel` rasterises the overview into RGBA images and `tui::Graphics` sends them through

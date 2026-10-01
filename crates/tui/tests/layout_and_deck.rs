@@ -182,7 +182,7 @@ fn a_trace_of_treble_does_not_paint_a_vocal_white_in_3_band() {
     assert_eq!(
         cell.fg,
         Color::Rgb(r, g, b),
-        "centre of a vocal should be amber"
+        "centre of a vocal should be the mid band's yellow"
     );
 }
 
@@ -258,7 +258,8 @@ fn a_loop_is_bracketed_under_the_waveform_and_tinted_behind_it() {
     assert_eq!(buf[(32, marker_y)].fg, Color::Rgb(r, g, b));
 
     let inside = &buf[(24, 2 + tui::WAVEFORM_ROWS / 2)];
-    assert_eq!(inside.bg, Color::Rgb(18, 46, 30), "the loop region is lit");
+    let [r, g, b] = tui::theme::LOOP_REGION_BG;
+    assert_eq!(inside.bg, Color::Rgb(r, g, b), "the loop region is lit");
     let outside = &buf[(60, 2 + tui::WAVEFORM_ROWS / 2)];
     assert_ne!(outside.bg, inside.bg, "only the loop region is lit");
 }

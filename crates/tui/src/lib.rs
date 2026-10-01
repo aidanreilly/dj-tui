@@ -7,6 +7,7 @@ mod keys;
 mod layout;
 pub mod pixel;
 mod screen;
+pub mod theme;
 pub mod waveform;
 
 pub use browser::{BrowserPanel, BrowserRow, BrowserView};

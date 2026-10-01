@@ -1,9 +1,10 @@
 //! The track list: what is in the music folder, what is known about it, and what would mix.
 
+use crate::theme;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     widgets::{Block, Widget},
 };
 
@@ -72,7 +73,7 @@ impl Widget for BrowserPanel<'_> {
             Block::bordered().title(format!(" BROWSER  {}  by {} {arrow} ", v.status, v.sort));
         // A lit border is how the panel says the keyboard is its own.
         if v.active {
-            block = block.border_style(Style::new().fg(Color::Cyan));
+            block = block.border_style(Style::new().fg(theme::colour(theme::BROWSER_BORDER)));
         }
         let inner = block.inner(area);
         block.render(area, buf);
@@ -157,7 +158,9 @@ impl Widget for BrowserPanel<'_> {
             if let Some(key) = &row.key {
                 let mut key_style = style;
                 if row.compatible {
-                    key_style = key_style.fg(Color::Green).add_modifier(Modifier::BOLD);
+                    key_style = key_style
+                        .fg(theme::colour(theme::KEY_MATCH))
+                        .add_modifier(Modifier::BOLD);
                 }
                 if key_x < inner.right() {
                     buf.set_stringn(key_x, y, key, KEY_WIDTH, key_style);

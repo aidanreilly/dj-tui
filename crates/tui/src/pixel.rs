@@ -7,6 +7,7 @@
 //! The anti-aliased span drawing follows `draw_vspan_aa` in tui-wave
 //! (<https://github.com/biomassa/tui-wave>, MIT, Copyright (c) 2026 biomassa).
 
+use crate::theme::{self, pixel};
 use crate::waveform::{downsample_bands, downsample_ranges};
 use image::{Rgba, RgbaImage};
 use std::hash::{Hash, Hasher};
@@ -31,16 +32,17 @@ fn shape(peak: f32) -> f32 {
 /// Colour scheme for the waveform modes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Palette {
-    /// 3-Band colours, indexed low, mid, high: blue, amber, white as on the CDJ-3000.
+    /// 3-Band colours, indexed low, mid, high: the CDJ-3000's blue, amber and white read
+    /// through Solarized as blue, yellow and the lightest base.
     pub three_band: [Rgba<u8>; 3],
-    /// Blue mode: bass-heavy passages are this deep blue...
+    /// Blue mode: bass-heavy passages are this blue...
     pub blue_dark: Rgba<u8>,
     /// ...and bright, treble-heavy passages approach this.
     pub blue_bright: Rgba<u8>,
     pub centre_line: Rgba<u8>,
     pub playhead: Rgba<u8>,
     pub warning: Rgba<u8>,
-    /// Loop region: the green a CDJ lights its loop with.
+    /// Loop region: the green a CDJ lights its loop with, Solarized's.
     pub loop_region: Rgba<u8>,
 }
 
@@ -48,16 +50,16 @@ impl Default for Palette {
     fn default() -> Self {
         Self {
             three_band: [
-                Rgba([24, 72, 255, 255]),
-                Rgba([255, 160, 16, 255]),
-                Rgba([246, 246, 246, 255]),
+                pixel(theme::BLUE),
+                pixel(theme::YELLOW),
+                pixel(theme::BASE3),
             ],
-            blue_dark: Rgba([34, 40, 170, 255]),
-            blue_bright: Rgba([190, 232, 255, 255]),
-            centre_line: Rgba([58, 50, 84, 255]),
-            playhead: Rgba([236, 232, 210, 255]),
-            warning: Rgba([230, 30, 30, 255]),
-            loop_region: Rgba([40, 220, 120, 255]),
+            blue_dark: pixel(theme::BLUE),
+            blue_bright: pixel(theme::BASE2),
+            centre_line: pixel(theme::CENTRE_LINE),
+            playhead: pixel(theme::PLAYHEAD),
+            warning: pixel(theme::RED),
+            loop_region: pixel(theme::GREEN),
         }
     }
 }
@@ -155,7 +157,7 @@ pub fn colour_at(
         }
         WaveformMode::Rgb => {
             if band_max <= 0.0 {
-                return Some(Rgba([200, 200, 200, 255]));
+                return Some(pixel(theme::RGB_FALLBACK));
             }
             let c = |v: f32| ((v / band_max).powf(RGB_SATURATION) * 255.0).round() as u8;
             Rgba([c(bands[0]), c(bands[1]), c(bands[2]), 255])

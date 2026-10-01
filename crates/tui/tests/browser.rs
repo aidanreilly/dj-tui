@@ -143,9 +143,10 @@ fn a_track_in_a_compatible_key_is_coloured() {
         .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
         .find(|&(x, y)| buf[(x, y)].symbol() == "9" && buf[(x + 1, y)].symbol() == "A")
         .expect("the key on screen");
+    let [r, g, b] = tui::theme::GREEN;
     assert_eq!(
         buf[cell].fg,
-        Color::Green,
+        Color::Rgb(r, g, b),
         "it would mix with what is playing"
     );
 }

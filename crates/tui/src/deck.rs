@@ -1,10 +1,11 @@
 use crate::pixel::{colour_at, extent, Palette, WaveformMode};
+use crate::theme;
 use crate::waveform::{amplitude_rows, downsample_bands, downsample_ranges};
 use engine::DeckId;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Widget},
 };
@@ -58,27 +59,24 @@ pub struct DeckView {
     pub kills: [bool; 3],
 }
 
-/// Hot cue colours, one per pad, following the CDJ palette's spread of hues.
+/// Hot cue colours, one per pad: the eight Solarized accents in the order the palette lists
+/// them, which spreads the hues the way the CDJ pads do.
 pub const HOT_CUE_COLOURS: [[u8; 3]; 8] = [
-    [40, 226, 20],
-    [16, 177, 118],
-    [48, 90, 255],
-    [170, 114, 255],
-    [255, 18, 123],
-    [230, 40, 40],
-    [255, 140, 20],
-    [224, 224, 30],
+    theme::YELLOW,
+    theme::ORANGE,
+    theme::RED,
+    theme::MAGENTA,
+    theme::VIOLET,
+    theme::BLUE,
+    theme::CYAN,
+    theme::GREEN,
 ];
-pub const MAIN_CUE_COLOUR: [u8; 3] = [255, 120, 0];
+pub const MAIN_CUE_COLOUR: [u8; 3] = theme::ORANGE;
 /// Loop brackets and the lit loop region, matching the pixel renderer's loop green.
-pub const LOOP_COLOUR: [u8; 3] = [40, 220, 120];
-/// Background of the loop region: the loop colour taken down to where glyphs stay readable.
-const LOOP_REGION_BG: [u8; 3] = [18, 46, 30];
-pub const END_WARNING_COLOUR: [u8; 3] = [230, 30, 30];
+pub const LOOP_COLOUR: [u8; 3] = theme::GREEN;
+pub const END_WARNING_COLOUR: [u8; 3] = theme::RED;
 
-fn rgb(c: [u8; 3]) -> ratatui::style::Color {
-    ratatui::style::Color::Rgb(c[0], c[1], c[2])
-}
+use theme::colour as rgb;
 
 pub struct DeckPanel<'a> {
     view: &'a DeckView,
@@ -149,7 +147,7 @@ impl DeckPanel<'_> {
             for (text, band) in MARKERS {
                 let style = if v.kills[band] {
                     Style::new()
-                        .fg(ratatui::style::Color::Rgb(90, 84, 110))
+                        .fg(rgb(theme::DIM_LABEL))
                         .add_modifier(Modifier::DIM)
                 } else {
                     Style::new()
@@ -165,8 +163,12 @@ impl DeckPanel<'_> {
             .title(Line::from(right).right_aligned());
         if v.focused {
             block = block
-                .border_style(Style::new().fg(Color::Red).add_modifier(Modifier::BOLD))
-                .title_style(Style::new().fg(Color::Gray));
+                .border_style(
+                    Style::new()
+                        .fg(rgb(theme::FOCUS_BORDER))
+                        .add_modifier(Modifier::BOLD),
+                )
+                .title_style(Style::new().fg(rgb(theme::PANEL_TITLE)));
         }
         let inner = block.inner(area);
         block.render(area, buf);
@@ -179,10 +181,7 @@ impl DeckPanel<'_> {
         // Title row.
         let Some(title) = &v.title else {
             let (text, style) = if v.loading {
-                (
-                    "Loading track…",
-                    Style::new().fg(ratatui::style::Color::Rgb(126, 113, 190)),
-                )
+                ("Loading track…", Style::new().fg(rgb(theme::LOADING)))
             } else {
                 ("No track loaded", Style::new().add_modifier(Modifier::DIM))
             };
@@ -210,7 +209,7 @@ impl DeckPanel<'_> {
             inner.x,
             center_y,
             "┄".repeat(inner.width as usize),
-            Style::new().fg(ratatui::style::Color::Rgb(58, 50, 84)),
+            Style::new().fg(rgb(theme::CENTRE_LINE)),
         );
         for (i, row) in rows.iter().enumerate() {
             let y = wave_y + i as u16;
@@ -229,7 +228,7 @@ impl DeckPanel<'_> {
                     inner.x + col as u16,
                     y,
                     glyph.to_string(),
-                    Style::new().fg(ratatui::style::Color::Rgb(c[0], c[1], c[2])),
+                    Style::new().fg(rgb([c[0], c[1], c[2]])),
                 );
             }
         }
@@ -241,12 +240,7 @@ impl DeckPanel<'_> {
                     buf[(x, y)].modifier.insert(Modifier::DIM);
                 }
                 // Draw the playhead after the waveform using the same half-cell bar width.
-                buf.set_string(
-                    head,
-                    y,
-                    "▌",
-                    Style::new().fg(ratatui::style::Color::Rgb(169, 165, 145)),
-                );
+                buf.set_string(head, y, "▌", Style::new().fg(rgb(theme::GLYPH_PLAYHEAD)));
             }
         }
 
@@ -258,7 +252,7 @@ impl DeckPanel<'_> {
             let (from, to) = (column(start), column(end));
             for y in wave_y..(wave_y + WAVEFORM_ROWS).min(inner.bottom()) {
                 for x in from..=to.min(inner.right().saturating_sub(1)) {
-                    buf[(x, y)].set_bg(rgb(LOOP_REGION_BG));
+                    buf[(x, y)].set_bg(rgb(theme::LOOP_REGION_BG));
                 }
             }
         }

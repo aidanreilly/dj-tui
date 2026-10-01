@@ -1,6 +1,7 @@
-//! Colour rules for the three waveform modes, following Pioneer's CDJ-3000 and rekordbox:
-//! RGB blends red lows, green mids and blue highs; 3-Band layers blue lows, amber mids and
-//! white highs as separate shapes; Blue brightens toward white as highs rise.
+//! Colour rules for the three waveform modes, following Pioneer's CDJ-3000 and rekordbox,
+//! drawn in Solarized. RGB blends red lows, green mids and blue highs. 3-Band layers blue
+//! lows, yellow mids and pale highs as separate shapes. Blue brightens toward the light end
+//! of the palette as highs rise.
 
 use image::Rgba;
 use tui::pixel::{colour_at, Palette, WaveformMode::*};
@@ -46,13 +47,19 @@ fn rgb_and_blue_are_empty_outside_the_envelope() {
 }
 
 #[test]
-fn blue_mode_brightens_with_highs_and_stays_blue() {
+fn blue_mode_brightens_with_highs() {
     let lows = colour_at(Blue, 1.0, [1.0, 0.0, 0.0], 0.0, &p()).unwrap();
     let highs = colour_at(Blue, 1.0, [0.0, 0.0, 1.0], 0.0, &p()).unwrap();
     assert!(luma(highs) > luma(lows) + 150, "{lows:?} {highs:?}");
-    for c in [lows, highs] {
-        assert!(c[2] >= c[0] && c[2] >= c[1], "not blue: {c:?}");
-    }
+    // Bass is the blue the mode is named for. The top end is Solarized's light base, which
+    // is warm rather than blue, so only the dark end carries the hue.
+    assert!(lows[2] > lows[0] && lows[2] > lows[1], "not blue: {lows:?}");
+    let spread = highs.0[..3].iter().map(|&c| c as i32).max().unwrap()
+        - highs.0[..3].iter().map(|&c| c as i32).min().unwrap();
+    assert!(
+        spread < 40,
+        "the bright end should read as near-white: {highs:?}"
+    );
 }
 
 #[test]
@@ -76,10 +83,11 @@ fn three_band_layers_highs_over_mids_over_lows() {
 }
 
 #[test]
-fn three_band_colours_are_blue_amber_white() {
+fn three_band_colours_are_blue_yellow_and_pale() {
     let [low, mid, high] = p().three_band;
     assert!(low[2] > 200 && low[0] < 80, "low {low:?}");
-    assert!(mid[0] > 200 && mid[1] > 120 && mid[2] < 60, "mid {mid:?}");
+    // Solarized yellow sits lower in red than the amber it replaces and has no blue at all.
+    assert!(mid[0] > 150 && mid[1] > 120 && mid[2] < 60, "mid {mid:?}");
     assert!(high.0[..3].iter().all(|&c| c > 220), "high {high:?}");
 }
 
