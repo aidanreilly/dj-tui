@@ -92,3 +92,11 @@ soft_takeover = true
 # the only way in.
 # folders = ["~/Music", "/mnt/crates"]
 folders = []
+
+# Ask Discogs for the genre of files whose own tags carry none, so the browser can filter by
+# it. This sends the artist and title of those files to discogs.com. Off until you turn it
+# on, and nothing is sent unless you press Alt+a or Alt+d.
+discogs = false
+
+# The token is read from DJ_TUI_DISCOGS_TOKEN, not from this file, so it stays out of
+# anywhere this config gets copied. Make one at discogs.com under Settings, Developers.

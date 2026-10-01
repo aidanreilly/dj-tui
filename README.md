@@ -73,9 +73,13 @@ One row per key. `Shift +`, `Alt +` or `Ctrl +` change key travel.
 | `Enter` | Load the selected track onto the focused deck. |
 | `Tab` | Switch focused deck, in every mode, which is what picks where `Enter` sends a track. |
 | `Esc` | Stop every running fade. In the browser or on the device screen it returns to mix mode in one press. |
-| `Backspace` | In the browser, edit the filter. |
+| `Backspace` | In the browser, edit the filter. Typing `bpm:124`, `bpm:124-128`, `key:9a` or `genre:house` narrows by that field; anything else is a fuzzy search over artist and title. |
 | `Alt+s` / `Alt+S` | In the browser, change the sort column, and with Shift the direction. |
-| `Alt+a` | In the browser, analyse everything in the list with no analysis yet. Press it again to stop. |
+| `Alt+a` | In the browser, work through the list: read tags, look up what the tags left blank, then analyse. Press it again to stop. |
+| `Alt+b` | In the browser, a tempo window around the playing deck: off, within 3 %, within 6 %. Half and double time count. |
+| `Alt+k` | In the browser, show only the keys that would mix with the playing deck's. |
+| `Alt+g` | In the browser, cycle the genres your library holds, and back to off. |
+| `Alt+d` | In the browser, ask Discogs about the selected track's genre. |
 | `Alt+f` | In the browser, swap between full screen and the panel beside the decks. |
 | `Ctrl+u` | In the browser, clear the filter. |
 | `Ctrl+D` | The audio device screen, where `↑` / `↓` and `Enter` choose a card. |

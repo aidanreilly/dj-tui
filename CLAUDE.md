@@ -268,6 +268,40 @@ ignores a saved analysis with no grid, which is how a better detector reaches a 
 has already been scanned. A deck load still takes the sidecar as it stands. The cost is that
 a track with no beat in it is read again on every run.
 
+## Browser filtering
+
+The query parses field tokens before the fuzzy score runs: `bpm:124`, `bpm:124-128`, `key:9a`
+and `genre:house`, with everything else a bare word. A token that looks like a field but will
+not parse becomes a word, because an empty list with nothing to explain it is worse than an
+odd one. A field an entry has nothing stored for rejects that entry. `Browser::type_char`
+re-scores only what the last query left, which holds only while a longer query matches a
+subset; a query with a `:` in it goes back to the whole library.
+
+`Filters` in `src/browser.rs` is what the Alt keys cycle, and it narrows alongside the query
+rather than through it. The tempo window and the key filter measure against whichever deck is
+playing, deck A first, which is `App::playing_deck` and the same rule the key highlighting
+follows. The window folds half and double time. The genre cycle is built from every entry
+rather than from what is shown, so cycling does not walk a set that shrinks under it.
+
+Genre is metadata and never comes from analysis: a file's own tag, or a Discogs release
+matched on the artist and title that tag gave. A tag always wins, and a load keeps a stored
+genre where the file is silent, so a lookup result is not wiped by playing the track.
+
+`crates/discogs` is pure except for `client.rs`, and its suite never touches the network: the
+live test is behind `DJ_TUI_DISCOGS_TESTS=1`. Styles beat genres there, since Discogs calls a
+techno twelve inch Electronic. `best_match` needs the artist and the title to agree, because
+a search returns something whatever it is asked and a wrong genre filters a track out of the
+list it belonged in.
+
+`Alt+a` runs tags, then lookups, then analysis. The tag pass exists because analysis skips
+anything with a grid, so a library analysed before today would never pick a genre up. An
+error that would repeat takes the rest of its own pass with it, which is what `stop_pass` on
+`Analysed` says.
+
+`SIDECAR_VERSION` stays at 1. `Sidecar::read` rejects a version it does not know, so a bump
+discards every sidecar in the library along with its cues and loops; new fields are optional
+and defaulted instead.
+
 ## Master limiter
 
 `dsp::Limiter` is the last thing on the master bus, and the cue bus blends in what it puts
