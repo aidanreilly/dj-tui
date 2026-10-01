@@ -89,7 +89,9 @@ pub const UNLIT_PIP: char = '□';
 
 /// Width of one channel's cell, and of a meter.
 pub const BAR: usize = 7;
-const XFADE_WIDTH: usize = 13;
+/// Odd, so the crossfader has a true centre cell for its detent to sit in, and narrow enough
+/// that the fade length fits beside it with a gap at its longest.
+const XFADE_WIDTH: usize = 11;
 /// A master control reaches across both channel columns and the space between them, so it
 /// reads as one control over the whole mix rather than sitting under either deck.
 const MASTER_WIDTH: usize = 2 * BAR + 1;
@@ -374,8 +376,10 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 // decks. Right-aligned into what the bar leaves, so the longest count the
                 // keys reach still lands inside the border.
                 let bar = crossfader_bar(m.crossfader, m.crossfader_fade_target);
+                // The panel's own width, not the width the control rows happen to use: they
+                // stop short of the border, and measuring by them left no gap at all.
                 let used = 2 + XFADE_WIDTH + 2;
-                let room = (MASTER_WIDTH + 5).saturating_sub(used);
+                let room = (inner.width as usize).saturating_sub(used);
                 Line::from(format!(
                     "A {bar} B{:>room$}",
                     format!("FADE {}", m.fade_beats)

@@ -354,7 +354,11 @@ fn the_fade_length_rides_the_crossfader_row() {
         row.contains("A \u{2501}"),
         "it rides the crossfader row: {row}"
     );
+    // The length is right-aligned to the border, so it stays put as the number changes
+    // width. What it must never do is run into the crossfader's B, which is what measuring
+    // the room by the control rows rather than by the panel produced.
     assert!(row.contains("FADE 8"), "{row}");
+    assert!(!row.contains("BFADE"), "it ran into the crossfader: {row}");
     assert!(
         !text.contains("fade"),
         "the old lowercase label is gone: {text}"
@@ -379,6 +383,10 @@ fn the_longest_fade_length_still_fits_the_panel() {
         .find(|l| l.contains("FADE"))
         .expect("a row with the fade length");
     assert!(row.contains("FADE 64"), "the count was cut off: {row}");
+    assert!(
+        !row.contains("BFADE"),
+        "the longest count still needs its gap: {row}"
+    );
 }
 
 #[test]
