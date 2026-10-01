@@ -216,8 +216,7 @@ Three keys narrow the list.
 Each one you switch on draws a chip in the panel title saying what it is measuring against.
 
 Typing narrows it too. `bpm:124`, `bpm:124-128`, `key:9a` and `genre:house` each filter by one
-field, and anything else searches artist and title. Mix them freely. `bpm:124-128 bicep` wants
-both.
+field, and anything else searches artist and title. Mix them freely, for example, `bpm:124-128 bicep`.
 
 `Alt+a` reads tags, asks Discogs about whatever the tags left blank, and analyses what has no
 tempo yet. Press it again to stop.
