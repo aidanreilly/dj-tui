@@ -56,7 +56,7 @@ One row per key. `Shift +`, `Alt +` or `Ctrl +` change key travel.
 | `k` | Key lock: hold the pitch where it is while the tempo fader moves. |
 | `l` | Four-beat loop on and off. |
 | `i` / `I` | Mark the loop in point. Shift closes the loop where the playhead is, which also sets the length. |
-| `[` / `]` | Halve and double the loop, keeping the in point. Shift (`{` / `}`) halves and doubles the fade length instead. |
+| `[` / `]` | Halve and double the loop, keeping the in point. Shift (`{` / `}`) halves and doubles the fade length instead, shown as `FADE 8b` on the crossfader row: every automated fade runs that many beats. |
 | `j` / `J` | Beat jump back by the loop length, forward with Shift. |
 | `←` / `→` | Crossfader one step. Shift takes it hard to that end, `Alt` fades it there over the fade length. |
 | `↑` / `↓` | The focused deck's channel fader one step, in dB. Shift goes hard to full or to zero, `Alt` fades. |

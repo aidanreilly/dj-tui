@@ -382,7 +382,8 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 let room = (inner.width as usize).saturating_sub(used);
                 Line::from(format!(
                     "A {bar} B{:>room$}",
-                    format!("FADE {}", m.fade_beats)
+                    // The b is the unit: a fade is a count of beats, not seconds.
+                    format!("FADE {}b", m.fade_beats)
                 ))
             },
             {

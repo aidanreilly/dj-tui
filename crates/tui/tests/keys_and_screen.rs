@@ -357,7 +357,8 @@ fn the_fade_length_rides_the_crossfader_row() {
     // The length is right-aligned to the border, so it stays put as the number changes
     // width. What it must never do is run into the crossfader's B, which is what measuring
     // the room by the control rows rather than by the panel produced.
-    assert!(row.contains("FADE 8"), "{row}");
+    // The b is the unit: a fade is a count of beats, not seconds.
+    assert!(row.contains("FADE 8b"), "{row}");
     assert!(!row.contains("BFADE"), "it ran into the crossfader: {row}");
     assert!(
         !text.contains("fade"),
@@ -382,7 +383,7 @@ fn the_longest_fade_length_still_fits_the_panel() {
         })
         .find(|l| l.contains("FADE"))
         .expect("a row with the fade length");
-    assert!(row.contains("FADE 64"), "the count was cut off: {row}");
+    assert!(row.contains("FADE 64b"), "the count was cut off: {row}");
     assert!(
         !row.contains("BFADE"),
         "the longest count still needs its gap: {row}"
