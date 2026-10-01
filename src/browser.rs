@@ -8,6 +8,98 @@ use library::{compatible, scan, search, sort, Column, Entry, SearchQuery};
 use std::path::{Path, PathBuf};
 use tui::{BrowserRow, BrowserView};
 
+/// How wide a tempo window the BPM filter keeps, either side of what is playing.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+enum BpmWindow {
+    #[default]
+    Off,
+    Near,
+    Wide,
+}
+
+impl BpmWindow {
+    fn next(self) -> BpmWindow {
+        match self {
+            BpmWindow::Off => BpmWindow::Near,
+            BpmWindow::Near => BpmWindow::Wide,
+            BpmWindow::Wide => BpmWindow::Off,
+        }
+    }
+
+    fn tolerance(self) -> Option<f64> {
+        match self {
+            BpmWindow::Off => None,
+            BpmWindow::Near => Some(0.03),
+            BpmWindow::Wide => Some(0.06),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            BpmWindow::Off => "off",
+            BpmWindow::Near => "\u{00b1}3%",
+            BpmWindow::Wide => "\u{00b1}6%",
+        }
+    }
+}
+
+/// True when `bpm` sits inside `tolerance` of `against`, at the same tempo, at half time or
+/// at double time. A 64 BPM track mixes against 128, and 174 mixes against 87.
+fn within_window(bpm: f64, against: f64, tolerance: f64) -> bool {
+    [against * 0.5, against, against * 2.0]
+        .iter()
+        .any(|&target| (bpm - target).abs() <= target * tolerance)
+}
+
+/// What the Alt keys narrow the list by, alongside whatever has been typed.
+#[derive(Default)]
+struct Filters {
+    bpm: BpmWindow,
+    /// The tempo the window is measured against, fixed when the filter was switched on.
+    bpm_against: Option<f64>,
+    key: Option<Key>,
+    genre: Option<String>,
+}
+
+impl Filters {
+    /// True when `entry` survives every filter that is on.
+    fn keeps(&self, entry: &Entry) -> bool {
+        if let (Some(tolerance), Some(against)) = (self.bpm.tolerance(), self.bpm_against) {
+            match entry.bpm() {
+                Some(bpm) if within_window(bpm, against, tolerance) => {}
+                _ => return false,
+            }
+        }
+        if let Some(ours) = self.key {
+            match entry.key() {
+                Some(theirs) if compatible(theirs, ours) => {}
+                _ => return false,
+            }
+        }
+        if let Some(want) = &self.genre {
+            match entry.genre() {
+                Some(genre) if genre.eq_ignore_ascii_case(want) => {}
+                _ => return false,
+            }
+        }
+        true
+    }
+
+    fn chips(&self) -> Vec<String> {
+        let mut chips = Vec::new();
+        if self.bpm != BpmWindow::Off {
+            chips.push(format!("\u{25b8}bpm {}", self.bpm.label()));
+        }
+        if self.key.is_some() {
+            chips.push("\u{25b8}key".into());
+        }
+        if let Some(genre) = &self.genre {
+            chips.push(format!("\u{25b8}genre {genre}"));
+        }
+        chips
+    }
+}
+
 /// A terminal can show only a small part of the library at once. Keep the per-frame view
 /// bounded, centred on the selection, instead of formatting every track on every frame.
 const BROWSER_VIEW_ROWS: usize = 256;
@@ -25,6 +117,7 @@ pub struct Browser {
     pub fullscreen: bool,
     /// What the panel says about itself: how many tracks, or what it is busy with.
     note: Option<String>,
+    filters: Filters,
 }
 
 impl Browser {
@@ -125,10 +218,12 @@ impl Browser {
         // Re-score those candidates instead of scanning the whole library for every key.
         let matches = {
             let entries = &self.entries;
+            let filters = &self.filters;
             let query = SearchQuery::new(&self.query);
             let mut scored: Vec<(i32, usize)> = self
                 .shown
                 .iter()
+                .filter(|&&i| filters.keeps(&entries[i]))
                 .filter_map(|&i| query.score_entry(&entries[i]).map(|s| (s, i)))
                 .collect();
             scored.sort_by(|(a_score, a_index), (b_score, b_index)| {
@@ -146,8 +241,78 @@ impl Browser {
     }
 
     fn refilter(&mut self) {
-        self.shown = search(&self.entries, &self.query);
+        let entries = &self.entries;
+        let filters = &self.filters;
+        self.shown = search(entries, &self.query)
+            .into_iter()
+            .filter(|&i| filters.keeps(&entries[i]))
+            .collect();
         self.selected = self.selected.min(self.shown.len().saturating_sub(1));
+    }
+
+    /// Cycle the BPM window. `playing` is the tempo it measures against, which is `None`
+    /// with nothing playing and with a track the detector could not read.
+    pub fn cycle_bpm_filter(&mut self, playing: Option<f64>) -> String {
+        let Some(tempo) = playing else {
+            self.filters.bpm = BpmWindow::Off;
+            self.filters.bpm_against = None;
+            self.refilter();
+            return "BPM filter needs a deck playing with a tempo".into();
+        };
+        self.filters.bpm = self.filters.bpm.next();
+        self.filters.bpm_against = Some(tempo);
+        self.refilter();
+        match self.filters.bpm {
+            BpmWindow::Off => "BPM filter off".into(),
+            window => format!("BPM within {} of {tempo:.1}", window.label()),
+        }
+    }
+
+    pub fn toggle_key_filter(&mut self, playing: Option<Key>) -> String {
+        if self.filters.key.is_some() {
+            self.filters.key = None;
+            self.refilter();
+            return "Key filter off".into();
+        }
+        let Some(key) = playing else {
+            return "Key filter needs a deck playing with a key".into();
+        };
+        self.filters.key = Some(key);
+        self.refilter();
+        format!("Keys that mix with {}", key.camelot())
+    }
+
+    /// Cycle the genres the library holds, alphabetically, then back to off. The list comes
+    /// from every entry rather than from what is shown, so cycling does not walk a set that
+    /// shrinks under it.
+    pub fn cycle_genre_filter(&mut self) -> String {
+        let mut genres: Vec<String> = self
+            .entries
+            .iter()
+            .filter_map(|e| e.genre().map(str::to_string))
+            .collect();
+        genres.sort_by_key(|g| g.to_lowercase());
+        genres.dedup_by_key(|g| g.to_lowercase());
+        if genres.is_empty() {
+            return "No genres yet. Alt+a reads the tags.".into();
+        }
+        let next = match &self.filters.genre {
+            None => Some(genres[0].clone()),
+            Some(current) => match genres.iter().position(|g| g == current) {
+                Some(i) if i + 1 < genres.len() => Some(genres[i + 1].clone()),
+                _ => None,
+            },
+        };
+        self.filters.genre = next.clone();
+        self.refilter();
+        match next {
+            Some(genre) => format!("Genre: {genre}"),
+            None => "Genre filter off".into(),
+        }
+    }
+
+    pub fn filter_chips(&self) -> Vec<String> {
+        self.filters.chips()
     }
 
     /// The panel. `active` is true while browser mode holds the keyboard, and `playing` is

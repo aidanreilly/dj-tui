@@ -438,6 +438,26 @@ impl App {
         self.chosen_device = Some(name.clone());
     }
 
+    /// Which deck the browser measures against: whichever is playing, deck A first. Both
+    /// the key highlighting and the filters follow this one rule.
+    fn playing_deck(&self) -> Option<usize> {
+        let snapshot = self.handle.snapshot();
+        [0, 1].into_iter().find(|&i| snapshot.decks[i].playing)
+    }
+
+    /// The key of whichever deck is playing, or `None` with nothing playing and with a track
+    /// the detector could not read.
+    fn playing_key(&self) -> Option<analysis::key::Key> {
+        self.playing_deck()
+            .and_then(|i| self.metas[i].key.as_deref())
+            .and_then(analysis::key::Key::from_camelot)
+    }
+
+    /// The tempo of whichever deck is playing, under the same rule.
+    fn playing_bpm(&self) -> Option<f64> {
+        self.playing_deck().and_then(|i| self.metas[i].bpm)
+    }
+
     /// Analyse everything in the browser that has no sidecar yet, one file at a time so the
     /// machine stays usable while it runs.
     fn start_analysis(&mut self) {
@@ -543,6 +563,15 @@ impl App {
             },
             Action::BrowserMove(dir) => self.browser.move_selection(dir),
             Action::BrowserSort(reverse) => self.browser.sort_by(reverse),
+            Action::BrowserFilterBpm => {
+                let playing = self.playing_bpm();
+                self.message = self.browser.cycle_bpm_filter(playing);
+            }
+            Action::BrowserFilterKey => {
+                let playing = self.playing_key();
+                self.message = self.browser.toggle_key_filter(playing);
+            }
+            Action::BrowserFilterGenre => self.message = self.browser.cycle_genre_filter(),
             Action::BrowserFullscreen => self.browser.fullscreen = !self.browser.fullscreen,
             Action::Search => {
                 self.browser.clear_query();
@@ -728,12 +757,7 @@ impl App {
         v.message = self.message.clone();
         v.help = self.help;
         // Highlight against whichever deck is playing; deck A wins when both are.
-        let snapshot = self.handle.snapshot();
-        let playing = [0, 1]
-            .iter()
-            .find(|&&i| snapshot.decks[i].playing)
-            .and_then(|&i| self.metas[i].key.as_deref())
-            .and_then(analysis::key::Key::from_camelot);
+        let playing = self.playing_key();
         let browsing = self.keymap.mode() == input::Mode::Browser;
         v.browser = self.browser.view(browsing, playing);
         // Say which mode holds the keyboard, since that changes what every letter does.

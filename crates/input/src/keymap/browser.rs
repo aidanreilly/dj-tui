@@ -17,6 +17,9 @@ pub fn handle(e: KeyEvent, focused: DeckId) -> Option<Action> {
             Key::Char('s') => Some(Action::BrowserSort(false)),
             Key::Char('S') => Some(Action::BrowserSort(true)),
             Key::Char('a') => Some(Action::AnalyseLibrary),
+            Key::Char('b') => Some(Action::BrowserFilterBpm),
+            Key::Char('k') => Some(Action::BrowserFilterKey),
+            Key::Char('g') => Some(Action::BrowserFilterGenre),
             Key::Char('f') => Some(Action::BrowserFullscreen),
             _ => None,
         };

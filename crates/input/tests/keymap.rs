@@ -326,6 +326,22 @@ mod action_names {
     use input::{parse_action, Action, Band, Dir};
 
     #[test]
+    fn the_browser_filters_can_be_mapped_from_midi() {
+        assert_eq!(
+            parse_action("browser-filter-bpm"),
+            Some(Action::BrowserFilterBpm)
+        );
+        assert_eq!(
+            parse_action("browser-filter-key"),
+            Some(Action::BrowserFilterKey)
+        );
+        assert_eq!(
+            parse_action("browser-filter-genre"),
+            Some(Action::BrowserFilterGenre)
+        );
+    }
+
+    #[test]
     fn transport_and_cues_read_as_words() {
         assert_eq!(parse_action("play a"), Some(Action::PlayPause(A)));
         assert_eq!(parse_action("cue b"), Some(Action::CuePress(B)));
@@ -449,6 +465,15 @@ mod modes {
 
     fn alt(km: &mut Keymap, key: Key) -> Option<Action> {
         km.handle(KeyEvent::press(key).alt())
+    }
+
+    #[test]
+    fn alt_keys_reach_the_browser_filters() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('b')), Some(Action::BrowserEnter));
+        assert_eq!(alt(&mut km, ch('b')), Some(Action::BrowserFilterBpm));
+        assert_eq!(alt(&mut km, ch('k')), Some(Action::BrowserFilterKey));
+        assert_eq!(alt(&mut km, ch('g')), Some(Action::BrowserFilterGenre));
     }
 
     #[test]

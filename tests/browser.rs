@@ -54,8 +54,6 @@ fn press(app: &mut App, key: Key) {
     app.on_key(KeyEvent::press(key));
 }
 
-/// Its callers are the filter tests, which land in the next commit.
-#[allow(dead_code)]
 fn press_alt(app: &mut App, key: Key) {
     app.on_key(KeyEvent::press(key).alt());
 }
@@ -88,8 +86,10 @@ fn library(dir: &Path, tracks: &[Track]) {
                     first_beat_secs: 0.0,
                 }),
                 key: key.and_then(analysis::key::Key::from_camelot),
-                waveform: Vec::new(),
-                bands: Vec::new(),
+                // Full length, so a load reuses this analysis instead of running the
+                // detector over the flat fixture audio and coming back with no grid.
+                waveform: vec![[-0.2, 0.2]; loader::ENVELOPE_POINTS],
+                bands: vec![[0.2, 0.1, 0.05]; loader::ENVELOPE_POINTS],
             }),
             cues: Default::default(),
             track: Some(loader::sidecar::TrackInfo {
@@ -507,4 +507,161 @@ fn typing_a_field_token_finds_tracks_the_letters_alone_would_not() {
         press(&mut app, Key::Char(c));
     }
     assert_eq!(rows(&app), vec!["Bicep - Glue"], "{:?}", rows(&app));
+}
+
+/// Load a track onto deck A and start it, so the filters have something to measure against.
+fn play(app: &mut App, p: &mut EngineProcessor, path: &Path) {
+    app.load_path(engine::DeckId::A, path.to_path_buf());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while app.view(String::new()).decks[0].title.is_none() {
+        app.tick();
+        process(p, 512);
+        assert!(Instant::now() < deadline, "the track never loaded");
+    }
+    press(app, Key::Space);
+    process(p, 512);
+    assert!(app.snapshot().decks[0].playing, "the deck did not start");
+}
+
+#[test]
+fn the_bpm_filter_cycles_and_measures_against_the_playing_deck() {
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("slow", Some(100.0), None, None),
+            ("near", Some(126.0), None, None),
+            ("spot on", Some(128.0), None, None),
+        ],
+    );
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    play(&mut app, &mut p, &dir.path().join("spot on.wav"));
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('b'));
+    let names = rows(&app);
+    assert!(names.contains(&"spot on".to_string()), "{names:?}");
+    assert!(
+        names.contains(&"near".to_string()),
+        "126 is inside 3 %: {names:?}"
+    );
+    assert!(!names.contains(&"slow".to_string()), "{names:?}");
+}
+
+#[test]
+fn the_bpm_filter_folds_half_and_double_time() {
+    // A 64 BPM track mixes against 128, and a jungle roller at 174 mixes against 87.
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("half", Some(64.0), None, None),
+            ("unrelated", Some(100.0), None, None),
+            ("host", Some(128.0), None, None),
+        ],
+    );
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    play(&mut app, &mut p, &dir.path().join("host.wav"));
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('b'));
+    let names = rows(&app);
+    assert!(names.contains(&"half".to_string()), "{names:?}");
+    assert!(!names.contains(&"unrelated".to_string()), "{names:?}");
+}
+
+#[test]
+fn the_bpm_filter_stays_off_when_the_playing_deck_has_no_grid() {
+    // A deck playing a track the detector could not read has no tempo to measure against.
+    // Filtering everything out would look like a broken library.
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("a", Some(124.0), None, None),
+            ("b", Some(130.0), None, None),
+            ("no grid", None, None, None),
+        ],
+    );
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    play(&mut app, &mut p, &dir.path().join("no grid.wav"));
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('b'));
+    assert_eq!(
+        rows(&app).len(),
+        3,
+        "nothing was filtered: {:?}",
+        rows(&app)
+    );
+    let message = app.view(String::new()).message;
+    assert!(
+        message.contains("needs a deck playing with a tempo"),
+        "it says why: {message}"
+    );
+}
+
+#[test]
+fn the_key_filter_keeps_what_would_mix() {
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("same", None, Some("9A"), None),
+            ("neighbour", None, Some("10A"), None),
+            ("clash", None, Some("4B"), None),
+        ],
+    );
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    play(&mut app, &mut p, &dir.path().join("same.wav"));
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('k'));
+    let names = rows(&app);
+    assert!(names.contains(&"same".to_string()), "{names:?}");
+    assert!(names.contains(&"neighbour".to_string()), "{names:?}");
+    assert!(!names.contains(&"clash".to_string()), "{names:?}");
+}
+
+#[test]
+fn the_genre_cycle_walks_what_the_library_holds() {
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("a", None, None, Some("House")),
+            ("b", None, None, Some("Techno")),
+            ("c", None, None, Some("House")),
+        ],
+    );
+    let (mut app, _p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('g'));
+    assert_eq!(rows(&app), vec!["a", "c"], "alphabetically first");
+    press_alt(&mut app, Key::Char('g'));
+    assert_eq!(rows(&app), vec!["b"]);
+    press_alt(&mut app, Key::Char('g'));
+    assert_eq!(rows(&app).len(), 3, "back to off");
+}
+
+#[test]
+fn a_typed_token_and_a_key_filter_narrow_together() {
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("keep me 9A", None, Some("9A"), None),
+            ("keep me 4B", None, Some("4B"), None),
+        ],
+    );
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    play(&mut app, &mut p, &dir.path().join("keep me 9A.wav"));
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('k'));
+    for c in "keep".chars() {
+        press(&mut app, Key::Char(c));
+    }
+    assert_eq!(rows(&app), vec!["keep me 9A"]);
 }

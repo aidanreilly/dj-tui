@@ -73,6 +73,12 @@ pub enum Action {
     BrowserFullscreen,
     /// Cycle the column the browser is sorted by, or with `true` turn the order around.
     BrowserSort(bool),
+    /// Cycle the BPM window: off, within 3 % of the playing deck, within 6 %.
+    BrowserFilterBpm,
+    /// Show only the keys that would mix with the playing deck's.
+    BrowserFilterKey,
+    /// Cycle through the genres the library holds, and back to off.
+    BrowserFilterGenre,
     /// Analyse every track in the browser that has no sidecar yet.
     AnalyseLibrary,
     /// Give the browser the keyboard.
