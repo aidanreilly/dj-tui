@@ -76,6 +76,21 @@ fn a_killed_band_says_so_instead_of_drawing_a_bar() {
 }
 
 #[test]
+fn the_kill_word_sits_in_the_middle_of_its_cell() {
+    // Rust centres a four-character word in seven columns by padding the right, which
+    // leaves the word reading as pushed to the left of a row whose neighbours are centred
+    // on a tick.
+    let bar = eq_bar(0.0, true, W);
+    let left = bar.len() - bar.trim_start().len();
+    let right = bar.len() - bar.trim_end().len();
+    assert!(
+        left.abs_diff(right) <= 1,
+        "padded {left} left and {right} right: {bar}"
+    );
+    assert!(left >= right, "the odd column goes to the left: {bar}");
+}
+
+#[test]
 fn a_fader_fills_from_the_left_and_ends_in_a_cap() {
     let full = fill_bar(1.0, W);
     assert_eq!(full.chars().count(), W);

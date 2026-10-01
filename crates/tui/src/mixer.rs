@@ -136,7 +136,11 @@ pub fn centre_bar(v: f32, width: usize) -> String {
 /// draws a flat EQ as a cut.
 pub fn eq_bar(db: f32, kill: bool, width: usize) -> String {
     if kill {
-        return format!("{:^w$}", "KILL", w = width);
+        // `{:^}` pads the right with the odd column, which reads as pushed left on a row
+        // whose neighbours are centred on a tick. Put it on the left instead.
+        let spare = width.saturating_sub("KILL".len());
+        let left = spare - spare / 2;
+        return format!("{:left$}KILL{:right$}", "", "", right = spare / 2);
     }
     let v = if db >= 0.0 {
         db / EQ_CEILING_DB
@@ -250,14 +254,27 @@ fn column_styles(focused: DeckId) -> (Style, Style) {
 /// The unlit rail sits back from the run, so a row of untouched controls recedes and the one
 /// that has been moved is what the eye lands on.
 fn rail_spans(bar: &str, style: Style) -> Vec<Span<'static>> {
+    // Lit by what the character means, not by which character it is. A killed band's word
+    // and a neutral tick are both state rather than a value being read off the row, so they
+    // recede with the rail.
+    spans_lit_by(bar, style, |c| matches!(c, RUN | CAP | TARGET))
+}
+
+/// A control whose value is one marker: the marker is what carries, and the rail it runs
+/// along recedes. Colouring these by glyph put the rail in the foreground and the marker in
+/// the muted grey, which is backwards.
+fn marker_spans(bar: &str, style: Style) -> Vec<Span<'static>> {
+    spans_lit_by(bar, style, |c| matches!(c, TICK | TARGET))
+}
+
+fn spans_lit_by(bar: &str, style: Style, lit: impl Fn(char) -> bool) -> Vec<Span<'static>> {
     // One span per character: a mixer row is at most 15 cells, so the cost is nothing and
     // the alternative is working out span boundaries by hand.
     bar.chars()
         .map(|c| {
-            let s = if c == RAIL || c == TICK {
-                style.fg(theme::colour(theme::BASE01))
-            } else {
-                style
+            let s = match lit(c) {
+                true => style,
+                false => style.fg(theme::colour(theme::BASE01)),
             };
             Span::styled(c.to_string(), s)
         })
@@ -373,9 +390,9 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
         pk.push(Span::raw(" "));
         pk.extend(meter_spans(b.meter));
         let mut vol = vec![Span::raw(format!("{:<5}", "VOL"))];
-        vol.extend(rail_spans(&position_bar(m.faders[0], BAR), Style::new()));
+        vol.extend(marker_spans(&position_bar(m.faders[0], BAR), Style::new()));
         vol.push(Span::raw(" "));
-        vol.extend(rail_spans(&position_bar(m.faders[1], BAR), Style::new()));
+        vol.extend(marker_spans(&position_bar(m.faders[1], BAR), Style::new()));
         vol.push(Span::raw(format!(
             "  CUE {}{}  A {} B",
             dot(m.headphone_cue[0]),

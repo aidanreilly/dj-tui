@@ -294,6 +294,65 @@ fn the_collapsed_faders_are_a_marker_on_a_rail() {
     assert!(!vol.contains(tui::mixer::CAP), "nothing is filled: {vol}");
 }
 
+/// The foreground of the first cell on `label`'s row that holds one of `glyphs`.
+fn colour_of(buf: &Buffer, label: &str, glyphs: &[char]) -> ratatui::style::Color {
+    for y in 0..buf.area.height {
+        let row: String = (0..buf.area.width)
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect();
+        if !row.contains(label) {
+            continue;
+        }
+        for x in 0..buf.area.width {
+            let cell = &buf[(x, y)];
+            if cell
+                .symbol()
+                .chars()
+                .next()
+                .is_some_and(|c| glyphs.contains(&c))
+            {
+                return cell.fg;
+            }
+        }
+    }
+    panic!("no {glyphs:?} on a row with {label}");
+}
+
+#[test]
+fn a_killed_band_is_muted_rather_than_shouted() {
+    // KILL is the state of a band, not a value being read off the row, so it recedes with
+    // the rail instead of being the brightest thing in the strip.
+    let mut m = MixerView::default();
+    m.strips[0].kills = [false, false, true];
+    let buf = mixer_buffer(m, 120, 44);
+    let [r, g, b] = tui::theme::BASE01;
+    assert_eq!(
+        // 'K' alone: the row's own label is "HI", whose I would be found first.
+        colour_of(&buf, "KILL", &['K']),
+        ratatui::style::Color::Rgb(r, g, b)
+    );
+}
+
+#[test]
+fn a_faders_marker_is_brighter_than_the_rail_it_sits_on() {
+    // The collapsed mixer draws a fader as a marker on a rail. Colouring by glyph put the
+    // rail in the foreground and the marker in the muted grey, which is backwards: the
+    // marker is the value.
+    let buf = mixer_buffer(MixerView::default(), 100, 44);
+    let [r, g, b] = tui::theme::BASE01;
+    let muted = ratatui::style::Color::Rgb(r, g, b);
+    assert_eq!(
+        colour_of(&buf, "VOL", &[tui::mixer::RUN]),
+        muted,
+        "the rail recedes"
+    );
+    assert_ne!(
+        colour_of(&buf, "VOL", &[tui::mixer::TICK]),
+        muted,
+        "the marker does not"
+    );
+}
+
 #[test]
 fn killed_bands_say_kill() {
     let mut m = MixerView::default();
