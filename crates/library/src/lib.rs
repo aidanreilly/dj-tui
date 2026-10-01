@@ -125,8 +125,6 @@ impl Entry {
         self.genre.as_deref()
     }
 
-    // Its only caller is the query's genre token, which lands in the next commit.
-    #[allow(dead_code)]
     pub(crate) fn folded_genre(&self) -> Option<&str> {
         self.folded_genre.as_deref()
     }
@@ -251,10 +249,10 @@ fn camelot_order(key: Option<Key>) -> (u32, char) {
 /// Indices of the entries matching `query`, best first. Letters have to appear in order but
 /// need not be next to each other, which is what makes it worth typing three of them.
 pub fn search(list: &[Entry], query: &str) -> Vec<usize> {
-    if query.trim().is_empty() {
+    let query = Query::parse(query);
+    if query.is_empty() {
         return (0..list.len()).collect();
     }
-    let query = SearchQuery::new(query);
     let mut scored: Vec<(i32, usize)> = list
         .iter()
         .enumerate()
@@ -263,6 +261,100 @@ pub fn search(list: &[Entry], query: &str) -> Vec<usize> {
     // Best score first, and the earlier entry wins a tie so the order stays predictable.
     scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     scored.into_iter().map(|(_, i)| i).collect()
+}
+
+/// A parsed browser query: field tokens an entry has to satisfy, plus the bare words scored
+/// fuzzily against the display name.
+#[derive(Debug, Clone)]
+pub struct Query {
+    text: SearchQuery,
+    /// Inclusive tempo range.
+    bpm: Option<(f64, f64)>,
+    key: Option<Key>,
+    /// Folded, matched as a substring of the entry's folded genre.
+    genre: Option<String>,
+}
+
+impl Query {
+    pub fn parse(query: &str) -> Query {
+        let mut bpm = None;
+        let mut key = None;
+        let mut genre = None;
+        let mut words: Vec<&str> = Vec::new();
+        for token in query.split_whitespace() {
+            match parse_field(token) {
+                Some(Field::Bpm(range)) => bpm = Some(range),
+                Some(Field::Key(k)) => key = Some(k),
+                Some(Field::Genre(g)) => genre = Some(g),
+                // A token that looks like a field but will not parse is a word, so a typo
+                // shows an odd list rather than an empty one with nothing to explain it.
+                None => words.push(token),
+            }
+        }
+        Query {
+            text: SearchQuery::new(&words.join(" ")),
+            bpm,
+            key,
+            genre,
+        }
+    }
+
+    /// True when nothing narrows the list, so the caller can skip scoring entirely.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty() && self.bpm.is_none() && self.key.is_none() && self.genre.is_none()
+    }
+
+    /// The entry's score, or `None` when any part of the query rejects it. A field the entry
+    /// has nothing stored for rejects it, the way sorting sinks unknowns to the bottom.
+    pub fn score_entry(&self, entry: &Entry) -> Option<i32> {
+        if let Some((low, high)) = self.bpm {
+            let bpm = entry.bpm()?;
+            if bpm < low || bpm > high {
+                return None;
+            }
+        }
+        if let Some(want) = self.key {
+            if entry.key()? != want {
+                return None;
+            }
+        }
+        if let Some(want) = &self.genre {
+            if !entry.folded_genre()?.contains(want.as_str()) {
+                return None;
+            }
+        }
+        self.text.score_entry(entry)
+    }
+}
+
+enum Field {
+    Bpm((f64, f64)),
+    Key(Key),
+    Genre(String),
+}
+
+fn parse_field(token: &str) -> Option<Field> {
+    let (name, value) = token.split_once(':')?;
+    if value.is_empty() {
+        return None;
+    }
+    match name.to_lowercase().as_str() {
+        "bpm" => parse_bpm(value).map(Field::Bpm),
+        "key" => Key::from_camelot(&value.to_uppercase()).map(Field::Key),
+        "genre" => Some(Field::Genre(value.to_lowercase())),
+        _ => None,
+    }
+}
+
+/// `124` is the tempo it rounds to; `124-128` is the range it names.
+fn parse_bpm(value: &str) -> Option<(f64, f64)> {
+    if let Some((low, high)) = value.split_once('-') {
+        let low: f64 = low.parse().ok()?;
+        let high: f64 = high.parse().ok()?;
+        return (low <= high).then_some((low, high));
+    }
+    let exact: f64 = value.parse().ok()?;
+    Some((exact - 0.5, exact + 0.5))
 }
 
 /// A prepared fuzzy-search query. Build it once and score many entries without repeatedly
@@ -285,6 +377,10 @@ impl SearchQuery {
 
     pub fn score_entry(&self, entry: &Entry) -> Option<i32> {
         self.score_chars(&entry.folded_display)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.needle.is_empty()
     }
 
     fn score_text(&self, text: &str) -> Option<i32> {
