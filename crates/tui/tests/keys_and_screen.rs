@@ -253,18 +253,6 @@ fn the_mixer_shows_the_headphone_mix() {
 }
 
 #[test]
-fn the_fade_length_fits_inside_the_mixer_panel() {
-    // The crossfader row is the widest thing in the strip. It used to run three spaces
-    // before "fade", which put the beat count past the right border and left the bare word.
-    let text = mixer_text(MixerView::default(), 120, 44);
-    let row = text
-        .lines()
-        .find(|l| l.contains("\u{2502}A \u{2501}"))
-        .expect("the crossfader row");
-    assert!(row.contains("fade 8"), "the beat count was cut off: {row}");
-}
-
-#[test]
 fn the_collapsed_mixer_lines_its_faders_up_with_its_meters() {
     // Under twelve rows the mixer folds into a bar under the decks. The fader and the meter
     // for a channel are the same channel, so they start in the same column.
@@ -350,6 +338,35 @@ fn a_faders_marker_is_brighter_than_the_rail_it_sits_on() {
         colour_of(&buf, "VOL", &[tui::mixer::TICK]),
         muted,
         "the marker does not"
+    );
+}
+
+#[test]
+fn the_fade_length_is_a_labelled_row_like_the_rest() {
+    // It used to ride on the end of the crossfader row as "fade 8", which put it outside the
+    // column every other label sits in.
+    let text = mixer_text(MixerView::default(), 120, 44);
+    // Columns, not byte offsets: the deck panel to the left of the mixer draws box-drawing
+    // characters that are three bytes each.
+    let column = |label: &str| {
+        let row = text
+            .lines()
+            .find(|l| l.contains(label))
+            .unwrap_or_else(|| panic!("a {label} row"));
+        let at = row.find(label).unwrap();
+        row[..at].chars().count()
+    };
+    assert_eq!(column("FADE"), column("MSTR"), "{text}");
+    assert_eq!(column("FADE"), column("TRIM"), "{text}");
+
+    let row = text.lines().find(|l| l.contains("FADE")).unwrap();
+    assert!(
+        row.contains("FADE 8"),
+        "the length is on its own row: {row}"
+    );
+    assert!(
+        !text.contains("fade"),
+        "the old lowercase label is gone: {text}"
     );
 }
 

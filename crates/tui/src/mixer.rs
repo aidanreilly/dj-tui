@@ -369,13 +369,13 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
             )),
             row("MIX", fill_bar(m.cue_mix, BAR), String::new(), m.focused),
             Line::from(""),
-            // Exactly the panel's inner width: three spaces before "fade" put the beat
-            // count past the right border and left the word on its own.
             Line::from(format!(
-                "A {} B fade {}",
-                crossfader_bar(m.crossfader, m.crossfader_fade_target),
-                m.fade_beats
+                "A {} B",
+                crossfader_bar(m.crossfader, m.crossfader_fade_target)
             )),
+            // Its own labelled row, in the column every other label sits in. Riding on the
+            // end of the crossfader row put it outside that column and ran it to the border.
+            Line::from(format!("{:<5}{}", "FADE", m.fade_beats)),
             {
                 let mut spans = vec![Span::raw(format!("{:<5}", "MSTR"))];
                 spans.extend(meter_spans(m.master_meter));
