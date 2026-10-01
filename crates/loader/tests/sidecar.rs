@@ -274,3 +274,104 @@ fn a_sidecar_from_before_the_track_details_still_reads() {
     assert!(stored.track.is_none());
     assert!(load_file(&audio, RATE).unwrap().from_sidecar, "still valid");
 }
+
+#[test]
+fn a_sidecar_written_before_genre_existed_still_reads() {
+    // The three fields added for browser filtering are absent from this JSON, exactly as
+    // they are absent from every sidecar already on disk. Rejecting it would throw away the
+    // analysis, the waveform and the cues in it.
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("track.flac");
+    std::fs::write(&audio, b"not really audio, the fingerprint is all we need").unwrap();
+    let id = fingerprint_file(&audio).unwrap();
+    let json = serde_json::json!({
+        "format": "dj-tui track data",
+        "version": 1,
+        "audio": id,
+        "track": { "title": "Glue", "artist": "Bicep", "duration_secs": 330.0 },
+    });
+    std::fs::write(sidecar_path(&audio), serde_json::to_string(&json).unwrap()).unwrap();
+
+    let read = loader::sidecar::Sidecar::read(&audio).expect("an old sidecar still reads");
+    let info = read.track.expect("its track info survives");
+    assert_eq!(info.title.as_deref(), Some("Glue"));
+    assert_eq!(info.genre, None, "nothing was stored, so nothing is known");
+    assert!(!info.tags_read, "no tag pass has run over it");
+    assert!(!info.discogs_checked, "no lookup has run over it");
+}
+
+#[test]
+fn a_genre_round_trips_through_the_sidecar() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("track.flac");
+    std::fs::write(&audio, b"not really audio").unwrap();
+    let id = fingerprint_file(&audio).unwrap();
+    let written = loader::sidecar::Sidecar {
+        audio: id,
+        analysis: None,
+        cues: Default::default(),
+        track: Some(loader::sidecar::TrackInfo {
+            title: Some("Cactus".into()),
+            artist: Some("Objekt".into()),
+            duration_secs: Some(400.0),
+            genre: Some("Techno, Breakbeat".into()),
+            tags_read: true,
+            discogs_checked: true,
+        }),
+    };
+    written.write(&audio).unwrap();
+
+    let read = loader::sidecar::Sidecar::read(&audio).unwrap();
+    assert_eq!(read.track, written.track);
+}
+
+#[test]
+fn loading_a_tagged_file_stores_its_genre() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("tagged.wav");
+    common::write_tagged_wav(
+        &audio,
+        &stereo(&common::sine(440.0, 2.0, RATE, 0.5)),
+        RATE,
+        "Bicep",
+        "Glue",
+        "Electronic",
+    );
+    loader::analyse_file(&audio, RATE).expect("it analyses");
+    let info = loader::sidecar::Sidecar::read(&audio)
+        .and_then(|s| s.track)
+        .expect("a sidecar with track info");
+    assert_eq!(info.genre.as_deref(), Some("Electronic"));
+    assert!(info.tags_read, "a load has read its tags");
+}
+
+#[test]
+fn a_load_keeps_a_stored_genre_the_file_itself_does_not_carry() {
+    // A Discogs result from an earlier run lives in the sidecar and nowhere else. Loading
+    // the track must not wipe it just because the file's own tags are silent.
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("untagged.wav");
+    write_wav(
+        &audio,
+        &stereo(&common::sine(440.0, 2.0, RATE, 0.5)),
+        2,
+        RATE,
+        Fmt::Float32,
+    );
+    loader::analyse_file(&audio, RATE).expect("it analyses");
+    let tags = loader::Tags {
+        genre: Some("Techno".into()),
+        ..Default::default()
+    };
+    loader::write_tags(&audio, &tags, true).unwrap();
+
+    loader::analyse_file(&audio, RATE).expect("it analyses again");
+    let info = loader::sidecar::Sidecar::read(&audio)
+        .and_then(|s| s.track)
+        .expect("track info");
+    assert_eq!(info.genre.as_deref(), Some("Techno"), "the lookup survived");
+    assert!(
+        info.discogs_checked,
+        "and so did the flag that stops a retry"
+    );
+}

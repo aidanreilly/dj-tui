@@ -159,3 +159,64 @@ fn loading_analyses_tempo_and_key() {
     assert!((grid.bpm - 128.0).abs() < 0.05, "{}", grid.bpm);
     assert_eq!(loaded.key.expect("key").camelot(), "8A");
 }
+
+#[test]
+fn tags_are_read_from_a_file_whose_audio_is_cut_off() {
+    // read_tags probes the container and reads the metadata the probe produced. A file that
+    // stops partway through its audio still has all of its tags, which is what the backfill
+    // pass needs and what a half-copied file in a library looks like.
+    let dir = tempfile::tempdir().unwrap();
+    let whole = dir.path().join("whole.wav");
+    common::write_tagged_wav(
+        &whole,
+        &stereo(&sine(440.0, 1.0, 48_000, 0.5)),
+        48_000,
+        "Bicep",
+        "Glue",
+        "Electronic",
+    );
+    let cut = dir.path().join("cut.wav");
+    let bytes = std::fs::read(&whole).unwrap();
+    std::fs::write(&cut, &bytes[..bytes.len() / 4]).unwrap();
+
+    let tags = loader::read_tags(&cut).expect("tags read from a truncated file");
+    assert_eq!(tags.artist.as_deref(), Some("Bicep"));
+    assert_eq!(tags.title.as_deref(), Some("Glue"));
+    assert_eq!(tags.genre.as_deref(), Some("Electronic"));
+}
+
+#[test]
+fn a_riff_tag_comes_back_without_its_terminator() {
+    // RIFF INFO strings are NUL-terminated and the chunk is word-aligned, so the value
+    // arrives with trailing NULs on it. Stored as-is they reach the browser's track list.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("tagged.wav");
+    common::write_tagged_wav(
+        &path,
+        &stereo(&sine(440.0, 1.0, 48_000, 0.5)),
+        48_000,
+        "Bicep",
+        "Glue",
+        "Electronic",
+    );
+    let tags = loader::read_tags(&path).unwrap();
+    for value in [tags.artist, tags.title, tags.genre] {
+        let value = value.expect("a tag");
+        assert!(!value.contains('\0'), "{value:?} still has its terminator");
+    }
+}
+
+#[test]
+fn a_file_with_no_genre_tag_reports_none() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("untagged.wav");
+    write_wav(
+        &path,
+        &stereo(&sine(440.0, 1.0, 48_000, 0.5)),
+        2,
+        48_000,
+        Fmt::Float32,
+    );
+    let tags = loader::read_tags(&path).expect("tags read");
+    assert_eq!(tags.genre, None, "nothing stored is not an empty genre");
+}

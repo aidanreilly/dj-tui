@@ -7,6 +7,8 @@ mod decode;
 mod resample;
 pub mod sidecar;
 
+pub use decode::Tags;
+
 use engine::{DeckId, Track};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -71,6 +73,35 @@ pub fn load_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadErro
 
 /// The same for a batch run, which reads a file again when the saved analysis has no tempo
 /// in it. Those are the ones a better detector can still rescue.
+/// Read a file's tags without decoding it, for the browser's backfill pass.
+pub fn read_tags(path: &Path) -> Result<Tags, LoadError> {
+    decode::tags(path)
+}
+
+/// Write `tags` into the sidecar beside `path`, leaving the analysis and the cues alone.
+/// Used by the backfill, which never opens the audio.
+pub fn write_tags(path: &Path, tags: &Tags, checked_discogs: bool) -> std::io::Result<()> {
+    let id = sidecar::fingerprint_file(path)?;
+    let existing = sidecar::Sidecar::read(path).filter(|s| s.audio == id);
+    let mut info = existing
+        .as_ref()
+        .and_then(|s| s.track.clone())
+        .unwrap_or_default();
+    info.title = tags.title.clone().or(info.title);
+    info.artist = tags.artist.clone().or(info.artist);
+    // A tag always wins over a lookup, and neither overwrites a genre already stored.
+    info.genre = info.genre.or_else(|| tags.genre.clone());
+    info.tags_read = true;
+    info.discogs_checked = info.discogs_checked || checked_discogs;
+    let file = sidecar::Sidecar {
+        audio: id,
+        analysis: existing.as_ref().and_then(|s| s.analysis.clone()),
+        cues: existing.map(|s| s.cues).unwrap_or_default(),
+        track: Some(info),
+    };
+    file.write(path)
+}
+
 pub fn analyse_file(path: &Path, session_rate: u32) -> Result<LoadedTrack, LoadError> {
     load(path, session_rate, true)
 }
@@ -106,17 +137,25 @@ fn load(path: &Path, session_rate: u32, retry_empty: bool) -> Result<LoadedTrack
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default()
     });
-    let info = sidecar::TrackInfo {
-        title: Some(title.clone()),
-        artist: decoded.artist.clone(),
-        duration_secs: Some(track.frames() as f64 / session_rate as f64),
-    };
-    let mut sidecar_note = None;
     // The browser reads the tags and the length straight out of the sidecar, so they are
     // written even when the analysis came back from it.
     let saved_info = sidecar::Sidecar::read(path)
         .filter(|s| s.audio == id)
         .and_then(|s| s.track);
+    let info = sidecar::TrackInfo {
+        title: Some(title.clone()),
+        artist: decoded.artist.clone(),
+        duration_secs: Some(track.frames() as f64 / session_rate as f64),
+        // The file's own tag wins. A stored genre survives only where the tag is silent,
+        // which is what keeps a Discogs result from an earlier run.
+        genre: decoded
+            .genre
+            .clone()
+            .or_else(|| saved_info.as_ref().and_then(|t| t.genre.clone())),
+        tags_read: true,
+        discogs_checked: saved_info.as_ref().is_some_and(|t| t.discogs_checked),
+    };
+    let mut sidecar_note = None;
     if !from_sidecar || saved_info.as_ref() != Some(&info) {
         let file = sidecar::Sidecar {
             audio: id,

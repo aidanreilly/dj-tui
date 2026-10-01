@@ -124,6 +124,16 @@ pub struct TrackInfo {
     pub title: Option<String>,
     pub artist: Option<String>,
     pub duration_secs: Option<f64>,
+    /// From the file's own tags, or from a matched Discogs release. Never from the audio.
+    #[serde(default)]
+    pub genre: Option<String>,
+    /// The file's tags have been read. Separates "no genre tag" from "never looked", which
+    /// both store `genre: None`.
+    #[serde(default)]
+    pub tags_read: bool,
+    /// A Discogs lookup has been run and is not worth running again.
+    #[serde(default)]
+    pub discogs_checked: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
