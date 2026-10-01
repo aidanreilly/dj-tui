@@ -2,7 +2,9 @@
 
 A two-deck DJ console for the Linux terminal.
 
-Two decks with CDJ-style cueing, hot cues, loops and key lock, a three-band isolator mixer with a master filter, colour waveforms drawn as real pixels where the terminal allows it, and tempo and key detection that runs as a track loads.
+Two decks with CDJ-style cueing, hot cues, loops and key lock. A three-band isolator mixer
+with a master filter. Tempo and key detection that runs as a track loads, and colour waveforms
+drawn as real pixels where the terminal allows it.
 
 Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
@@ -23,8 +25,8 @@ cd dj-tui-*-x86_64-linux
 ```
 
 It needs glibc 2.35 or newer and `libasound2`, which any desktop that plays audio already has.
-JACK is optional and loaded at runtime, so the same binary works with or without a server
-running. Each release carries a `.sha256` beside it:
+JACK is loaded at runtime rather than linked, so the same binary serves whether or not a JACK
+server is installed. Every release carries a `.sha256` beside it:
 
 ```sh
 sha256sum -c dj-tui-*-x86_64-linux.tar.gz.sha256
@@ -203,23 +205,28 @@ folders = ["~/Music", "/mnt/crates"]
 
 `b` opens the file browser full screen, `/` opens it beside the decks.
 
-It narrows two ways. `Alt+b` cycles a tempo window around whatever deck is playing, counting
-half and double time, so a 64 BPM track still shows against 128. `Alt+k` keeps only the keys
-that would mix with it. `Alt+g` cycles the genres your library holds. Whatever is on shows as
-a chip in the panel title.
+Three keys narrow the list.
 
-For anything more exact, type it: `bpm:124`, `bpm:124-128`, `key:9a` and `genre:house` filter
-by that field, and anything else is a fuzzy search over artist and title. They combine, so
-`bpm:124-128 bicep` is both.
+| Key | Keeps |
+| --- | --- |
+| `Alt+b` | Tracks inside a tempo window around whatever deck is playing. Half and double time count, so a 64 BPM track still shows against 128. Press again to widen it, again to switch it off. |
+| `Alt+k` | Keys that would mix with the playing deck's. |
+| `Alt+g` | One genre, walking whatever your library holds. |
 
-`Alt+a` works through the list: it reads tags first, then looks up what the tags left blank,
-then analyses. Press it again to stop.
+Each one you switch on draws a chip in the panel title saying what it is measuring against.
+
+Typing narrows it too. `bpm:124`, `bpm:124-128`, `key:9a` and `genre:house` each filter by one
+field, and anything else searches artist and title. Mix them freely. `bpm:124-128 bicep` wants
+both.
+
+`Alt+a` reads tags, asks Discogs about whatever the tags left blank, and analyses what has no
+tempo yet. Press it again to stop.
 
 ### Genre
 
-Genre comes from the file's own tags. For the files whose tags carry none, dj-tui can ask
-Discogs instead, matched on artist and title. It is off until you turn it on, and nothing is
-sent unless you press `Alt+a` or `Alt+d`:
+Genre comes from the file's own tags. Where a file carries none, dj-tui can ask Discogs
+instead, matching on artist and title. This is off until you switch it on, and nothing leaves
+your machine unless you press `Alt+a` or `Alt+d`.
 
 ```toml
 [library]
@@ -245,8 +252,8 @@ Three colour modes, cycle with `w`:
 
 ## Track data
 
-Analysis, the waveform and your cues are saved beside the audio as `<file name>.dj-tui.json`,
-so they load instantly the second time and travel with the music if you move your library.
+Analysis, the waveform and your cues are saved beside the audio as `<file name>.dj-tui.json`.
+They load instantly the second time, and they travel with the music if you move your library.
 Editing or replacing the audio file invalidates them, and the track is analysed again.
 
 ## realtime audio
