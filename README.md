@@ -11,6 +11,27 @@ Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
 ## Install
 
+### A built binary
+
+Every tag publishes an x86_64 Linux tarball on the
+[releases page](https://github.com/aidanreilly/dj-tui/releases):
+
+```sh
+tar xzf dj-tui-*-x86_64-linux.tar.gz
+cd dj-tui-*-x86_64-linux
+./dj-tui --demo
+```
+
+It needs glibc 2.35 or newer and `libasound2`, which any desktop that plays audio already has.
+JACK is optional and loaded at runtime, so the same binary works with or without a server
+running. Each release carries a `.sha256` beside it:
+
+```sh
+sha256sum -c dj-tui-*-x86_64-linux.tar.gz.sha256
+```
+
+### From source
+
 Fedora:
 
 ```sh
@@ -22,6 +43,9 @@ Debian and Ubuntu:
 ```sh
 sudo apt install cargo libjack-jackd2-dev libasound2-dev pipewire-jack
 ```
+
+Then `cargo build --release`, or run it straight from the checkout as below. Building needs
+Rust 1.90 or newer.
 
 ## Terminal requirements
 
