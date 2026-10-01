@@ -7,6 +7,7 @@ use tui::{render_screen, BrowserRow, BrowserView, DeckView, MixerView, ScreenVie
 fn row(name: &str, bpm: Option<f64>, key: Option<&str>, secs: Option<f64>) -> BrowserRow {
     BrowserRow {
         name: name.into(),
+        genre: None,
         bpm,
         key: key.map(|k| k.to_string()),
         duration_secs: secs,
@@ -86,7 +87,12 @@ fn listing() -> BrowserView {
         active: false,
         fullscreen: false,
         status: "3 tracks".into(),
+        filters: Vec::new(),
     }
+}
+
+fn panel_text(view: &BrowserView, w: u16, h: u16) -> String {
+    text(&draw(&screen(view.clone()), w, h))
 }
 
 #[test]
@@ -317,5 +323,55 @@ fn the_help_list_matches_the_keys_that_exist() {
     }
     for present in ["x / X", "t / y / u", "T / Y / U", "{ / }", "Alt+arrows"] {
         assert!(shown.contains(present), "missing entry: {present}");
+    }
+}
+
+#[test]
+fn active_filters_show_as_chips_in_the_title() {
+    let mut view = listing();
+    view.filters = vec!["\u{25b8}bpm \u{b1}6%".into(), "\u{25b8}key".into()];
+    let t = panel_text(&view, 120, 44);
+    assert!(t.contains("\u{25b8}bpm \u{b1}6%"), "{t}");
+    assert!(t.contains("\u{25b8}key"), "{t}");
+}
+
+#[test]
+fn chips_are_dropped_from_the_right_when_the_title_will_not_fit() {
+    // The panel's name matters more than the third chip, and the count in the status line
+    // says how much is being hidden either way.
+    let mut view = listing();
+    view.filters = vec![
+        "\u{25b8}bpm \u{b1}6%".into(),
+        "\u{25b8}key".into(),
+        "\u{25b8}genre Drum n Bass".into(),
+    ];
+    let t = panel_text(&view, 40, 44);
+    assert!(t.contains("BROWSER"), "the panel keeps its name: {t}");
+    assert!(
+        !t.contains("Drum n Bass"),
+        "the last chip went rather than the name: {t}"
+    );
+}
+
+#[test]
+fn the_genre_column_appears_when_there_is_width_for_it() {
+    let mut view = listing();
+    view.rows[0].genre = Some("Techno".into());
+    let wide = panel_text(&view, 120, 44);
+    assert!(wide.contains("Techno"), "{wide}");
+    let narrow = panel_text(&view, 44, 44);
+    assert!(
+        !narrow.contains("Techno"),
+        "a narrow panel keeps the name readable instead: {narrow}"
+    );
+}
+
+#[test]
+fn the_hint_row_names_the_filter_keys() {
+    let mut view = listing();
+    view.active = true;
+    let t = panel_text(&view, 160, 44);
+    for hint in ["Alt+b", "Alt+k", "Alt+g"] {
+        assert!(t.contains(hint), "missing {hint}: {t}");
     }
 }

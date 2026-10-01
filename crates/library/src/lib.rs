@@ -174,6 +174,7 @@ pub enum Column {
     Name,
     Bpm,
     Key,
+    Genre,
     Length,
 }
 
@@ -182,7 +183,8 @@ impl Column {
         match self {
             Column::Name => Column::Bpm,
             Column::Bpm => Column::Key,
-            Column::Key => Column::Length,
+            Column::Key => Column::Genre,
+            Column::Genre => Column::Length,
             Column::Length => Column::Name,
         }
     }
@@ -192,6 +194,7 @@ impl Column {
             Column::Name => "name",
             Column::Bpm => "BPM",
             Column::Key => "key",
+            Column::Genre => "genre",
             Column::Length => "length",
         }
     }
@@ -205,6 +208,7 @@ pub fn sort(list: &mut [Entry], column: Column, ascending: bool) {
             Column::Name => true,
             Column::Bpm => e.bpm.is_some(),
             Column::Key => e.key.is_some(),
+            Column::Genre => e.genre.is_some(),
             Column::Length => e.duration_secs.is_some(),
         };
         match (known(a), known(b)) {
@@ -223,6 +227,11 @@ pub fn sort(list: &mut [Entry], column: Column, ascending: bool) {
                 .duration_secs
                 .unwrap_or_default()
                 .total_cmp(&b.duration_secs.unwrap_or_default()),
+            Column::Genre => a
+                .folded_genre
+                .as_deref()
+                .unwrap_or_default()
+                .cmp(b.folded_genre.as_deref().unwrap_or_default()),
             // Camelot order, so neighbours on the wheel sit together.
             Column::Key => camelot_order(a.key).cmp(&camelot_order(b.key)),
         };

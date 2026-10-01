@@ -12,6 +12,8 @@ use ratatui::{
 #[derive(Debug, Clone, Default)]
 pub struct BrowserRow {
     pub name: String,
+    /// From the file's tags or a matched release, shown when the panel has width for it.
+    pub genre: Option<String>,
     pub bpm: Option<f64>,
     /// Camelot code, e.g. "8A".
     pub key: Option<String>,
@@ -37,14 +39,20 @@ pub struct BrowserView {
     pub fullscreen: bool,
     /// What the list holds, or what it is busy doing.
     pub status: String,
+    /// Filters that are on, already written out for the title.
+    pub filters: Vec<String>,
 }
 
 /// What browser mode offers, on the panel's own bottom row. Six bindings document themselves
 /// better here than in an overlay nobody opens.
-const HINT: &str =
-    "Esc back  Enter load  Tab deck  Ctrl+u clear  Alt+s sort  Alt+a analyse  Alt+f size";
+const HINT: &str = "Esc back  Enter load  Tab deck  Ctrl+u clear  Alt+s sort  Alt+a analyse  \
+                    Alt+f size  Alt+b bpm  Alt+k key  Alt+g genre";
 
 /// Width of each fixed column, and the gap between them.
+const GENRE_WIDTH: usize = 12;
+/// The name column has to stay readable, so the genre draws only when this much is left for
+/// it once every other column has taken its share.
+const NAME_FLOOR_WITH_GENRE: usize = 24;
 const BPM_WIDTH: usize = 6;
 const KEY_WIDTH: usize = 3;
 const LEN_WIDTH: usize = 6;
@@ -69,8 +77,18 @@ impl Widget for BrowserPanel<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let v = self.view;
         let arrow = if v.ascending { '▲' } else { '▼' };
-        let mut block =
-            Block::bordered().title(format!(" BROWSER  {}  by {} {arrow} ", v.status, v.sort));
+        // Chips go after the panel's name and drop from the right when they will not fit:
+        // the name matters more than the third chip, and the status line carries the count
+        // either way.
+        let mut title = format!(" BROWSER  {}  by {} {arrow} ", v.status, v.sort);
+        for chip in &v.filters {
+            let grown = format!("{title}{chip}  ");
+            if grown.chars().count() + 2 > area.width as usize {
+                break;
+            }
+            title = grown;
+        }
+        let mut block = Block::bordered().title(title);
         // A lit border is how the panel says the keyboard is its own.
         if v.active {
             block = block.border_style(Style::new().fg(theme::colour(theme::BROWSER_BORDER)));
@@ -125,8 +143,10 @@ impl Widget for BrowserPanel<'_> {
         let first = first.min(v.rows.len().saturating_sub(list_height));
 
         let width = inner.width as usize;
-        let columns = BPM_WIDTH + KEY_WIDTH + LEN_WIDTH + GAP * 3;
-        let name_width = width.saturating_sub(columns).max(8);
+        let fixed = BPM_WIDTH + KEY_WIDTH + LEN_WIDTH + GAP * 3;
+        let with_genre = width.saturating_sub(fixed + GENRE_WIDTH + GAP) >= NAME_FLOOR_WITH_GENRE;
+        let genre_width = if with_genre { GENRE_WIDTH + GAP } else { 0 };
+        let name_width = width.saturating_sub(fixed + genre_width).max(8);
         for (line, row) in v.rows[first..].iter().take(list_height).enumerate() {
             let y = inner.y + line as u16;
             let index = first + line;
@@ -143,8 +163,21 @@ impl Widget for BrowserPanel<'_> {
                 .unwrap_or_else(|| "-".into());
             let length = row.duration_secs.map(mmss).unwrap_or_else(|| "-".into());
             let name: String = row.name.chars().take(name_width).collect();
+            let genre = match with_genre {
+                true => {
+                    let text: String = row
+                        .genre
+                        .as_deref()
+                        .unwrap_or("-")
+                        .chars()
+                        .take(GENRE_WIDTH)
+                        .collect();
+                    format!("{text:<GENRE_WIDTH$}{:gap$}", "", gap = GAP)
+                }
+                false => String::new(),
+            };
             let line_text = format!(
-                "{name:<name_width$}{:gap$}{bpm:>BPM_WIDTH$}{:gap$}{:KEY_WIDTH$}{:gap$}{length:>LEN_WIDTH$}",
+                "{name:<name_width$}{:gap$}{genre}{bpm:>BPM_WIDTH$}{:gap$}{:KEY_WIDTH$}{:gap$}{length:>LEN_WIDTH$}",
                 "",
                 "",
                 "",
@@ -154,7 +187,7 @@ impl Widget for BrowserPanel<'_> {
             buf.set_stringn(inner.x, y, &line_text, width, style);
 
             // The key goes on afterwards, so a compatible one can carry its own colour.
-            let key_x = inner.x + (name_width + GAP + BPM_WIDTH + GAP) as u16;
+            let key_x = inner.x + (name_width + GAP + genre_width + BPM_WIDTH + GAP) as u16;
             if let Some(key) = &row.key {
                 let mut key_style = style;
                 if row.compatible {

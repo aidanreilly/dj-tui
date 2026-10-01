@@ -329,6 +329,7 @@ impl Browser {
                 let entry = &self.entries[i];
                 BrowserRow {
                     name: entry.display().to_string(),
+                    genre: entry.genre().map(str::to_string),
                     bpm: entry.bpm(),
                     key: entry.key().map(|k| k.camelot()),
                     duration_secs: entry.duration_secs(),
@@ -350,6 +351,7 @@ impl Browser {
             active,
             fullscreen: self.fullscreen,
             status: self.status(),
+            filters: self.filter_chips(),
         }
     }
 
