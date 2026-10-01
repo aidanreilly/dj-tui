@@ -453,7 +453,9 @@ fn deck_title_row(kills: [bool; 3]) -> (String, Buffer) {
     let buf = term.backend().buffer().clone();
     let (w, h) = (buf.area.width, buf.area.height);
     let row = (0..h)
-        .find(|&y| (0..w).any(|x| buf[(x, y)].symbol() == "\u{2503}" || buf[(x, y)].symbol() == "\u{250f}"))
+        .find(|&y| {
+            (0..w).any(|x| buf[(x, y)].symbol() == "\u{2503}" || buf[(x, y)].symbol() == "\u{250f}")
+        })
         .expect("a deck panel border row");
     let text: String = (0..w).map(|x| buf[(x, row)].symbol().to_string()).collect();
     (text, buf)
@@ -469,10 +471,12 @@ fn the_deck_title_names_the_bands() {
 fn a_killed_band_is_dimmed_in_the_deck_title() {
     let (row, buf) = deck_title_row([false, true, false]);
     let y = (0..buf.area.height)
-        .find(|&y| (0..buf.area.width)
-            .map(|x| buf[(x, y)].symbol().to_string())
-            .collect::<String>()
-            == row)
+        .find(|&y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+                == row
+        })
         .unwrap();
     // `row` concatenates one glyph per column, but a glyph like the thick border corners
     // is multiple bytes, so a substring's byte offset is not its column: count chars instead.
@@ -553,6 +557,12 @@ fn the_focused_and_unfocused_decks_agree_on_whether_the_markers_fit() {
     // them: both panels are always the same width in the real layout, so that disagreement
     // was the bug (finding 1). Fixed, both read the same width the same way and agree.
     let (a_row, b_row) = deck_rows_with_bpm_and_key(41);
-    assert!(a_row.contains("[hi]"), "deck A dropped the markers: {a_row}");
-    assert!(b_row.contains("[hi]"), "deck B dropped the markers: {b_row}");
+    assert!(
+        a_row.contains("[hi]"),
+        "deck A dropped the markers: {a_row}"
+    );
+    assert!(
+        b_row.contains("[hi]"),
+        "deck B dropped the markers: {b_row}"
+    );
 }

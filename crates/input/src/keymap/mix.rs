@@ -52,7 +52,11 @@ impl Keymap {
             if alt {
                 return None;
             }
-            let deck = if c.is_uppercase() { DeckId::B } else { DeckId::A };
+            let deck = if c.is_uppercase() {
+                DeckId::B
+            } else {
+                DeckId::A
+            };
             return Some(EqKill(deck, band));
         }
 

@@ -388,10 +388,7 @@ mod action_names {
             parse_action("crossfader centre"),
             Some(Action::CrossfaderCentre)
         );
-        assert_eq!(
-            parse_action("filter centre"),
-            Some(Action::FilterCentre)
-        );
+        assert_eq!(parse_action("filter centre"), Some(Action::FilterCentre));
         assert_eq!(
             parse_action("fader b down end"),
             Some(Action::FaderEnd(B, Dir::Down))
