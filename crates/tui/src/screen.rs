@@ -74,6 +74,25 @@ const HELP: &[(&str, &str)] = &[
     ("b", "browser, full screen; Esc comes back"),
     ("/", "browser beside the decks, with the filter cleared"),
     ("Enter", "load the selection onto the focused deck"),
+    (
+        "Alt+b",
+        "in the browser: tempo window around the playing deck",
+    ),
+    ("Alt+k", "in the browser: only keys that would mix"),
+    (
+        "Alt+g",
+        "in the browser: cycle the genres your library holds",
+    ),
+    (
+        "Alt+d",
+        "in the browser: ask Discogs the selected track's genre",
+    ),
+    ("Alt+a", "in the browser: read tags, look up, then analyse"),
+    (
+        "Alt+s / Alt+f",
+        "in the browser: sort column, and panel size",
+    ),
+    ("bpm: key: genre:", "typed filters, e.g. bpm:124-128 key:9a"),
     ("Ctrl+D", "audio device"),
     ("?", "this list"),
     ("Ctrl+Q", "quit"),

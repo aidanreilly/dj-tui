@@ -159,7 +159,7 @@ with the track and comes back the next time you load it.
 | `?` | Key list |
 | `Ctrl+Q` | Quit |
 
-In browser `Alt+s` and `Alt+S` sort, `Alt+a` analyses, `Alt+f` swaps between full screen and the panel, `Ctrl+u` clears the filter.
+In browser `Alt+s` and `Alt+S` sort, `Alt+a` reads and analyses, `Alt+f` swaps between full screen and the panel, `Ctrl+u` clears the filter.
 
 ## The browser
 
@@ -170,7 +170,39 @@ Point dj-tui at your music:
 folders = ["~/Music", "/mnt/crates"]
 ```
 
-`b` opens the file browser.
+`b` opens the file browser full screen, `/` opens it beside the decks.
+
+It narrows two ways. `Alt+b` cycles a tempo window around whatever deck is playing, counting
+half and double time, so a 64 BPM track still shows against 128. `Alt+k` keeps only the keys
+that would mix with it. `Alt+g` cycles the genres your library holds. Whatever is on shows as
+a chip in the panel title.
+
+For anything more exact, type it: `bpm:124`, `bpm:124-128`, `key:9a` and `genre:house` filter
+by that field, and anything else is a fuzzy search over artist and title. They combine, so
+`bpm:124-128 bicep` is both.
+
+`Alt+a` works through the list: it reads tags first, then looks up what the tags left blank,
+then analyses. Press it again to stop.
+
+### Genre
+
+Genre comes from the file's own tags. For the files whose tags carry none, dj-tui can ask
+Discogs instead, matched on artist and title. It is off until you turn it on, and nothing is
+sent unless you press `Alt+a` or `Alt+d`:
+
+```toml
+[library]
+discogs = true
+```
+
+```sh
+export DJ_TUI_DISCOGS_TOKEN=...   # discogs.com, Settings then Developers
+```
+
+The token is read from the environment rather than the config file, so a config you copy
+around carries no credential. Turning this on sends the artist and title of those files to
+discogs.com. Answers are kept in `$XDG_STATE_HOME/dj-tui/discogs.json`, so nothing is asked
+twice.
 
 ## Waveforms
 

@@ -324,6 +324,10 @@ fn the_help_list_matches_the_keys_that_exist() {
     for present in ["x / X", "t / y / u", "T / Y / U", "{ / }", "Alt+arrows"] {
         assert!(shown.contains(present), "missing entry: {present}");
     }
+    // The browser's own keys. They were reachable and written down nowhere in the app.
+    for present in ["Alt+b", "Alt+k", "Alt+g", "Alt+d", "bpm:"] {
+        assert!(shown.contains(present), "missing entry: {present}\n{shown}");
+    }
 }
 
 #[test]
