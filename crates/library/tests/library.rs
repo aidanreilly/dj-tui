@@ -95,6 +95,7 @@ fn entries(specs: &[Spec]) -> Vec<Entry> {
                 *bpm,
                 key.and_then(Key::from_camelot),
                 *secs,
+                None,
             )
         })
         .collect()
@@ -222,4 +223,49 @@ fn a_playlist_can_be_written_back_out() {
     assert!(text.starts_with("#EXTM3U"), "{text}");
     assert!(text.contains("one.wav"), "{text}");
     assert_eq!(Playlist::read(&out).unwrap().entries().len(), 1);
+}
+
+#[test]
+fn an_entry_carries_the_genre_from_its_sidecar() {
+    let entry = Entry::for_test(
+        Path::new("/music/a.flac"),
+        "Objekt - Cactus".into(),
+        Some(130.0),
+        None,
+        Some(400.0),
+        Some("Techno, Breakbeat".into()),
+    );
+    assert_eq!(entry.genre(), Some("Techno, Breakbeat"));
+}
+
+#[test]
+fn an_entry_with_no_sidecar_wants_both_passes() {
+    // Nothing has been read, so the tag pass and the lookup both have work to do.
+    let entry = Entry::for_test(
+        Path::new("/music/b.flac"),
+        "b".into(),
+        None,
+        None,
+        None,
+        None,
+    );
+    assert!(entry.needs_tags(), "its tags have never been read");
+    assert!(entry.needs_lookup(), "no lookup has run over it");
+}
+
+#[test]
+fn an_entry_that_already_has_a_genre_needs_no_lookup() {
+    let entry = Entry::for_test(
+        Path::new("/music/c.flac"),
+        "c".into(),
+        None,
+        None,
+        None,
+        Some("House".into()),
+    );
+    assert!(!entry.needs_lookup(), "there is nothing left to find out");
+    assert!(
+        !entry.needs_tags(),
+        "a genre can only have come from a read"
+    );
 }

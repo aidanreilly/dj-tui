@@ -20,6 +20,11 @@ pub struct Entry {
     key: Option<Key>,
     duration_secs: Option<f64>,
     analysed: bool,
+    genre: Option<String>,
+    /// Lowercased once, so a genre filter does not fold the string on every keystroke.
+    folded_genre: Option<String>,
+    tags_read: bool,
+    discogs_checked: bool,
 }
 
 impl Entry {
@@ -42,6 +47,10 @@ impl Entry {
         };
         let folded_display = display.to_lowercase().chars().collect();
         let bpm = analysis.and_then(|a| a.grid.map(|g| g.bpm));
+        let genre = info.as_ref().and_then(|i| i.genre.clone());
+        let folded_genre = genre.as_ref().map(|g| g.to_lowercase());
+        let tags_read = info.as_ref().is_some_and(|i| i.tags_read);
+        let discogs_checked = info.as_ref().is_some_and(|i| i.discogs_checked);
         Entry {
             path: path.to_path_buf(),
             display,
@@ -52,6 +61,10 @@ impl Entry {
             // A sidecar with no tempo in it is worth another run: the file may be one the
             // detector could not read the first time round.
             analysed: bpm.is_some(),
+            genre,
+            folded_genre,
+            tags_read,
+            discogs_checked,
         }
     }
 
@@ -62,8 +75,10 @@ impl Entry {
         bpm: Option<f64>,
         key: Option<Key>,
         duration_secs: Option<f64>,
+        genre: Option<String>,
     ) -> Entry {
         let folded_display = display.to_lowercase().chars().collect();
+        let folded_genre = genre.as_ref().map(|g| g.to_lowercase());
         Entry {
             path: path.to_path_buf(),
             display,
@@ -72,6 +87,11 @@ impl Entry {
             key,
             duration_secs,
             analysed: bpm.is_some(),
+            // A genre can only have come from a read, so one implies the other.
+            tags_read: genre.is_some(),
+            discogs_checked: false,
+            genre,
+            folded_genre,
         }
     }
 
@@ -98,6 +118,27 @@ impl Entry {
     /// True once the track has been through analysis and has a sidecar to show for it.
     pub fn analysed(&self) -> bool {
         self.analysed
+    }
+
+    /// From a tag or a matched release, never from the audio. `None` means nothing is known.
+    pub fn genre(&self) -> Option<&str> {
+        self.genre.as_deref()
+    }
+
+    // Its only caller is the query's genre token, which lands in the next commit.
+    #[allow(dead_code)]
+    pub(crate) fn folded_genre(&self) -> Option<&str> {
+        self.folded_genre.as_deref()
+    }
+
+    /// Its tags have never been read, so the backfill's tag pass has work to do.
+    pub fn needs_tags(&self) -> bool {
+        !self.tags_read
+    }
+
+    /// Its tags carried no genre and no lookup has been run, so Discogs is worth asking.
+    pub fn needs_lookup(&self) -> bool {
+        self.genre.is_none() && !self.discogs_checked
     }
 }
 
