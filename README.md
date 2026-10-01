@@ -39,7 +39,14 @@ cargo run -- --midi-learn                       # print what a controller sends
 
 ## Controls
 
-![The dj-tui key map on a UK keyboard](images/keyboard.svg)
+The keyboard has two layers. Mix mode is where you start:
+
+![The dj-tui mix mode key map on a UK keyboard](images/keyboard.svg)
+
+Browser mode, on `b` or `/`, hands the whole keyboard to the track list: letters type into the
+filter, so every command moves onto `Alt`. `Esc` gives it back in one press.
+
+![The dj-tui browser mode key map on a UK keyboard](images/keyboard-browser.svg)
 
 One row per key. `Shift +`, `Alt +` or `Ctrl +` change key travel.
 
