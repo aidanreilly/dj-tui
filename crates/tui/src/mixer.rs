@@ -80,6 +80,10 @@ pub const TICK: char = '╋';
 pub const CAP: char = '╸';
 /// Where a running fade is heading.
 pub const TARGET: char = '╎';
+/// A meter segment that is lit, and one that is not. Squares, because a meter reads as a
+/// row of equal cells filling up rather than as a bar growing out of anything.
+pub const LIT_PIP: char = '■';
+pub const UNLIT_PIP: char = '□';
 
 /// Width of one channel's cell, and of a meter.
 pub const BAR: usize = 7;
@@ -209,9 +213,15 @@ fn meter_spans(level: f32) -> Vec<Span<'static>> {
                 _ => theme::colour(theme::METER_OK),
             };
             if i < lit {
-                Span::styled("▮", Style::new().fg(color))
+                Span::styled(LIT_PIP.to_string(), Style::new().fg(color))
             } else {
-                Span::styled("▯", Style::new().add_modifier(Modifier::DIM))
+                // Coloured rather than dimmed: a bare DIM leaves the unlit squares on the
+                // terminal's own foreground, which fights the lit ones instead of sitting
+                // behind them.
+                Span::styled(
+                    UNLIT_PIP.to_string(),
+                    Style::new().fg(theme::colour(theme::BASE01)),
+                )
             }
         })
         .collect()

@@ -62,9 +62,12 @@ the left and end in a cap. The EQ's two directions are scaled separately, becaus
 takes 26 dB of cut against 6 dB of boost and one scale across the pair would put 0 dB off
 centre and draw a flat EQ as a cut.
 
-Meters keep their `▮`/`▯` pips and their colour. A level is a different reading from a control
-position, and it is the one place the blockiness does work. The rail and the centre tick are
-drawn in `BASE01` so an untouched row recedes and a moved control is what the eye lands on.
+Meters keep their own shape and their colour. A level is a different reading from a control
+position, and it is the one place the blockiness does work: `LIT_PIP` and `UNLIT_PIP` are
+squares, because a meter fills as a row of equal cells rather than growing out of anything.
+The unlit square is `BASE01` rather than a bare `DIM`, which would leave it on the terminal's
+own foreground fighting the lit ones. The rail and the centre tick are `BASE01` too, so an
+untouched row recedes and a moved control is what the eye lands on.
 
 The crossfader row is the widest thing in the panel and fits its 24 columns exactly.
 

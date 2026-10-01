@@ -274,12 +274,13 @@ fn killed_bands_say_kill() {
 
 #[test]
 fn meters_fill_with_level() {
+    // Lit and unlit are both squares, so counting one of them counts the level.
     let lit = |level: f32| {
         let mut m = MixerView::default();
         m.strips[0].meter = level;
         let text = mixer_text(m, 120, 44);
         let row = text.lines().find(|l| l.contains("PK")).unwrap().to_string();
-        row.matches('▮').count()
+        row.matches('■').count()
     };
     assert_eq!(lit(0.0), 0);
     assert!(
