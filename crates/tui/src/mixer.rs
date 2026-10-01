@@ -70,8 +70,10 @@ pub struct StripView {
 
 // --- The glyph family every control is drawn from ---
 
-/// Unlit track.
-pub const RAIL: char = '┄';
+/// Unlit track: solid and light, so a control row reads as one continuous bar with a heavier
+/// stretch lit on it. A dotted rail made the trim and EQ rows look like a different kind of
+/// control from a fader, which they are not.
+pub const RAIL: char = '─';
 /// Lit run.
 pub const RUN: char = '━';
 /// Neutral point of a control that has one.
@@ -88,8 +90,6 @@ pub const UNLIT_PIP: char = '□';
 /// Width of one channel's cell, and of a meter.
 pub const BAR: usize = 7;
 const XFADE_WIDTH: usize = 13;
-/// Width of a fader in the collapsed mixer, which has no room for the labelled rows.
-const FADER_WIDTH: usize = 8;
 /// A master control reaches across both channel columns and the space between them, so it
 /// reads as one control over the whole mix rather than sitting under either deck.
 const MASTER_WIDTH: usize = 2 * BAR + 1;
@@ -175,6 +175,16 @@ fn with_target(bar: String, cell: Option<usize>) -> String {
 fn fading_fill(v: f32, fade_target: Option<f32>, width: usize) -> String {
     let cell = fade_target.map(|t| (t.clamp(0.0, 1.0) * (width - 1) as f32).round() as usize);
     with_target(fill_bar(v, width), cell)
+}
+
+/// A control whose value is a place rather than an amount: an unbroken rail with one marker
+/// on it, which is how the crossfader has always read.
+pub fn position_bar(v: f32, width: usize) -> String {
+    let at = (v.clamp(0.0, 1.0) * (width - 1) as f32).round() as usize;
+    // The heavy rail the crossfader uses, since this is the same kind of reading.
+    (0..width)
+        .map(|i| if i == at { TICK } else { RUN })
+        .collect()
 }
 
 /// Which cell of a bar of `width` a -1..1 position lands in.
@@ -356,21 +366,23 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
             },
         ]
     } else {
-        let mut pk = vec![Span::raw("PK ")];
+        // The label column is the width the tall mixer uses, so a channel's fader and its
+        // meter start in the same place and read as the one channel.
+        let mut pk = vec![Span::raw(format!("{:<5}", "PK"))];
         pk.extend(meter_spans(a.meter));
         pk.push(Span::raw(" "));
         pk.extend(meter_spans(b.meter));
-        vec![
-            Line::from(format!(
-                "VOL {} {}  CUE {}{}  A {} B",
-                fill_bar(m.faders[0], FADER_WIDTH),
-                fill_bar(m.faders[1], FADER_WIDTH),
-                dot(m.headphone_cue[0]),
-                dot(m.headphone_cue[1]),
-                crossfader_bar(m.crossfader, m.crossfader_fade_target)
-            )),
-            Line::from(pk),
-        ]
+        let mut vol = vec![Span::raw(format!("{:<5}", "VOL"))];
+        vol.extend(rail_spans(&position_bar(m.faders[0], BAR), Style::new()));
+        vol.push(Span::raw(" "));
+        vol.extend(rail_spans(&position_bar(m.faders[1], BAR), Style::new()));
+        vol.push(Span::raw(format!(
+            "  CUE {}{}  A {} B",
+            dot(m.headphone_cue[0]),
+            dot(m.headphone_cue[1]),
+            crossfader_bar(m.crossfader, m.crossfader_fade_target)
+        )));
+        vec![Line::from(vol), Line::from(pk)]
     };
     f.render_widget(Paragraph::new(lines).block(block), area);
 }

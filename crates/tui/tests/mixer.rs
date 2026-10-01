@@ -5,7 +5,7 @@
 //! give: a quantity grows from the point it is measured against, which is the centre for a
 //! control with a neutral position and the left end for one that runs from nothing.
 
-use tui::mixer::{centre_bar, eq_bar, fill_bar, CAP, RAIL, RUN, TICK};
+use tui::mixer::{centre_bar, eq_bar, fill_bar, position_bar, CAP, RAIL, RUN, TICK};
 
 const W: usize = 7;
 
@@ -94,5 +94,41 @@ fn a_fader_fills_from_the_left_and_ends_in_a_cap() {
 fn values_outside_the_range_clamp_rather_than_overflow_the_cell() {
     for bar in [centre_bar(4.0, W), centre_bar(-4.0, W), fill_bar(9.0, W)] {
         assert_eq!(bar.chars().count(), W, "{bar}");
+    }
+}
+
+#[test]
+fn the_rail_is_solid_and_lighter_than_the_run() {
+    // A control row reads as one continuous bar with a heavier stretch lit on it. A dotted
+    // rail made the trim and EQ rows look like a different kind of control from a fader.
+    // The two cannot be the same character either: that would leave every value drawing the
+    // same string, with nothing but colour to say where the control sits.
+    assert_ne!(RAIL, RUN, "lit and unlit have to be tellable apart");
+    for c in [RAIL, RUN] {
+        assert!(
+            !"┄┈╌╍".contains(c),
+            "{c} is dashed, which is what this moved away from"
+        );
+    }
+}
+
+#[test]
+fn a_position_bar_puts_one_marker_on_an_unbroken_rail() {
+    // For a control whose value is a place rather than an amount, the way the crossfader
+    // already reads: one marker on the same heavy rail, and nothing filled behind it.
+    let bar = position_bar(0.5, W);
+    assert_eq!(bar.chars().count(), W);
+    assert_eq!(bar.chars().filter(|&c| c == TICK).count(), 1, "{bar}");
+    assert_eq!(bar.chars().nth(W / 2), Some(TICK), "{bar}");
+    assert!(!bar.contains(CAP), "nothing is filled: {bar}");
+    assert!(!bar.contains(RAIL), "it is the heavy rail: {bar}");
+}
+
+#[test]
+fn a_position_bar_reaches_both_ends() {
+    assert_eq!(position_bar(0.0, W).chars().next(), Some(TICK));
+    assert_eq!(position_bar(1.0, W).chars().last(), Some(TICK));
+    for v in [-1.0, 2.0] {
+        assert_eq!(position_bar(v, W).chars().count(), W, "{v} clamps");
     }
 }

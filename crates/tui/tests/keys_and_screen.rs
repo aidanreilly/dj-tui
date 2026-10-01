@@ -247,7 +247,7 @@ fn the_mixer_shows_the_headphone_mix() {
         .find(|l| l.contains("MIX ") && !l.contains("MIXER"))
         .unwrap();
     assert!(
-        !row.contains(tui::mixer::RUN),
+        !row.contains(tui::mixer::CAP),
         "all the way to the cue bus: {row}"
     );
 }
@@ -262,6 +262,36 @@ fn the_fade_length_fits_inside_the_mixer_panel() {
         .find(|l| l.contains("\u{2502}A \u{2501}"))
         .expect("the crossfader row");
     assert!(row.contains("fade 8"), "the beat count was cut off: {row}");
+}
+
+#[test]
+fn the_collapsed_mixer_lines_its_faders_up_with_its_meters() {
+    // Under twelve rows the mixer folds into a bar under the decks. The fader and the meter
+    // for a channel are the same channel, so they start in the same column.
+    let text = mixer_text(MixerView::default(), 100, 44);
+    let vol = text.lines().find(|l| l.contains("VOL")).expect("a VOL row");
+    let pk = text.lines().find(|l| l.contains("PK")).expect("a PK row");
+    // The column each bar starts in, counted across the whole row, since the labels are
+    // different lengths and it is the bars that have to line up.
+    let column = |row: &str, bar: &[char]| {
+        row.chars()
+            .position(|c| bar.contains(&c))
+            .expect("a bar on the row")
+    };
+    assert_eq!(
+        column(vol, &[tui::mixer::RUN, tui::mixer::TICK]),
+        column(pk, &[tui::mixer::LIT_PIP, tui::mixer::UNLIT_PIP]),
+        "the fader and the meter start in different columns\n{vol}\n{pk}"
+    );
+}
+
+#[test]
+fn the_collapsed_faders_are_a_marker_on_a_rail() {
+    // A fader's value is where it sits, which is what the crossfader under it already says.
+    let text = mixer_text(MixerView::default(), 100, 44);
+    let vol = text.lines().find(|l| l.contains("VOL")).expect("a VOL row");
+    assert!(vol.contains(tui::mixer::TICK), "no marker: {vol}");
+    assert!(!vol.contains(tui::mixer::CAP), "nothing is filled: {vol}");
 }
 
 #[test]

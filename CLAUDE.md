@@ -51,9 +51,14 @@ the same way it averages peaks, and a cell takes its colour from the row centres
 ## Mixer
 
 `tui::mixer` owns the strip and its own tests. Every control is a rail with a lit run on it,
-drawn from one glyph family: `┄` unlit, `━` lit, `╋` for a neutral point, `╸` for the end of a
-run that grows from one end, `╎` for where a running fade is heading. Six rows of a block bar
-filled from the left read as one slab, which is what the rails replaced.
+drawn from one glyph family: `─` unlit, `━` lit, `╋` for a neutral point or a position, `╸`
+for the end of a run that grows from one end, `╎` for where a running fade is heading. Six
+rows of a block bar filled from the left read as one slab, which is what the rails replaced.
+
+The rail is solid and a weight lighter than the run, rather than dashed. A dotted rail made
+the trim and EQ rows look like a different kind of control from a fader, which they are not.
+The two cannot be the same character either: every value would draw the same string and only
+colour would say where the control sits, which `crates/tui/tests/mixer.rs` pins.
 
 A quantity grows from the point it is measured against. Trim, the EQ bands and the master
 filter have a neutral position, so their run leaves the centre tick and its side says which
@@ -70,6 +75,11 @@ own foreground fighting the lit ones. The rail and the centre tick are `BASE01` 
 untouched row recedes and a moved control is what the eye lands on.
 
 The crossfader row is the widest thing in the panel and fits its 24 columns exactly.
+
+Under `WIDE_MIN_WIDTH` the strip folds into the four-row bar, where a channel fader is a
+marker on a rail through `position_bar` rather than a fill: there is no room for a label per
+row, so the reading has to be the crossfader's. Its label column is the tall mixer's width,
+so a channel's fader and its meter start in the same place and read as the one channel.
 
 ## Loops
 
