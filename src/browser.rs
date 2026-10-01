@@ -114,6 +114,13 @@ impl Browser {
 
     pub fn type_char(&mut self, c: char) {
         self.query.push(c);
+        // The shortcut below holds only while a longer query matches a subset of what the
+        // shorter one did. A field token breaks that: `bp` is a bare word matching almost
+        // nothing, and `bpm:124` has to find the tracks `bp` threw away.
+        if self.query.contains(':') {
+            self.refilter();
+            return;
+        }
         // Every match for the longer query must also match the query before this character.
         // Re-score those candidates instead of scanning the whole library for every key.
         let matches = {

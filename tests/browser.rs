@@ -54,6 +54,57 @@ fn press(app: &mut App, key: Key) {
     app.on_key(KeyEvent::press(key));
 }
 
+/// Its callers are the filter tests, which land in the next commit.
+#[allow(dead_code)]
+fn press_alt(app: &mut App, key: Key) {
+    app.on_key(KeyEvent::press(key).alt());
+}
+
+/// The track names the browser is showing, in order.
+fn rows(app: &App) -> Vec<String> {
+    app.view(String::new())
+        .browser
+        .rows
+        .iter()
+        .map(|r| r.name.clone())
+        .collect()
+}
+
+/// Name, tempo, Camelot key, genre: what a track's sidecar says about it.
+type Track<'a> = (&'a str, Option<f64>, Option<&'a str>, Option<&'a str>);
+
+/// A library whose sidecars already say what each track is. The filters read the sidecar,
+/// so writing one directly tests the filter rather than the detector, and keeps the fixture
+/// to a file write instead of a full analysis per track.
+fn library(dir: &Path, tracks: &[Track]) {
+    for (name, bpm, key, genre) in tracks {
+        let path = dir.join(format!("{name}.wav"));
+        write_wav(&path, &stereo(&[0.2; 4_800]), 2, RATE, Fmt::Pcm16);
+        let sidecar = loader::sidecar::Sidecar {
+            audio: loader::sidecar::fingerprint_file(&path).unwrap(),
+            analysis: Some(loader::sidecar::Stored {
+                grid: bpm.map(|bpm| analysis::tempo::BeatGrid {
+                    bpm,
+                    first_beat_secs: 0.0,
+                }),
+                key: key.and_then(analysis::key::Key::from_camelot),
+                waveform: Vec::new(),
+                bands: Vec::new(),
+            }),
+            cues: Default::default(),
+            track: Some(loader::sidecar::TrackInfo {
+                title: Some((*name).to_string()),
+                artist: None,
+                duration_secs: Some(300.0),
+                genre: genre.map(str::to_string),
+                tags_read: genre.is_some(),
+                discogs_checked: false,
+            }),
+        };
+        sidecar.write(&path).unwrap();
+    }
+}
+
 #[test]
 fn the_browser_lists_the_music_folder() {
     let dir = tempfile::tempdir().unwrap();
@@ -434,4 +485,26 @@ fn leaving_browser_mode_gives_the_mixer_back_even_from_full_screen() {
         !view.browser.fullscreen,
         "a full-screen list in mix mode hides the decks and the mixer with no key to undo it"
     );
+}
+
+#[test]
+fn typing_a_field_token_finds_tracks_the_letters_alone_would_not() {
+    // Typing narrows by re-scoring what the previous query left, on the assumption that a
+    // longer query matches a subset. A field token breaks it: "bp" is a bare word matching
+    // almost nothing, and "bpm:124" has to find tracks "bp" threw away.
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("Bicep - Glue", Some(124.0), None, None),
+            ("Objekt - Cactus", Some(130.0), None, None),
+        ],
+    );
+    let (mut app, _p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
+    for c in "bpm:124".chars() {
+        press(&mut app, Key::Char(c));
+    }
+    assert_eq!(rows(&app), vec!["Bicep - Glue"], "{:?}", rows(&app));
 }
