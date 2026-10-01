@@ -90,22 +90,18 @@ impl App {
         // The switch is in the config and the token is in the environment, so a config file
         // that gets copied around carries no credential. With the switch on and no token,
         // the lookup stays off and says so once.
-        let token = std::env::var("DJ_TUI_DISCOGS_TOKEN")
-            .ok()
-            .filter(|t| !t.is_empty());
-        let discogs = match (config.library.discogs, token) {
-            (true, Some(token)) => Some(discogs::Client::new(token)),
-            _ => None,
-        };
+        let discogs = crate::genre::Discogs::new(config.library.discogs);
         let discogs_on = discogs.is_some();
         let unset_token = config.library.discogs && !discogs_on;
+        let lookup: Option<Box<dyn loader::GenreLookup>> =
+            discogs.map(|d| Box::new(d) as Box<dyn loader::GenreLookup>);
         let mut app = Self {
             handle,
             controls: Controls::new(config.deck.tempo_range, sample_rate),
             state: ControlState::default(),
             keymap: Keymap::new(),
             metas: Default::default(),
-            loader: Loader::spawn_with(sample_rate, discogs),
+            loader: Loader::spawn_with(sample_rate, lookup),
             sample_rate,
             message: String::new(),
             meters: [0.0; 3],
@@ -176,6 +172,9 @@ impl App {
         let dt = self.last_frame.elapsed().as_secs_f64();
         self.last_frame = std::time::Instant::now();
         self.tick_fades(dt);
+        // The browser's filters measure against whatever is playing, which moves under them
+        // as the tempo fader is ridden.
+        self.refresh_playing();
         self.handle.collect_garbage();
         self.save_changed_cues();
         while let Some(note) = self.loader.try_recv_note() {
@@ -223,7 +222,12 @@ impl App {
             self.analysing.pop_front();
             match done.error {
                 Some(e) => {
-                    let line = format!("Could not read {}: {e}", done.path.display());
+                    let what = match pass {
+                        Some(Pass::Tags) => "read the tags of",
+                        Some(Pass::Lookup) => "look up",
+                        _ => "analyse",
+                    };
+                    let line = format!("Could not {what} {}: {e}", done.path.display());
                     self.log.push(line.clone());
                     self.message = line;
                 }
@@ -233,12 +237,16 @@ impl App {
             // pass is dropped rather than worked through to find out.
             if done.stop_pass {
                 if let Some(pass) = pass {
+                    let before = self.analysing.len();
                     self.analysing.retain(|job| job.pass != pass);
+                    // Taken off the total too, or the note jumps a hundred and the closing
+                    // line claims work that was abandoned.
+                    self.analysis_total -= before - self.analysing.len();
                 }
             }
             if self.analysing.is_empty() {
                 if self.analysis_total > 0 {
-                    self.message = format!("Finished with {} tracks", self.analysis_total);
+                    self.message = format!("Finished with {} jobs", self.analysis_total);
                 }
                 self.analysis_total = 0;
                 self.browser.set_note(None);
@@ -510,6 +518,12 @@ impl App {
         self.chosen_device = Some(name.clone());
     }
 
+    /// Tell the browser what the decks are doing, so its filters measure against now.
+    fn refresh_playing(&mut self) {
+        let (bpm, key) = (self.playing_bpm(), self.playing_key());
+        self.browser.set_playing(bpm, key);
+    }
+
     /// Whether a queued lookup for `path` is still worth sending. Every job list is built
     /// when the run starts, before the tag pass has read anything, so a lookup queued then
     /// may have been answered by a tag since. Asking anyway sends the artist and title of a
@@ -576,8 +590,11 @@ impl App {
         self.analysis_total = self.analysing.len();
         match self.analysis_total {
             0 => self.message = "Every track is already read and analysed".into(),
+            // Jobs, not tracks: a library of 100 files with the lookup on is 300 of these,
+            // and calling them tracks made the count look like a library three times the
+            // size of the one on screen.
             n => {
-                self.message = format!("Working through {n} tracks. Alt+a again stops it.");
+                self.message = format!("Working through {n} jobs. Alt+a again stops it.");
                 self.next_analysis();
             }
         }
@@ -693,12 +710,15 @@ impl App {
             Action::BrowserMove(dir) => self.browser.move_selection(dir),
             Action::BrowserSort(reverse) => self.browser.sort_by(reverse),
             Action::BrowserFilterBpm => {
-                let playing = self.playing_bpm();
-                self.message = self.browser.cycle_bpm_filter(playing);
+                // Read the decks at the moment of the press rather than trusting the last
+                // frame's: a key can land between ticks, and switching a filter on against
+                // a stale "nothing is playing" would just refuse.
+                self.refresh_playing();
+                self.message = self.browser.cycle_bpm_filter();
             }
             Action::BrowserFilterKey => {
-                let playing = self.playing_key();
-                self.message = self.browser.toggle_key_filter(playing);
+                self.refresh_playing();
+                self.message = self.browser.toggle_key_filter();
             }
             Action::BrowserFilterGenre => self.message = self.browser.cycle_genre_filter(),
             Action::BrowserFullscreen => self.browser.fullscreen = !self.browser.fullscreen,

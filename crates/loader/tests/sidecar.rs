@@ -284,11 +284,24 @@ fn a_sidecar_written_before_genre_existed_still_reads() {
     let audio = dir.path().join("track.flac");
     std::fs::write(&audio, b"not really audio, the fingerprint is all we need").unwrap();
     let id = fingerprint_file(&audio).unwrap();
+    // With real cues, a saved loop and an analysis block in it, so the claim that rejecting
+    // this file would throw those away is something the test can actually demonstrate.
     let json = serde_json::json!({
         "format": "dj-tui track data",
         "version": 1,
         "audio": id,
         "track": { "title": "Glue", "artist": "Bicep", "duration_secs": 330.0 },
+        "analysis": { "bpm": 128.0, "first_beat_secs": 0.25, "key": "9A" },
+        "waveform": {
+            "points": 2,
+            "ranges": [[-100, 100], [-50, 50]],
+            "bands": [[10, 20, 30], [40, 50, 60]],
+        },
+        "cues": {
+            "main_cue_secs": 12.5,
+            "hot_cues": [{ "pad": 1, "secs": 1.0 }, { "pad": 3, "secs": 3.5 }],
+            "loop_secs": [8.0, 16.0],
+        },
     });
     std::fs::write(sidecar_path(&audio), serde_json::to_string(&json).unwrap()).unwrap();
 
@@ -298,6 +311,18 @@ fn a_sidecar_written_before_genre_existed_still_reads() {
     assert_eq!(info.genre, None, "nothing was stored, so nothing is known");
     assert!(!info.tags_read, "no tag pass has run over it");
     assert!(!info.discogs_checked, "no lookup has run over it");
+
+    // The point of not bumping SIDECAR_VERSION: this is what a rejected file would cost.
+    let analysis = read.analysis.expect("the analysis survives");
+    assert_eq!(analysis.grid.map(|g| g.bpm), Some(128.0));
+    assert_eq!(
+        read.cues.main_cue_secs,
+        Some(12.5),
+        "the cue point survives"
+    );
+    assert_eq!(read.cues.hot_cues[0], Some(1.0), "and the hot cues");
+    assert_eq!(read.cues.hot_cues[2], Some(3.5));
+    assert_eq!(read.cues.loop_secs, Some((8.0, 16.0)), "and the saved loop");
 }
 
 #[test]

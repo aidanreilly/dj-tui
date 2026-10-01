@@ -280,8 +280,14 @@ subset; a query with a `:` in it goes back to the whole library.
 `Filters` in `src/browser.rs` is what the Alt keys cycle, and it narrows alongside the query
 rather than through it. The tempo window and the key filter measure against whichever deck is
 playing, deck A first, which is `App::playing_deck` and the same rule the key highlighting
-follows. The window folds half and double time. The genre cycle is built from every entry
-rather than from what is shown, so cycling does not walk a set that shrinks under it.
+follows, at the grid tempo times the deck's rate so it is the tempo on screen rather than the
+unpitched one. `App::refresh_playing` pushes that in every frame and at each filter press, so
+riding the fader moves the window with it rather than leaving it where it was switched on.
+The window folds half and double time.
+
+A stored genre is several styles: Discogs joins them and a tag may already read "Drum n Bass,
+Jungle", so the cycle offers each one and matching is per style. The list is built from every
+entry rather than from what is shown, so cycling does not walk a set that shrinks under it.
 
 Genre is metadata and never comes from analysis: a file's own tag, or a Discogs release
 matched on the artist and title that tag gave. A tag always wins, and a load keeps a stored
@@ -297,6 +303,11 @@ what it asked, and a missing or corrupt file is an empty cache rather than a fai
 The lookup pass re-checks each job as it is dispatched. Every job list is built when the run
 starts, before the tag pass has read anything, so a lookup queued then is often answered by a
 tag before it is sent; sending it anyway is a third-party request for a settled question.
+
+`loader` names the lookup as the `GenreLookup` trait and `src/genre.rs` implements it over
+the Discogs client, so the crate that decodes audio does not carry a TLS stack for every
+consumer. A file with no artist tag never reaches the network: a search needs both halves to
+confirm a match, so there is nothing to spend a request on.
 
 `crates/discogs` is pure except for `client.rs`, and its suite never touches the network: the
 live test is behind `DJ_TUI_DISCOGS_TESTS=1`. Styles beat genres there, since Discogs calls a

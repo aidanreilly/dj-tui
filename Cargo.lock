@@ -936,7 +936,6 @@ name = "loader"
 version = "0.1.0"
 dependencies = [
  "analysis",
- "discogs",
  "engine",
  "rubato",
  "serde",

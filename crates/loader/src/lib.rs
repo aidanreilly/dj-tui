@@ -295,8 +295,29 @@ enum Request {
     Analyse(PathBuf),
     /// Read a file's tags into its sidecar. No audio is decoded.
     Tags(PathBuf),
-    /// Ask Discogs about a file, by the artist and title its tags gave.
+    /// Ask the genre lookup about a file, by the artist and title its tags gave.
     Lookup(PathBuf, String, String),
+}
+
+/// Why a lookup failed, and whether the next one would fail the same way.
+#[derive(Debug, Clone)]
+pub struct LookupError {
+    pub message: String,
+    /// The rest of the pass is not worth sending: a wrong credential, or a rate limit.
+    pub fatal: bool,
+}
+
+/// Somewhere to ask what a record's genre is. Implemented outside this crate, so the audio
+/// decoder does not depend on an HTTP client.
+pub trait GenreLookup: Send {
+    /// The genre of this record, or `None` when nothing matched.
+    fn genre(&self, artist: &str, title: &str) -> Result<Option<String>, LookupError>;
+    /// True when the answer is already held, so no request and no wait are needed.
+    fn knows(&self, artist: &str, title: &str) -> bool;
+    /// How long to leave between requests, to stay inside whatever limit applies.
+    fn request_gap(&self) -> std::time::Duration;
+    /// Write down whatever was learned, so a later run does not ask again.
+    fn remember(&self);
 }
 
 /// One file the background analysis has finished with.
@@ -324,9 +345,10 @@ impl Loader {
         Self::spawn_with(session_rate, None)
     }
 
-    /// `discogs` is the genre lookup, which is `None` unless the config switched it on and
-    /// a token was in the environment.
-    pub fn spawn_with(session_rate: u32, discogs: Option<discogs::Client>) -> Self {
+    /// `lookup` is the genre lookup, which is `None` unless it was switched on. It is a
+    /// trait object so this crate, which exists to decode audio, does not have to carry a
+    /// TLS stack for every consumer.
+    pub fn spawn_with(session_rate: u32, lookup: Option<Box<dyn GenreLookup>>) -> Self {
         let (req_tx, req_rx) = channel::<Request>();
         let (res_tx, res_rx) = channel();
         let (note_tx, note_rx) = channel();
@@ -376,12 +398,25 @@ impl Loader {
                             // Ahead of the call, not after it: a gap on the way out delays
                             // whatever is queued behind this, and a deck load is queued on
                             // the same thread. A cached answer skips it entirely.
-                            let cached = discogs.as_ref().is_some_and(|c| c.knows(&artist, &title));
-                            if !cached {
-                                std::thread::sleep(discogs::MIN_REQUEST_GAP);
+                            // A search needs both halves to confirm a match, so a file with
+                            // no artist tag can never produce one: do not spend a request
+                            // and a rate-limit gap finding that out.
+                            let hopeless = artist.trim().is_empty() || title.trim().is_empty();
+                            let known = lookup.as_ref().is_some_and(|l| l.knows(&artist, &title));
+                            if !known && !hopeless {
+                                if let Some(l) = &lookup {
+                                    std::thread::sleep(l.request_gap());
+                                }
                             }
-                            let (error, stop_pass) = match &discogs {
-                                None => (Some("Discogs lookup is off".to_string()), true),
+                            let (error, stop_pass) = match &lookup {
+                                None => (Some("Genre lookup is off".to_string()), true),
+                                Some(_) if hopeless => {
+                                    // Still written back, so it is not asked again.
+                                    let e = write_tags(&path, &Tags::default(), true)
+                                        .err()
+                                        .map(|e| e.to_string());
+                                    (e, false)
+                                }
                                 Some(client) => match client.genre(&artist, &title) {
                                     Ok(genre) => {
                                         // Written back whatever the answer, so a miss is not
@@ -395,13 +430,13 @@ impl Loader {
                                             .map(|e| e.to_string());
                                         (e, false)
                                     }
-                                    Err(e) => (Some(e.to_string()), e.stops_the_pass()),
+                                    Err(LookupError { message, fatal }) => (Some(message), fatal),
                                 },
                             };
                             // Written after every answer rather than at the end: a run that
                             // is stopped or crashes still keeps what it already asked.
-                            if let Some(client) = &discogs {
-                                client.save_cache();
+                            if let Some(client) = &lookup {
+                                client.remember();
                             }
                             let done = Analysed {
                                 path,

@@ -7,6 +7,7 @@ pub mod clock;
 pub mod config;
 pub mod controller;
 pub mod demo;
+pub mod genre;
 pub mod log;
 pub mod session;
 pub mod view;

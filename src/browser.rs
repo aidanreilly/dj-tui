@@ -55,30 +55,33 @@ fn within_window(bpm: f64, against: f64, tolerance: f64) -> bool {
 #[derive(Default)]
 struct Filters {
     bpm: BpmWindow,
-    /// The tempo the window is measured against, fixed when the filter was switched on.
-    bpm_against: Option<f64>,
-    key: Option<Key>,
+    key: bool,
     genre: Option<String>,
+    /// What is playing now, refreshed every frame. The window used to latch the tempo when
+    /// it was switched on, so riding the pitch afterwards left the list around a tempo the
+    /// deck had moved away from.
+    playing_bpm: Option<f64>,
+    playing_key: Option<Key>,
 }
 
 impl Filters {
     /// True when `entry` survives every filter that is on.
     fn keeps(&self, entry: &Entry) -> bool {
-        if let (Some(tolerance), Some(against)) = (self.bpm.tolerance(), self.bpm_against) {
+        if let (Some(tolerance), Some(against)) = (self.bpm.tolerance(), self.playing_bpm) {
             match entry.bpm() {
                 Some(bpm) if within_window(bpm, against, tolerance) => {}
                 _ => return false,
             }
         }
-        if let Some(ours) = self.key {
-            match entry.key() {
-                Some(theirs) if compatible(theirs, ours) => {}
+        if self.key {
+            match (entry.key(), self.playing_key) {
+                (Some(theirs), Some(ours)) if compatible(theirs, ours) => {}
                 _ => return false,
             }
         }
         if let Some(want) = &self.genre {
             match entry.genre() {
-                Some(genre) if genre.eq_ignore_ascii_case(want) => {}
+                Some(genre) if styles(genre).any(|s| s.eq_ignore_ascii_case(want)) => {}
                 _ => return false,
             }
         }
@@ -88,10 +91,17 @@ impl Filters {
     fn chips(&self) -> Vec<String> {
         let mut chips = Vec::new();
         if self.bpm != BpmWindow::Off {
-            chips.push(format!("\u{25b8}bpm {}", self.bpm.label()));
+            // The tempo it is measuring against, so a stale-looking list explains itself.
+            match self.playing_bpm {
+                Some(bpm) => chips.push(format!("\u{25b8}bpm {} of {bpm:.1}", self.bpm.label())),
+                None => chips.push(format!("\u{25b8}bpm {}", self.bpm.label())),
+            }
         }
-        if self.key.is_some() {
-            chips.push("\u{25b8}key".into());
+        if self.key {
+            match self.playing_key {
+                Some(key) => chips.push(format!("\u{25b8}key {}", key.camelot())),
+                None => chips.push("\u{25b8}key".into()),
+            }
         }
         if let Some(genre) = &self.genre {
             chips.push(format!("\u{25b8}genre {genre}"));
@@ -107,6 +117,12 @@ fn split_display(display: &str) -> (String, String) {
         Some((artist, title)) => (artist.to_string(), title.to_string()),
         None => (String::new(), display.to_string()),
     }
+}
+
+/// The styles inside a stored genre. Discogs joins them with a comma, and a tag may already
+/// read "Drum n Bass, Jungle", so one stored string is several things to filter by.
+fn styles(genre: &str) -> impl Iterator<Item = &str> {
+    genre.split(',').map(str::trim).filter(|s| !s.is_empty())
 }
 
 /// A terminal can show only a small part of the library at once. Keep the per-frame view
@@ -308,15 +324,28 @@ impl Browser {
 
     /// Cycle the BPM window. `playing` is the tempo it measures against, which is `None`
     /// with nothing playing and with a track the detector could not read.
-    pub fn cycle_bpm_filter(&mut self, playing: Option<f64>) -> String {
-        let Some(tempo) = playing else {
+    /// What the decks are doing now, pushed in every frame so the filters measure against a
+    /// deck that is being ridden rather than against where it was when they were switched on.
+    pub fn set_playing(&mut self, bpm: Option<f64>, key: Option<Key>) {
+        let moved = match (self.filters.playing_bpm, bpm) {
+            (Some(was), Some(now)) => (was - now).abs() > 0.01,
+            (was, now) => was.is_some() != now.is_some(),
+        };
+        let rekeyed = self.filters.playing_key != key;
+        self.filters.playing_bpm = bpm;
+        self.filters.playing_key = key;
+        if (moved && self.filters.bpm != BpmWindow::Off) || (rekeyed && self.filters.key) {
+            self.refilter();
+        }
+    }
+
+    pub fn cycle_bpm_filter(&mut self) -> String {
+        let Some(tempo) = self.filters.playing_bpm else {
             self.filters.bpm = BpmWindow::Off;
-            self.filters.bpm_against = None;
             self.refilter();
             return "BPM filter needs a deck playing with a tempo".into();
         };
         self.filters.bpm = self.filters.bpm.next();
-        self.filters.bpm_against = Some(tempo);
         self.refilter();
         match self.filters.bpm {
             BpmWindow::Off => "BPM filter off".into(),
@@ -324,16 +353,16 @@ impl Browser {
         }
     }
 
-    pub fn toggle_key_filter(&mut self, playing: Option<Key>) -> String {
-        if self.filters.key.is_some() {
-            self.filters.key = None;
+    pub fn toggle_key_filter(&mut self) -> String {
+        if self.filters.key {
+            self.filters.key = false;
             self.refilter();
             return "Key filter off".into();
         }
-        let Some(key) = playing else {
+        let Some(key) = self.filters.playing_key else {
             return "Key filter needs a deck playing with a key".into();
         };
-        self.filters.key = Some(key);
+        self.filters.key = true;
         self.refilter();
         format!("Keys that mix with {}", key.camelot())
     }
@@ -345,7 +374,9 @@ impl Browser {
         let mut genres: Vec<String> = self
             .entries
             .iter()
-            .filter_map(|e| e.genre().map(str::to_string))
+            .filter_map(|e| e.genre())
+            .flat_map(styles)
+            .map(str::to_string)
             .collect();
         genres.sort_by_key(|g| g.to_lowercase());
         genres.dedup_by_key(|g| g.to_lowercase());

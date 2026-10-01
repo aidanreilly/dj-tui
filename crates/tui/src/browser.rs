@@ -45,8 +45,12 @@ pub struct BrowserView {
 
 /// What browser mode offers, on the panel's own bottom row. Six bindings document themselves
 /// better here than in an overlay nobody opens.
-const HINT: &str = "Esc back  Enter load  Tab deck  Ctrl+u clear  Alt+s sort  Alt+a analyse  \
-                    Alt+f size  Alt+b bpm  Alt+k key  Alt+g genre";
+/// Two rows, because one trimmed at the panel's usual width and took every key added to the
+/// browser off the right-hand side of a panel that has them.
+const HINT: [&str; 2] = [
+    "Esc back  Enter load  Tab deck  Ctrl+u clear  Alt+f size  Alt+s sort",
+    "Alt+a read  Alt+d lookup  Alt+b bpm  Alt+k key  Alt+g genre",
+];
 
 /// Width of each fixed column, and the gap between them.
 const GENRE_WIDTH: usize = 12;
@@ -102,13 +106,18 @@ impl Widget for BrowserPanel<'_> {
         // The query line sits at the bottom, with the commands under it while the mode is
         // active, so the list gets whatever is left above them.
         let searching = v.search.is_some();
-        let rows_below = searching as u16 + v.active as u16;
+        let hint_rows = if v.active { HINT.len() as u16 } else { 0 };
+        let rows_below = searching as u16 + hint_rows;
         let list_height = inner.height.saturating_sub(rows_below) as usize;
-        if v.active {
+        for (i, hint) in HINT.iter().enumerate() {
+            if !v.active {
+                break;
+            }
+            let y = inner.bottom() - hint_rows + i as u16;
             buf.set_stringn(
                 inner.x,
-                inner.bottom() - 1,
-                HINT,
+                y,
+                hint,
                 inner.width as usize,
                 Style::new().add_modifier(Modifier::DIM),
             );
@@ -117,7 +126,7 @@ impl Widget for BrowserPanel<'_> {
             let query = v.search.as_deref().unwrap_or_default();
             buf.set_stringn(
                 inner.x,
-                inner.bottom() - 1 - v.active as u16,
+                inner.bottom() - 1 - hint_rows,
                 format!("/{query}"),
                 inner.width as usize,
                 Style::new().add_modifier(Modifier::BOLD),

@@ -345,11 +345,14 @@ fn chips_are_dropped_from_the_right_when_the_title_will_not_fit() {
         "\u{25b8}key".into(),
         "\u{25b8}genre Drum n Bass".into(),
     ];
-    let t = panel_text(&view, 40, 44);
+    // Wide enough for some of them: at a width that fits none, every dropping scheme looks
+    // the same, including dropping from the left.
+    let t = panel_text(&view, 64, 44);
     assert!(t.contains("BROWSER"), "the panel keeps its name: {t}");
+    assert!(t.contains("\u{25b8}bpm"), "the first chip stayed: {t}");
     assert!(
         !t.contains("Drum n Bass"),
-        "the last chip went rather than the name: {t}"
+        "and the last one went, rather than the first: {t}"
     );
 }
 
@@ -373,5 +376,19 @@ fn the_hint_row_names_the_filter_keys() {
     let t = panel_text(&view, 160, 44);
     for hint in ["Alt+b", "Alt+k", "Alt+g"] {
         assert!(t.contains(hint), "missing {hint}: {t}");
+    }
+}
+
+#[test]
+fn the_hint_row_wraps_rather_than_losing_the_keys_off_the_right() {
+    // One long line trimmed at the panel's usual width, so every key added to the browser
+    // was invisible in the app that has it. Two rows fit what one could not.
+    let mut view = listing();
+    view.active = true;
+    let t = panel_text(&view, 120, 44);
+    for hint in [
+        "Esc", "Enter", "Alt+s", "Alt+a", "Alt+b", "Alt+k", "Alt+g", "Alt+d",
+    ] {
+        assert!(t.contains(hint), "missing {hint}:\n{t}");
     }
 }

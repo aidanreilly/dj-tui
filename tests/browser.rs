@@ -389,6 +389,11 @@ fn alt_a_analyses_everything_in_the_list_that_has_no_analysis_yet() {
     let status = app.view(String::new()).browser.status;
     assert!(status.contains("2 tracks"), "back to counting: {status}");
     assert!(app.message().contains("Finished with"), "{}", app.message());
+    assert!(
+        !app.message().contains("tracks"),
+        "it counts jobs, which are not tracks: {}",
+        app.message()
+    );
 }
 
 #[test]
@@ -858,4 +863,77 @@ fn a_run_stopped_and_restarted_still_finishes_every_track() {
         missed.is_empty(),
         "the run said it was done, but {missed:?} never were"
     );
+}
+
+#[test]
+fn the_bpm_window_follows_the_deck_rather_than_latching() {
+    // The tempo was read once, when the filter was switched on. Ride the pitch afterwards
+    // and the list still showed records around where the deck used to be.
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("host", Some(124.0), None, None),
+            ("near the start", Some(125.0), None, None),
+            ("near the end", Some(133.0), None, None),
+        ],
+    );
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    play(&mut app, &mut p, &dir.path().join("host.wav"));
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('b'));
+    assert!(
+        rows(&app).contains(&"near the start".to_string()),
+        "{:?}",
+        rows(&app)
+    );
+
+    // Pitch the deck up past the window it started with.
+    press(&mut app, Key::Esc);
+    for _ in 0..60 {
+        press(&mut app, Key::Char('.'));
+    }
+    app.tick();
+    process(&mut p, 256);
+    press(&mut app, Key::Char('b'));
+
+    let names = rows(&app);
+    assert!(
+        names.contains(&"near the end".to_string()),
+        "the window followed the deck up: {names:?}"
+    );
+    assert!(
+        !names.contains(&"near the start".to_string()),
+        "and left where it started: {names:?}"
+    );
+}
+
+#[test]
+fn the_genre_cycle_offers_each_style_rather_than_each_joined_string() {
+    // Discogs joins styles, so a library of its answers gives "Techno, Breakbeat" and
+    // "Techno, Minimal" as two unrelated stops and no way to reach all the techno.
+    let dir = tempfile::tempdir().unwrap();
+    library(
+        dir.path(),
+        &[
+            ("a", None, None, Some("Techno, Breakbeat")),
+            ("b", None, None, Some("Techno, Minimal")),
+            ("c", None, None, Some("House")),
+        ],
+    );
+    let (mut app, _p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
+    // The styles alphabetically: Breakbeat, House, Minimal, Techno. Each is its own stop,
+    // and Techno reaches both of the records that carry it.
+    let walk = |app: &mut App| {
+        press_alt(app, Key::Char('g'));
+        rows(app)
+    };
+    assert_eq!(walk(&mut app), vec!["a"], "Breakbeat");
+    assert_eq!(walk(&mut app), vec!["c"], "House");
+    assert_eq!(walk(&mut app), vec!["b"], "Minimal");
+    assert_eq!(walk(&mut app), vec!["a", "b"], "Techno reaches both");
+    assert_eq!(walk(&mut app).len(), 3, "back to off");
 }
