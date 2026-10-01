@@ -50,3 +50,43 @@ pub fn sine(freq: f32, secs: f32, rate: u32, amp: f32) -> Vec<f32> {
 pub fn stereo(mono: &[f32]) -> Vec<f32> {
     mono.iter().flat_map(|&s| [s, s]).collect()
 }
+/// A decodable WAV with a LIST/INFO chunk, for the tests that go all the way through a load.
+/// Symphonia maps IART, INAM and IGNR onto Artist, TrackTitle and Genre.
+pub fn write_tagged_wav(
+    path: &Path,
+    samples: &[f32],
+    rate: u32,
+    artist: &str,
+    title: &str,
+    genre: &str,
+) {
+    write_wav(path, samples, 2, rate, Fmt::Float32);
+    let mut info: Vec<u8> = b"INFO".to_vec();
+    for (id, value) in [(b"IART", artist), (b"INAM", title), (b"IGNR", genre)] {
+        let mut text = value.as_bytes().to_vec();
+        text.push(0);
+        if text.len() % 2 == 1 {
+            text.push(0);
+        }
+        info.extend_from_slice(id);
+        info.extend_from_slice(&(text.len() as u32).to_le_bytes());
+        info.extend_from_slice(&text);
+    }
+    let file = std::fs::read(path).expect("the wav just written");
+    // The LIST chunk goes ahead of `data`. A reader streams the audio from the data chunk
+    // onwards and never looks past it, so a LIST after it is never seen.
+    let at = file
+        .windows(4)
+        .position(|w| w == b"data")
+        .expect("a data chunk");
+    let mut out = Vec::with_capacity(file.len() + info.len() + 8);
+    out.extend_from_slice(&file[..at]);
+    out.extend_from_slice(b"LIST");
+    out.extend_from_slice(&(info.len() as u32).to_le_bytes());
+    out.extend_from_slice(&info);
+    out.extend_from_slice(&file[at..]);
+    // The RIFF size covers everything after the first eight bytes.
+    let riff = (out.len() - 8) as u32;
+    out[4..8].copy_from_slice(&riff.to_le_bytes());
+    std::fs::write(path, out).expect("rewrite the wav with its tags");
+}

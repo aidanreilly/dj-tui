@@ -24,6 +24,7 @@ analysis = { path = "crates/analysis" }
 backend = { path = "crates/backend" }
 midi = { path = "crates/midi" }
 library = { path = "crates/library" }
+discogs = { path = "crates/discogs" }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 ratatui = "0.30"

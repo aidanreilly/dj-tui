@@ -8,6 +8,7 @@ rust-version.workspace = true
 [dependencies]
 engine = { path = "../engine" }
 analysis = { path = "../analysis" }
+discogs = { path = "../discogs" }
 symphonia = { version = "0.5.4", features = ["all"] }
 rubato = "0.15"
 serde = { version = "1", features = ["derive"] }

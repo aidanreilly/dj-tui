@@ -100,6 +100,15 @@ impl Filters {
     }
 }
 
+/// Split a track's display name into artist and title. A name with no artist half gives the
+/// whole of it as the title, which is what a file named after the track alone looks like.
+fn split_display(display: &str) -> (String, String) {
+    match display.split_once(" - ") {
+        Some((artist, title)) => (artist.to_string(), title.to_string()),
+        None => (String::new(), display.to_string()),
+    }
+}
+
 /// A terminal can show only a small part of the library at once. Keep the per-frame view
 /// bounded, centred on the selection, instead of formatting every track on every frame.
 const BROWSER_VIEW_ROWS: usize = 256;
@@ -145,6 +154,36 @@ impl Browser {
 
     pub fn entries(&self) -> &[Entry] {
         &self.entries
+    }
+
+    /// Paths whose tags have never been read.
+    pub fn needs_tags(&self) -> Vec<PathBuf> {
+        self.entries
+            .iter()
+            .filter(|e| e.needs_tags())
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    }
+
+    /// Paths with no genre that no lookup has been run against.
+    pub fn needs_lookup(&self) -> Vec<PathBuf> {
+        self.entries
+            .iter()
+            .filter(|e| e.needs_lookup())
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    }
+
+    /// The selected track's artist and title, as a lookup wants them.
+    pub fn selected_artist_and_title(&self) -> Option<(String, String)> {
+        let entry = self.shown.get(self.selected).map(|&i| &self.entries[i])?;
+        Some(split_display(entry.display()))
+    }
+
+    /// The same for a path the backfill is working through.
+    pub fn artist_and_title_of(&self, path: &Path) -> Option<(String, String)> {
+        let entry = self.entries.iter().find(|e| e.path() == path)?;
+        Some(split_display(entry.display()))
     }
 
     /// Paths in the list that have never been analysed.

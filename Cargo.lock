@@ -445,6 +445,7 @@ version = "0.1.0"
 dependencies = [
  "analysis",
  "backend",
+ "discogs",
  "engine",
  "input",
  "library",
@@ -934,6 +935,7 @@ name = "loader"
 version = "0.1.0"
 dependencies = [
  "analysis",
+ "discogs",
  "engine",
  "rubato",
  "serde",

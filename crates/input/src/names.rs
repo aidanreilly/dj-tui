@@ -94,6 +94,7 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["browser-filter-bpm"] => Action::BrowserFilterBpm,
         ["browser-filter-key"] => Action::BrowserFilterKey,
         ["browser-filter-genre"] => Action::BrowserFilterGenre,
+        ["browser-lookup"] => Action::BrowserLookup,
         ["analyse-library"] => Action::AnalyseLibrary,
         ["devices"] => Action::Devices,
         ["help"] => Action::Help,

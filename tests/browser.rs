@@ -358,8 +358,13 @@ fn alt_a_analyses_everything_in_the_list_that_has_no_analysis_yet() {
 
     press(&mut app, Key::Char('b'));
     app.on_key(KeyEvent::press(Key::Char('a')).alt());
+    // The run starts with the tag pass, because analysis skips anything with a grid and a
+    // library that has been analysed before would otherwise never pick a genre up.
     assert!(
-        app.view(String::new()).browser.status.contains("nalys"),
+        app.view(String::new())
+            .browser
+            .status
+            .contains("reading tags"),
         "the panel says what it is doing: {}",
         app.view(String::new()).browser.status
     );
@@ -383,7 +388,7 @@ fn alt_a_analyses_everything_in_the_list_that_has_no_analysis_yet() {
     }
     let status = app.view(String::new()).browser.status;
     assert!(status.contains("2 tracks"), "back to counting: {status}");
-    assert!(app.message().contains("Analysed"), "{}", app.message());
+    assert!(app.message().contains("Finished with"), "{}", app.message());
 }
 
 #[test]
@@ -394,13 +399,16 @@ fn analysis_leaves_tracks_that_already_have_a_tempo_alone() {
     app.scan_library(&[dir.path().to_path_buf()]);
     press(&mut app, Key::Char('b'));
     app.on_key(KeyEvent::press(Key::Char('a')).alt());
+    // The panel goes back to counting tracks when every pass has finished, which is what
+    // says the run is over: the note names whichever pass is going while one is.
     let start = Instant::now();
-    while app.view(String::new()).browser.status.contains("nalys") {
+    while !app.view(String::new()).browser.status.contains("tracks") {
         app.tick();
         process(&mut p, 16);
         assert!(
             start.elapsed() < Duration::from_secs(30),
-            "first pass timed out"
+            "first pass timed out: {}",
+            app.view(String::new()).browser.status
         );
         std::thread::sleep(Duration::from_millis(10));
     }
@@ -664,4 +672,72 @@ fn a_typed_token_and_a_key_filter_narrow_together() {
         press(&mut app, Key::Char(c));
     }
     assert_eq!(rows(&app), vec!["keep me 9A"]);
+}
+
+#[test]
+fn analysing_reads_the_tags_of_files_that_have_never_been_read() {
+    // Alt+a skips anything that already has a grid, so a library that has been analysed
+    // would never pick a genre up without a pass of its own ahead of the analysis.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("tagged.wav");
+    common::write_tagged_wav(
+        &path,
+        &stereo(&common::sine(440.0, 1.0, RATE, 0.4)),
+        RATE,
+        "Bicep",
+        "Glue",
+        "Electronic",
+    );
+    // Already analysed, and its sidecar says nothing about a genre. This is the library that
+    // has been through Alt+a before today and would otherwise never pick one up.
+    let sidecar = loader::sidecar::Sidecar {
+        audio: loader::sidecar::fingerprint_file(&path).unwrap(),
+        analysis: Some(loader::sidecar::Stored {
+            grid: Some(analysis::tempo::BeatGrid {
+                bpm: 128.0,
+                first_beat_secs: 0.0,
+            }),
+            key: None,
+            waveform: vec![[-0.2, 0.2]; loader::ENVELOPE_POINTS],
+            bands: vec![[0.2, 0.1, 0.05]; loader::ENVELOPE_POINTS],
+        }),
+        cues: Default::default(),
+        track: Some(loader::sidecar::TrackInfo {
+            title: Some("tagged".into()),
+            artist: None,
+            duration_secs: Some(60.0),
+            genre: None,
+            tags_read: false,
+            discogs_checked: false,
+        }),
+    };
+    sidecar.write(&path).unwrap();
+    let (mut app, mut p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('a'));
+
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        app.tick();
+        process(&mut p, 256);
+        let genre = app.view(String::new()).browser.rows[0].genre.clone();
+        if genre.is_some() {
+            assert_eq!(genre.as_deref(), Some("Electronic"));
+            break;
+        }
+        assert!(Instant::now() < deadline, "the tag pass never finished");
+    }
+}
+
+#[test]
+fn a_lookup_with_the_switch_off_says_how_to_turn_it_on() {
+    let dir = tempfile::tempdir().unwrap();
+    library(dir.path(), &[("Bicep - Glue", Some(124.0), None, None)]);
+    let (mut app, _p) = setup();
+    app.scan_library(&[dir.path().to_path_buf()]);
+    press(&mut app, Key::Char('b'));
+    press_alt(&mut app, Key::Char('d'));
+    let message = app.view(String::new()).message;
+    assert!(message.contains("discogs = true"), "{message}");
 }

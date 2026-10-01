@@ -79,6 +79,8 @@ pub enum Action {
     BrowserFilterKey,
     /// Cycle through the genres the library holds, and back to off.
     BrowserFilterGenre,
+    /// Ask Discogs about the selected track's genre.
+    BrowserLookup,
     /// Analyse every track in the browser that has no sidecar yet.
     AnalyseLibrary,
     /// Give the browser the keyboard.

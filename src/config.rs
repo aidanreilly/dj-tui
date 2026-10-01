@@ -52,6 +52,11 @@ pub struct Config {
 pub struct Library {
     /// Folders the browser lists, searched all the way down. A leading `~` is your home.
     pub folders: Vec<String>,
+    /// Ask Discogs for the genre of files whose own tags carry none. Off by default: it
+    /// sends the artist and title of files in your library to a third party. The token
+    /// comes from `DJ_TUI_DISCOGS_TOKEN`, never from this file.
+    #[serde(default)]
+    pub discogs: bool,
 }
 
 impl Library {

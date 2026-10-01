@@ -291,6 +291,10 @@ enum Request {
     SaveCues(PathBuf, sidecar::Cues),
     /// Analyse a file for the library, keeping only what lands in the sidecar.
     Analyse(PathBuf),
+    /// Read a file's tags into its sidecar. No audio is decoded.
+    Tags(PathBuf),
+    /// Ask Discogs about a file, by the artist and title its tags gave.
+    Lookup(PathBuf, String, String),
 }
 
 /// One file the background analysis has finished with.
@@ -299,6 +303,9 @@ pub struct Analysed {
     pub path: PathBuf,
     /// Why it could not be analysed, if it could not.
     pub error: Option<String>,
+    /// The next request of the same kind would fail the same way, so the rest of the pass is
+    /// not worth sending. A wrong Discogs token and a rate limit both say this.
+    pub stop_pass: bool,
 }
 
 /// A background thread that loads files and saves cue changes, so the UI never waits on
@@ -312,6 +319,12 @@ pub struct Loader {
 
 impl Loader {
     pub fn spawn(session_rate: u32) -> Self {
+        Self::spawn_with(session_rate, None)
+    }
+
+    /// `discogs` is the genre lookup, which is `None` unless the config switched it on and
+    /// a token was in the environment.
+    pub fn spawn_with(session_rate: u32, discogs: Option<discogs::Client>) -> Self {
         let (req_tx, req_rx) = channel::<Request>();
         let (res_tx, res_rx) = channel();
         let (note_tx, note_rx) = channel();
@@ -332,7 +345,58 @@ impl Loader {
                             let error = analyse_file(&path, session_rate)
                                 .err()
                                 .map(|e| e.to_string());
-                            if analysed_tx.send(Analysed { path, error }).is_err() {
+                            let done = Analysed {
+                                path,
+                                error,
+                                stop_pass: false,
+                            };
+                            if analysed_tx.send(done).is_err() {
+                                break;
+                            }
+                        }
+                        Request::Tags(path) => {
+                            let error = match read_tags(&path) {
+                                Ok(tags) => {
+                                    write_tags(&path, &tags, false).err().map(|e| e.to_string())
+                                }
+                                Err(e) => Some(e.to_string()),
+                            };
+                            let done = Analysed {
+                                path,
+                                error,
+                                stop_pass: false,
+                            };
+                            if analysed_tx.send(done).is_err() {
+                                break;
+                            }
+                        }
+                        Request::Lookup(path, artist, title) => {
+                            let (error, stop_pass) = match &discogs {
+                                None => (Some("Discogs lookup is off".to_string()), true),
+                                Some(client) => match client.genre(&artist, &title) {
+                                    Ok(genre) => {
+                                        // Written back whatever the answer, so a miss is not
+                                        // asked about again on the next run.
+                                        let tags = Tags {
+                                            genre,
+                                            ..Default::default()
+                                        };
+                                        let e = write_tags(&path, &tags, true)
+                                            .err()
+                                            .map(|e| e.to_string());
+                                        (e, false)
+                                    }
+                                    Err(e) => (Some(e.to_string()), e.stops_the_pass()),
+                                },
+                            };
+                            // Spaced so a batch stays inside the rate limit.
+                            std::thread::sleep(discogs::MIN_REQUEST_GAP);
+                            let done = Analysed {
+                                path,
+                                error,
+                                stop_pass,
+                            };
+                            if analysed_tx.send(done).is_err() {
                                 break;
                             }
                         }
@@ -364,6 +428,16 @@ impl Loader {
     /// Analyse `path` in the background, writing the results into its sidecar.
     pub fn analyse(&self, path: PathBuf) {
         let _ = self.requests.send(Request::Analyse(path));
+    }
+
+    /// Read `path`'s tags in the background and store them.
+    pub fn read_tags_for(&self, path: PathBuf) {
+        let _ = self.requests.send(Request::Tags(path));
+    }
+
+    /// Ask Discogs about `path` in the background.
+    pub fn look_up(&self, path: PathBuf, artist: String, title: String) {
+        let _ = self.requests.send(Request::Lookup(path, artist, title));
     }
 
     /// A file the background analysis has finished with, if one is ready.

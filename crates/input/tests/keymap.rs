@@ -742,3 +742,24 @@ mod global_tempo {
         );
     }
 }
+
+mod lookup_key {
+    use super::*;
+    use input::Mode;
+
+    #[test]
+    fn alt_d_asks_for_a_lookup() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('b')), Some(Action::BrowserEnter));
+        assert_eq!(
+            km.handle(KeyEvent::press(ch('d')).alt()),
+            Some(Action::BrowserLookup)
+        );
+        assert_eq!(km.mode(), Mode::Browser);
+    }
+
+    #[test]
+    fn the_lookup_can_be_mapped_from_midi() {
+        assert_eq!(parse_action("browser-lookup"), Some(Action::BrowserLookup));
+    }
+}

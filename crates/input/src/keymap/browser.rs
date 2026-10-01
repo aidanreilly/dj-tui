@@ -20,6 +20,7 @@ pub fn handle(e: KeyEvent, focused: DeckId) -> Option<Action> {
             Key::Char('b') => Some(Action::BrowserFilterBpm),
             Key::Char('k') => Some(Action::BrowserFilterKey),
             Key::Char('g') => Some(Action::BrowserFilterGenre),
+            Key::Char('d') => Some(Action::BrowserLookup),
             Key::Char('f') => Some(Action::BrowserFullscreen),
             _ => None,
         };

@@ -17,6 +17,23 @@ use tui::ScreenView;
 /// Meter fall per UI frame. At 30 frames a second this is about 20 dB a second.
 const METER_FALL_PER_TICK: f32 = 0.926;
 
+/// One unit of the background run Alt+a starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pass {
+    /// Read the file's tags into its sidecar.
+    Tags,
+    /// Ask Discogs about what the tags left blank.
+    Lookup,
+    /// Detect the tempo and key.
+    Analyse,
+}
+
+#[derive(Debug, Clone)]
+struct Job {
+    pass: Pass,
+    path: PathBuf,
+}
+
 pub struct App {
     handle: EngineHandle,
     controls: Controls,
@@ -39,8 +56,10 @@ pub struct App {
     log: Vec<String>,
     browser: crate::browser::Browser,
     /// Files waiting for background analysis, and how many the run started with.
-    analysing: std::collections::VecDeque<PathBuf>,
+    analysing: std::collections::VecDeque<Job>,
     analysis_total: usize,
+    /// The Discogs lookup is switched on and has a token to use.
+    discogs_on: bool,
     /// The audio devices offered, and which is in use.
     devices: Vec<(String, String)>,
     current_device: String,
@@ -68,13 +87,25 @@ struct Persisted {
 impl App {
     /// `sample_rate` is the session rate reported by the audio backend.
     pub fn new(handle: EngineHandle, config: &Config, sample_rate: u32) -> Self {
+        // The switch is in the config and the token is in the environment, so a config file
+        // that gets copied around carries no credential. With the switch on and no token,
+        // the lookup stays off and says so once.
+        let token = std::env::var("DJ_TUI_DISCOGS_TOKEN")
+            .ok()
+            .filter(|t| !t.is_empty());
+        let discogs = match (config.library.discogs, token) {
+            (true, Some(token)) => Some(discogs::Client::new(token)),
+            _ => None,
+        };
+        let discogs_on = discogs.is_some();
+        let unset_token = config.library.discogs && !discogs_on;
         let mut app = Self {
             handle,
             controls: Controls::new(config.deck.tempo_range, sample_rate),
             state: ControlState::default(),
             keymap: Keymap::new(),
             metas: Default::default(),
-            loader: Loader::spawn(sample_rate),
+            loader: Loader::spawn_with(sample_rate, discogs),
             sample_rate,
             message: String::new(),
             meters: [0.0; 3],
@@ -86,6 +117,7 @@ impl App {
             browser: crate::browser::Browser::new(),
             analysing: std::collections::VecDeque::new(),
             analysis_total: 0,
+            discogs_on,
             devices: Vec::new(),
             current_device: String::new(),
             device_note: String::new(),
@@ -101,6 +133,13 @@ impl App {
             },
         };
         app.send(Command::SetCrossfaderCurve(config.mixer.crossfader_curve));
+        if unset_token {
+            app.log.push(
+                "Discogs lookup is on in the config but DJ_TUI_DISCOGS_TOKEN is not set, \
+                 so it stays off."
+                    .into(),
+            );
+        }
         app
     }
 
@@ -155,18 +194,26 @@ impl App {
             }
         }
         while let Some(done) = self.loader.try_recv_analysed() {
+            let pass = self.analysing.front().map(|j| j.pass);
             self.analysing.pop_front();
             match done.error {
                 Some(e) => {
-                    let line = format!("Could not analyse {}: {e}", done.path.display());
+                    let line = format!("Could not read {}: {e}", done.path.display());
                     self.log.push(line.clone());
                     self.message = line;
                 }
                 None => self.browser.refresh(&done.path),
             }
+            // The next request of this kind would fail the same way, so the rest of that
+            // pass is dropped rather than worked through to find out.
+            if done.stop_pass {
+                if let Some(pass) = pass {
+                    self.analysing.retain(|job| job.pass != pass);
+                }
+            }
             if self.analysing.is_empty() {
                 if self.analysis_total > 0 {
-                    self.message = format!("Analysed {} tracks", self.analysis_total);
+                    self.message = format!("Finished with {} tracks", self.analysis_total);
                 }
                 self.analysis_total = 0;
                 self.browser.set_note(None);
@@ -458,8 +505,10 @@ impl App {
         self.playing_deck().and_then(|i| self.metas[i].bpm)
     }
 
-    /// Analyse everything in the browser that has no sidecar yet, one file at a time so the
-    /// machine stays usable while it runs.
+    /// Work through the library, one file at a time so the machine stays usable. Tags first,
+    /// because analysis deliberately skips anything that already has a grid and a library
+    /// that has been analysed before would otherwise never pick a genre up. Then the lookup
+    /// for what the tags left blank, then the analysis itself.
     fn start_analysis(&mut self) {
         if !self.analysing.is_empty() {
             self.analysing.clear();
@@ -468,28 +517,62 @@ impl App {
             self.message = "Analysis stopped".into();
             return;
         }
-        self.analysing = self.browser.unanalysed().into();
+        let mut jobs: std::collections::VecDeque<Job> = self
+            .browser
+            .needs_tags()
+            .into_iter()
+            .map(|path| Job {
+                pass: Pass::Tags,
+                path,
+            })
+            .collect();
+        if self.discogs_on {
+            jobs.extend(self.browser.needs_lookup().into_iter().map(|path| Job {
+                pass: Pass::Lookup,
+                path,
+            }));
+        }
+        jobs.extend(self.browser.unanalysed().into_iter().map(|path| Job {
+            pass: Pass::Analyse,
+            path,
+        }));
+        self.analysing = jobs;
         self.analysis_total = self.analysing.len();
         match self.analysis_total {
-            0 => self.message = "Every track is already analysed".into(),
+            0 => self.message = "Every track is already read and analysed".into(),
             n => {
-                self.message = format!("Analysing {n} tracks. A again stops it.");
+                self.message = format!("Working through {n} tracks. Alt+a again stops it.");
                 self.next_analysis();
             }
         }
     }
 
-    /// Send the next file to the loader and say how far along the run is.
+    /// Send the next job to the loader and say how far along the run is.
     fn next_analysis(&mut self) {
-        let Some(path) = self.analysing.front().cloned() else {
+        let Some(job) = self.analysing.front().cloned() else {
             self.browser.set_note(None);
             self.analysis_total = 0;
             return;
         };
         let done = self.analysis_total - self.analysing.len() + 1;
+        let what = match job.pass {
+            Pass::Tags => "reading tags",
+            Pass::Lookup => "looking up",
+            Pass::Analyse => "analysing",
+        };
         self.browser
-            .set_note(Some(format!("analysing {done} of {}", self.analysis_total)));
-        self.loader.analyse(path);
+            .set_note(Some(format!("{what} {done} of {}", self.analysis_total)));
+        match job.pass {
+            Pass::Tags => self.loader.read_tags_for(job.path),
+            Pass::Analyse => self.loader.analyse(job.path),
+            Pass::Lookup => {
+                let (artist, title) = self
+                    .browser
+                    .artist_and_title_of(&job.path)
+                    .unwrap_or_default();
+                self.loader.look_up(job.path, artist, title);
+            }
+        }
     }
 
     /// Read `roots` into the browser.
@@ -606,6 +689,20 @@ impl App {
                 self.keymap.set_mode(input::Mode::Mix);
             }
             Action::AnalyseLibrary => self.start_analysis(),
+            Action::BrowserLookup => match self.browser.selected_artist_and_title() {
+                None => self.message = "Nothing selected in the browser".into(),
+                Some(_) if !self.discogs_on => {
+                    self.message = "Discogs lookup is off. Set [library] discogs = true.".into()
+                }
+                Some((artist, title)) => match self.browser.selected_path() {
+                    None => self.message = "Nothing selected in the browser".into(),
+                    Some(path) => {
+                        let path = path.to_path_buf();
+                        self.loader.look_up(path, artist, title);
+                        self.message = "Asking Discogs…".into();
+                    }
+                },
+            },
             Action::CrossfaderFade(dir) => {
                 let to = end_of_travel(dir);
                 let focused = self.keymap.focused();

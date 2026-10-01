@@ -282,3 +282,13 @@ fn the_example_config_lists_every_key_at_its_default() {
         );
     }
 }
+
+#[test]
+fn the_discogs_lookup_is_off_unless_it_is_switched_on() {
+    // It sends the artist and title of files in the library to a third party, so it waits
+    // to be asked.
+    let config: Config = toml::from_str("[library]\nfolders = []\n").unwrap();
+    assert!(!config.library.discogs);
+    let on: Config = toml::from_str("[library]\nfolders = []\ndiscogs = true\n").unwrap();
+    assert!(on.library.discogs);
+}
