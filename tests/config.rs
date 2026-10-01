@@ -241,32 +241,30 @@ fn the_example_config_lists_every_key_at_its_default() {
         "the example has drifted from the defaults"
     );
 
-    // Every key, not just the ones with interesting defaults: nothing is left to be found
-    // out by reading the source.
-    for key in [
-        "backend",
-        "device",
-        "sample_rate",
-        "buffer_frames",
-        "client_name",
-        "routing",
-        "master_ports",
-        "cue_ports",
-        "waveform_mode",
-        "end_warning_secs",
-        "graphics",
-        "tempo_range",
-        "crossfader_curve",
-        "fade_beats",
-        "enabled",
-        "mappings",
-        "soft_takeover",
-        "folders",
-    ] {
-        assert!(
-            text.lines().any(|l| l.trim_start().starts_with(key)),
-            "{key} is not set in the example"
-        );
+    // The key list is read out of the source rather than written down here. A hand-kept list
+    // is only as good as the last person to remember it, and this one had already missed a
+    // key by the time it was noticed.
+    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/config.rs"))
+        .expect("src/config.rs is where the sections are declared");
+    for section in ["Audio", "Ui", "Deck", "Mixer", "Midi", "Library"] {
+        let decl = format!("pub struct {section} {{");
+        let at = source
+            .find(&decl)
+            .unwrap_or_else(|| panic!("{section} is declared in src/config.rs"))
+            + decl.len();
+        let body = &source[at..][..source[at..].find("\n}").expect("the struct ends")];
+        let keys: Vec<&str> = body
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("pub "))
+            .filter_map(|l| l.split(':').next())
+            .collect();
+        assert!(!keys.is_empty(), "no fields found on {section}");
+        for key in keys {
+            assert!(
+                text.lines().any(|l| l.trim_start().starts_with(key)),
+                "{key} is a key of {section} and is not set in the example"
+            );
+        }
     }
     for section in [
         "[audio]",
