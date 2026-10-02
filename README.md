@@ -59,13 +59,13 @@ Every key, both keyboard layers and the key map images: [docs/controls.md](docs/
 
 ## Documentation
 
-- [Installing](docs/install.md). Binaries, building from source, terminal requirements,
+- [Installing](docs/install.md): Binaries, building from source, terminal requirements,
   realtime audio.
-- [Controls](docs/controls.md). The full key reference for mix mode and browser mode.
-- [The browser](docs/browser.md). Library folders, tempo and key filtering, typed filters,
+- [Controls](docs/controls.md): The full key reference for mix mode and browser mode.
+- [The browser](docs/browser.md): Library folders, tempo and key filtering, typed filters,
   Discogs genre lookup.
-- [Waveforms](docs/waveforms.md). The three colour modes and pixel rendering.
-- [Configuration](docs/configuration.md). The config file, MIDI mappings, track sidecars, logs.
+- [Waveforms](docs/waveforms.md): The three colour modes and pixel rendering.
+- [Configuration](docs/configuration.md): The config file, MIDI mappings, track sidecars, logs.
 
 ## Building and testing
 
