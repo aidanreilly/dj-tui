@@ -121,7 +121,14 @@ impl AlsaBackend {
         self,
         processor: EngineProcessor,
         routing: &Routing,
+        output: engine::OutputMode,
     ) -> Result<AlsaRunning, String> {
+        if output == engine::OutputMode::Decks && self.channels < 4 {
+            return Err(format!(
+                "output = \"decks\" needs four output channels and {} has {}; use output = \"mix\"",
+                self.device, self.channels
+            ));
+        }
         let AlsaBackend {
             pcm,
             device,

@@ -20,7 +20,9 @@ fn plays_through_a_real_jack_server() {
     let rate = jack.sample_rate();
     assert!(rate > 0);
     let (mut h, p) = channel(Engine::new(), 32);
-    let running = jack.activate(p, &Routing::Auto).expect("activate");
+    let running = jack
+        .activate(p, &Routing::Auto, engine::OutputMode::Mix)
+        .expect("activate");
     assert!(running.warnings().is_empty(), "{:?}", running.warnings());
 
     let ports = running.connected_ports();

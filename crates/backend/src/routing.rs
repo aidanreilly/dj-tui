@@ -1,5 +1,13 @@
-/// Our output ports, in order: master left/right, headphone cue left/right.
-pub const OUTPUT_PORTS: [&str; 4] = ["master_L", "master_R", "cue_L", "cue_R"];
+use engine::OutputMode;
+
+/// Our four output ports, in order. The first pair is the master in `Mix` and deck A in
+/// `Decks`; the second is the headphone cue, or deck B.
+pub fn output_ports(mode: OutputMode) -> [&'static str; 4] {
+    match mode {
+        OutputMode::Mix => ["master_L", "master_R", "cue_L", "cue_R"],
+        OutputMode::Decks => ["deck_a_L", "deck_a_R", "deck_b_L", "deck_b_R"],
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Routing {
@@ -24,8 +32,14 @@ pub struct Plan {
 }
 
 /// Decide connections for client `client` given the physical playback ports that exist.
-pub fn plan_connections(client: &str, routing: &Routing, physical: &[String]) -> Plan {
-    let ours = |i: usize| format!("{client}:{}", OUTPUT_PORTS[i]);
+pub fn plan_connections(
+    client: &str,
+    routing: &Routing,
+    physical: &[String],
+    mode: OutputMode,
+) -> Plan {
+    let names = output_ports(mode);
+    let ours = |i: usize| format!("{client}:{}", names[i]);
     let mut plan = Plan::default();
     match routing {
         Routing::Off => {}
@@ -48,10 +62,10 @@ pub fn plan_connections(client: &str, routing: &Routing, physical: &[String]) ->
                 plan.connections.push((ours(i), port.clone()));
             }
             if physical.len() < 4 {
-                plan.warnings.push(
-                    "soundcard has only two outputs, so headphone cue is not connected; set routing = \"split\" for mono master left and mono cue right"
-                        .into(),
-                );
+                plan.warnings.push(match mode {
+                    OutputMode::Mix => "soundcard has only two outputs, so headphone cue is not connected; set routing = \"split\" for mono master left and mono cue right".to_string(),
+                    OutputMode::Decks => "soundcard has only two outputs, so deck B is not connected; connect it by hand or use output = \"mix\"".to_string(),
+                });
             }
         }
         Routing::Explicit { master, cue } => {
@@ -68,6 +82,12 @@ pub fn plan_connections(client: &str, routing: &Routing, physical: &[String]) ->
                     plan.warnings
                         .push(format!("configured port {target} does not exist"));
                 }
+            }
+            if mode == OutputMode::Decks && cue.is_none() {
+                plan.warnings.push(
+                    "output = \"decks\" needs a second pair: deck B is not connected, so set cue_ports to its outputs"
+                        .into(),
+                );
             }
         }
     }

@@ -2,7 +2,7 @@
 //! only run with DJ_TUI_ALSA_TESTS=1 set, the way the JACK ones do.
 
 use backend::{alsa_devices, AlsaBackend, Routing};
-use engine::{channel, Engine};
+use engine::{channel, Engine, OutputMode};
 
 fn hardware_tests() -> bool {
     std::env::var("DJ_TUI_ALSA_TESTS").is_ok_and(|v| v == "1")
@@ -55,7 +55,7 @@ fn a_real_device_plays_and_reports_what_it_settled_on() {
 
     let (_handle, processor) = channel(Engine::with_sample_rate(backend.sample_rate()), 16);
     let running = backend
-        .activate(processor, &Routing::Auto)
+        .activate(processor, &Routing::Auto, OutputMode::Mix)
         .expect("start playback");
     assert_eq!(running.device(), "default");
     assert!(running.buffer_size() > 0);
@@ -66,4 +66,23 @@ fn a_real_device_plays_and_reports_what_it_settled_on() {
         "a quarter second of silence is not hard"
     );
     running.stop();
+}
+
+#[test]
+fn deck_mode_needs_four_channels() {
+    if !hardware_tests() {
+        return;
+    }
+    let Ok(backend) = AlsaBackend::open("default", 48_000, 256) else {
+        return;
+    };
+    if backend.channels() >= 4 {
+        // This card can carry deck mode, so there is no error to assert.
+        return;
+    }
+    let (_, processor) = channel(Engine::new(), 32);
+    let Err(err) = backend.activate(processor, &Routing::Auto, OutputMode::Decks) else {
+        panic!("deck mode should refuse a device with fewer than four channels");
+    };
+    assert!(err.contains("four output channels"), "{err}");
 }

@@ -1,4 +1,5 @@
-use crate::{plan_connections, PlanarRenderer, Routing, OUTPUT_PORTS};
+use crate::{output_ports, plan_connections, PlanarRenderer, Routing};
+use engine::OutputMode;
 use engine::EngineProcessor;
 use jack::{
     AudioOut, Client, ClientOptions, Control, Frames, MidiIn, MidiOut, Port, PortFlags, PortSpec,
@@ -112,6 +113,8 @@ pub struct Running {
     xruns: Arc<AtomicU64>,
     /// What the callback reported about its own scheduling, once it has run.
     sched: Arc<AtomicU32>,
+    /// What our four output ports carry, which is what names them.
+    output: OutputMode,
     sample_rate: u32,
     buffer_size: u32,
 }
@@ -132,6 +135,7 @@ impl JackBackend {
         self,
         processor: EngineProcessor,
         routing: &Routing,
+        output: OutputMode,
     ) -> Result<Running, String> {
         let client = self.client;
         let reg = |name: &str| {
@@ -139,12 +143,8 @@ impl JackBackend {
                 .register_port(name, AudioOut::default())
                 .map_err(|e| format!("register {name}: {e}"))
         };
-        let ports = [
-            reg(OUTPUT_PORTS[0])?,
-            reg(OUTPUT_PORTS[1])?,
-            reg(OUTPUT_PORTS[2])?,
-            reg(OUTPUT_PORTS[3])?,
-        ];
+        let names = output_ports(output);
+        let ports = [reg(names[0])?, reg(names[1])?, reg(names[2])?, reg(names[3])?];
         let midi_in = client
             .register_port("midi_in", MidiIn::default())
             .map_err(|e| format!("register midi_in: {e}"))?;
@@ -184,7 +184,7 @@ impl JackBackend {
             Some(AudioOut::default().jack_port_type()),
             PortFlags::IS_INPUT | PortFlags::IS_PHYSICAL,
         );
-        let plan = plan_connections(&name, routing, &physical);
+        let plan = plan_connections(&name, routing, &physical, output);
         let mut warnings = plan.warnings;
         for (ours, theirs) in &plan.connections {
             if let Err(e) = active.as_client().connect_ports_by_name(ours, theirs) {
@@ -202,6 +202,7 @@ impl JackBackend {
             midi_rx,
             midi_tx,
             midi_connected: Vec::new(),
+            output,
         })
     }
 }
@@ -288,7 +289,7 @@ impl Running {
     /// Current (ours, theirs) connections, read back from the server.
     pub fn connected_ports(&self) -> Vec<(String, String)> {
         let client = self.client.as_client();
-        OUTPUT_PORTS
+        output_ports(self.output)
             .iter()
             .map(|p| format!("{}:{p}", self.name))
             .filter_map(|full| client.port_by_name(&full).map(|port| (full, port)))
