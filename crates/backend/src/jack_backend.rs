@@ -1,6 +1,6 @@
 use crate::{output_ports, plan_connections, PlanarRenderer, Routing};
-use engine::OutputMode;
 use engine::EngineProcessor;
+use engine::OutputMode;
 use jack::{
     AudioOut, Client, ClientOptions, Control, Frames, MidiIn, MidiOut, Port, PortFlags, PortSpec,
     ProcessScope, RawMidi,
@@ -144,7 +144,12 @@ impl JackBackend {
                 .map_err(|e| format!("register {name}: {e}"))
         };
         let names = output_ports(output);
-        let ports = [reg(names[0])?, reg(names[1])?, reg(names[2])?, reg(names[3])?];
+        let ports = [
+            reg(names[0])?,
+            reg(names[1])?,
+            reg(names[2])?,
+            reg(names[3])?,
+        ];
         let midi_in = client
             .register_port("midi_in", MidiIn::default())
             .map_err(|e| format!("register midi_in: {e}"))?;

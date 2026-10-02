@@ -83,3 +83,32 @@ fn meters_follow_each_deck_and_the_master_meter_stays_quiet() {
 fn mix_is_the_default() {
     assert_eq!(OutputMode::default(), OutputMode::Mix);
 }
+
+/// A ramp, so a wrong rate, a repeated render or a dropped frame shows up. Flat tracks cannot
+/// catch any of those: every sample is the same, so the playhead can be anywhere.
+fn ramp(n: usize) -> Arc<Track> {
+    Arc::new(Track::from_interleaved(
+        (0..n).map(|i| i as f32 / n as f32).collect(),
+        48_000,
+    ))
+}
+
+#[test]
+fn deck_output_equals_the_deck_rendering_itself_sample_for_sample() {
+    let mut e = Engine::with_output(48_000, OutputMode::Decks);
+    e.apply(Command::Load(A, ramp(4_000)));
+    e.apply(Command::PlayPause(A));
+
+    // The same track through a bare deck is the reference the mode promises to match.
+    let mut reference = engine::Deck::with_sample_rate(48_000);
+    reference.load(ramp(4_000));
+    reference.play_pause();
+
+    let (mut a, mut b) = (vec![0.0; 512], vec![0.0; 512]);
+    let mut want = vec![0.0; 512];
+    for block in 0..4 {
+        e.process(&mut a, &mut b);
+        reference.render(&mut want);
+        assert_eq!(a, want, "block {block} drifted from the deck's own render");
+    }
+}

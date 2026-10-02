@@ -75,17 +75,14 @@ fn midi_learn() -> ExitCode {
         }
     };
     let (_, processor) = engine::channel(Engine::new(), COMMAND_QUEUE);
-    let mut running = match backend.activate(
-        processor,
-        &backend::Routing::Auto,
-        engine::OutputMode::Mix,
-    ) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let mut running =
+        match backend.activate(processor, &backend::Routing::Auto, engine::OutputMode::Mix) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::FAILURE;
+            }
+        };
     println!("Listening for controllers. Press a control to see what it sends; Ctrl+C to stop.");
     println!("Paste the lines into a mapping file under mappings/, changing the action to suit.");
     let mut last = None;
@@ -183,8 +180,7 @@ fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<Strin
                         alsa.channels()
                     ));
                 }
-                let (handle, processor) =
-                    channel(Engine::with_output(rate, output), COMMAND_QUEUE);
+                let (handle, processor) = channel(Engine::with_output(rate, output), COMMAND_QUEUE);
                 let app = App::new(handle, config, rate);
                 let running = alsa.activate(processor, &routing, output)?;
                 return Ok((app, Audio::Alsa(running), notes));

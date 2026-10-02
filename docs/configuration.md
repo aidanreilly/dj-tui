@@ -80,6 +80,21 @@ There is no headphone cue bus in this mode, since all four outputs carry deck au
 mixer does the cueing. The mixer panel changes to match: two output meters and the pairs they
 feed, with the keys for the bypassed controls left inert.
 
+Under JACK the port names keep their config keys but change meaning: `master_ports` is now
+deck A and `cue_ports` is now deck B. Since `routing = "auto"` usually picks the wrong card
+under PipeWire, naming them is the common case:
+
+```toml
+[audio]
+output = "decks"
+routing = "explicit"
+master_ports = ["<node>:playback_FL", "<node>:playback_FR"]   # deck A
+cue_ports    = ["<node>:playback_RL", "<node>:playback_RR"]   # deck B
+```
+
+Leave `cue_ports` empty and deck B goes nowhere, which dj-tui warns about at startup rather
+than quietly doubling deck A onto both pairs.
+
 This needs four outputs. The ALSA backend refuses to start on a card with fewer, naming the
 channel count. The JACK backend warns and leaves deck B for you to connect by hand, which is
 a reasonable thing to want. It cannot be combined with `routing = "split"`, which exists to

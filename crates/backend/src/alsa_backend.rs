@@ -17,6 +17,18 @@ const PERIODS: u32 = 3;
 /// Channels wanted: master left and right, then the headphone cue pair.
 const WANTED_CHANNELS: u32 = 4;
 
+/// Whether `channels` can carry deck mode, which needs a pair per deck. Separate from the
+/// backend so the message and the threshold are testable without a card.
+pub fn deck_mode_channels(channels: u32, device: &str) -> Result<(), String> {
+    if channels < 4 {
+        return Err(format!(
+            "output = \"decks\" needs four output channels and {device} has {channels}; \
+             use output = \"mix\""
+        ));
+    }
+    Ok(())
+}
+
 /// A playback device as the setup screen lists it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Device {
@@ -123,11 +135,8 @@ impl AlsaBackend {
         routing: &Routing,
         output: engine::OutputMode,
     ) -> Result<AlsaRunning, String> {
-        if output == engine::OutputMode::Decks && self.channels < 4 {
-            return Err(format!(
-                "output = \"decks\" needs four output channels and {} has {}; use output = \"mix\"",
-                self.device, self.channels
-            ));
+        if output == engine::OutputMode::Decks {
+            deck_mode_channels(self.channels, &self.device)?;
         }
         let AlsaBackend {
             pcm,

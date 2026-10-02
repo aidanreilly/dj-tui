@@ -262,9 +262,11 @@ impl Config {
     fn validate(&self) -> Result<(), String> {
         self.routing()?;
         if self.audio.output == OutputSetting::Decks && self.audio.routing == RoutingMode::Split {
-            return Err("audio.output = \"decks\" cannot use routing = \"split\": split folds a \
+            return Err(
+                "audio.output = \"decks\" cannot use routing = \"split\": split folds a \
                  master and a cue onto one stereo pair, and deck mode needs two"
-                .into());
+                    .into(),
+            );
         }
         if !TEMPO_RANGES.contains(&self.deck.tempo_range) {
             return Err(format!(

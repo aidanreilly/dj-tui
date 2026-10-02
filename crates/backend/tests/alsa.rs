@@ -86,3 +86,18 @@ fn deck_mode_needs_four_channels() {
     };
     assert!(err.contains("four output channels"), "{err}");
 }
+
+#[test]
+fn the_deck_mode_channel_check_names_the_device_and_the_count() {
+    let err = backend::deck_mode_channels(2, "plughw:1,0")
+        .expect_err("two channels cannot carry deck A and deck B");
+    assert!(err.contains("four output channels"), "{err}");
+    assert!(err.contains("plughw:1,0"), "names the device: {err}");
+    assert!(err.contains('2'), "names the count: {err}");
+    assert!(err.contains("mix"), "offers the way out: {err}");
+}
+
+#[test]
+fn four_channels_can_carry_deck_mode() {
+    assert!(backend::deck_mode_channels(4, "plughw:1,0").is_ok());
+}

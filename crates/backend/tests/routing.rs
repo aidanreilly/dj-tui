@@ -171,9 +171,11 @@ fn split_mono_puts_master_left_and_cue_right_on_a_stereo_card() {
 
 #[test]
 fn split_mono_without_outputs_warns() {
-    assert!(!plan_connections("x", &Routing::Split, &[], OutputMode::Mix)
-        .warnings
-        .is_empty());
+    assert!(
+        !plan_connections("x", &Routing::Split, &[], OutputMode::Mix)
+            .warnings
+            .is_empty()
+    );
 }
 
 #[test]

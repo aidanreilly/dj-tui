@@ -146,9 +146,19 @@ pub fn render_screen(f: &mut Frame, v: &ScreenView) {
             ..area
         }
     } else {
-        f.render_widget(DeckPanel::new(&v.decks[0]), l.deck_a);
+        // Deck mode bypasses the EQ, so a lit band marker would claim an effect the audio
+        // never sees. Suppressing it here keeps every caller honest, not just the app.
+        let bypassed = v.mixer.output == engine::OutputMode::Decks;
+        let deck = |i: usize| {
+            let mut d = v.decks[i].clone();
+            if bypassed {
+                d.kills = [false; 3];
+            }
+            d
+        };
+        f.render_widget(DeckPanel::new(&deck(0)), l.deck_a);
         render_phase(f, l.phase, v.phase);
-        f.render_widget(DeckPanel::new(&v.decks[1]), l.deck_b);
+        f.render_widget(DeckPanel::new(&deck(1)), l.deck_b);
         render_mixer(f, l.mixer, &v.mixer);
         l.browser
     };

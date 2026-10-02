@@ -62,6 +62,8 @@ impl Default for MixerView {
 fn render_deck_out(f: &mut Frame, area: Rect, m: &MixerView) {
     let block = Block::bordered().title(" DECK OUT ");
     let inner = block.inner(area);
+    // The label column is the width the meters start at, so the letters line up with them.
+    let header = || format!("{:<5}{:^w$} {:^w$}", "", "A", "B", w = BAR);
     let meters = || {
         let mut pk = vec![Span::raw(format!("{:<5}", "PK"))];
         pk.extend(meter_spans(m.strips[0].meter));
@@ -72,7 +74,9 @@ fn render_deck_out(f: &mut Frame, area: Rect, m: &MixerView) {
     let dim = Style::new().fg(theme::colour(theme::DIM_LABEL));
     let lines = if inner.height >= 6 {
         vec![
-            Line::from("      A           B"),
+            // Centre each letter over its own meter, the way the tall strip does, rather
+            // than spacing them by hand.
+            Line::from(header()),
             Line::from(meters()),
             Line::from(""),
             Line::from(Span::styled(" out 1/2      out 3/4", dim)),

@@ -1,7 +1,7 @@
 //! The mixer panel in deck output mode: meters and a label, nothing that lies.
 
 use engine::{DeckId, OutputMode};
-use ratatui::{backend::TestBackend, Terminal};
+use ratatui::{backend::TestBackend, style::Modifier, Terminal};
 use tui::{render_screen, DeckView, MixerView, ScreenView};
 
 /// An empty deck. `DeckView` has no `Default`, so this mirrors the helper in
@@ -92,4 +92,92 @@ fn mix_mode_still_draws_the_full_strip() {
         assert!(out.contains(row), "{row} missing from the mix strip: {out}");
     }
     assert!(!out.contains("DECK OUT"), "{out}");
+}
+
+/// Every cell's symbol plus whether it is DIM, which is how a killed band marker is drawn.
+fn styled_screen(output: OutputMode, kills: [bool; 3]) -> Vec<(String, bool)> {
+    let mut view = screen(output);
+    view.decks[0].kills = kills;
+    view.decks[1].kills = kills;
+    let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
+    term.draw(|f| render_screen(f, &view)).unwrap();
+    let buf = term.backend().buffer();
+    (0..44)
+        .flat_map(|y| (0..120).map(move |x| (x, y)))
+        .map(|(x, y)| {
+            (
+                buf[(x, y)].symbol().to_string(),
+                buf[(x, y)].modifier.contains(Modifier::DIM),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn killing_a_band_changes_nothing_on_screen_in_deck_mode() {
+    // Deck mode bypasses the EQ, so a lit band marker would claim an effect the audio never
+    // sees. The screen must be identical whether or not the kills are set.
+    assert_eq!(
+        styled_screen(OutputMode::Decks, [true; 3]),
+        styled_screen(OutputMode::Decks, [false; 3]),
+        "a kill must not show anywhere on screen in deck mode"
+    );
+}
+
+#[test]
+fn killing_a_band_still_shows_in_mix_mode() {
+    assert_ne!(
+        styled_screen(OutputMode::Mix, [true; 3]),
+        styled_screen(OutputMode::Mix, [false; 3]),
+        "mix mode must still mark a killed band"
+    );
+}
+
+/// The rows of the deck-out panel, trimmed of the border, as plain strings.
+fn deck_out_rows() -> Vec<String> {
+    let mut term = Terminal::new(TestBackend::new(120, 44)).unwrap();
+    term.draw(|f| render_screen(f, &screen(OutputMode::Decks)))
+        .unwrap();
+    let buf = term.backend().buffer();
+    // The panel sits in the rightmost 26 columns; drop its two border columns.
+    (0..44)
+        .map(|y| {
+            (94..119)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+        })
+        .collect()
+}
+
+#[test]
+fn each_output_label_sits_over_its_own_meter() {
+    let rows = deck_out_rows();
+    let pk_row = rows
+        .iter()
+        .position(|r| r.contains(tui::mixer::UNLIT_PIP))
+        .expect("the meter row");
+    // The header is the row directly above the meters it labels.
+    let header = &rows[pk_row - 1];
+    let pk = &rows[pk_row];
+
+    let pips: Vec<usize> = pk
+        .chars()
+        .enumerate()
+        .filter(|(_, c)| *c == tui::mixer::UNLIT_PIP)
+        .map(|(i, _)| i)
+        .collect();
+    assert_eq!(pips.len(), tui::mixer::BAR * 2, "two meters of BAR pips");
+    let centre_a = pips[tui::mixer::BAR / 2];
+    let centre_b = pips[tui::mixer::BAR + tui::mixer::BAR / 2];
+
+    assert_eq!(
+        header.chars().position(|c| c == 'A'),
+        Some(centre_a),
+        "A should sit over its meter\n{header}\n{pk}"
+    );
+    assert_eq!(
+        header.chars().position(|c| c == 'B'),
+        Some(centre_b),
+        "B should sit over its meter\n{header}\n{pk}"
+    );
 }

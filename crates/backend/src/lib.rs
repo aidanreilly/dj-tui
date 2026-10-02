@@ -7,7 +7,9 @@ mod planar;
 pub mod realtime;
 mod routing;
 
-pub use alsa_backend::{devices as alsa_devices, AlsaBackend, AlsaRunning, Device};
+pub use alsa_backend::{
+    deck_mode_channels, devices as alsa_devices, AlsaBackend, AlsaRunning, Device,
+};
 pub use jack_backend::{JackBackend, Running};
 pub use planar::PlanarRenderer;
 pub use routing::{output_ports, plan_connections, Plan, Routing};
