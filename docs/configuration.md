@@ -21,7 +21,7 @@ Mappings are TOML files in `~/.config/dj-tui/mappings/`. Copy `mappings/generic.
 repository as a starting point, then find out what your hardware sends:
 
 ```sh
-cargo run -- --midi-learn
+dj-tui --midi-learn
 ```
 
 Soft takeover is on by default, so a knob has to reach the value on screen before it takes

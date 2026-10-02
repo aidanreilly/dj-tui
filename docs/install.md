@@ -19,6 +19,28 @@ server is installed. Every release carries a `.sha256` beside it:
 sha256sum -c dj-tui-*-x86_64-linux.tar.gz.sha256
 ```
 
+The tarball also carries `config.toml.example` and the licence, so keep the directory around
+until you have copied the example config somewhere useful. See
+[configuration](configuration.md).
+
+## Putting it on your PATH
+
+Running it from wherever you unpacked it gets old. Copy the binary into a directory your shell
+already searches:
+
+```sh
+install -Dm755 dj-tui ~/.local/bin/dj-tui         # just for you, no sudo
+sudo install -Dm755 dj-tui /usr/local/bin/dj-tui  # for everyone on the machine
+```
+
+`~/.local/bin` is on the PATH by default on Fedora and most systemd distributions. Check with
+`echo $PATH` where you are unsure, and add it in your shell profile if it is missing.
+
+From a checkout, `cargo install --path .` builds in release mode and puts the binary in
+`~/.cargo/bin`, which the Rust installer already added to your PATH.
+
+Either way, `dj-tui --demo` from any directory tells you it worked.
+
 ## From source
 
 Fedora:
@@ -34,7 +56,7 @@ sudo apt install cargo libjack-jackd2-dev libasound2-dev pipewire-jack
 ```
 
 Then `cargo build --release`, or run it straight from the checkout. Building needs Rust 1.90 or
-newer.
+newer. `cargo install --path .` does the release build and installs it in one step.
 
 Tests:
 
@@ -65,7 +87,18 @@ WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF.
 ## Running
 
 ```sh
-cargo run -- ~/Music/one.flac ~/Music/two.mp3   # deck A, deck B
-cargo run -- --demo                             # click tracks at 124 and 126 BPM
-cargo run -- --midi-learn                       # print what a controller sends
+dj-tui ~/Music/one.flac ~/Music/two.mp3   # deck A, deck B
+dj-tui --demo                             # click tracks at 124 and 126 BPM
+dj-tui --midi-learn                       # print what a controller sends
 ```
+
+How you reach the binary depends on where it came from.
+
+| Installed from | Command |
+| --- | --- |
+| A release tarball | `./dj-tui` inside the unpacked directory. |
+| `cargo build --release` | `./target/release/dj-tui`. |
+| `cargo install --path .`, or a copy into a PATH directory | `dj-tui` from anywhere. |
+| A checkout, without building first | `cargo run --` followed by the arguments, as in `cargo run -- --demo`. |
+
+The rest of these docs write the command as `dj-tui`.

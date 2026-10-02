@@ -35,10 +35,15 @@ Full steps, per-distribution packages and realtime scheduling: [docs/install.md]
 ## Run
 
 ```sh
-cargo run -- ~/Music/one.flac ~/Music/two.mp3   # deck A, deck B
-cargo run -- --demo                             # click tracks at 124 and 126 BPM
-cargo run -- --midi-learn                       # print what a controller sends
+dj-tui ~/Music/one.flac ~/Music/two.mp3   # deck A, deck B
+dj-tui --demo                             # click tracks at 124 and 126 BPM
+dj-tui --midi-learn                       # print what a controller sends
 ```
+
+From an unpacked release tarball the binary sits in that directory, so it is `./dj-tui` until
+you copy it somewhere on your `PATH`, which
+[docs/install.md](docs/install.md#putting-it-on-your-path) covers. Working in a checkout
+instead, put `cargo run --` in front of the arguments, as in `cargo run -- --demo`.
 
 ## Quickstart
 
