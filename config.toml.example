@@ -6,9 +6,10 @@
 # directly, for a machine with no sound server running.
 backend = "jack"
 
-# Which card the ALSA backend opens: "default", or something like "hw:0,0" for a card of your
-# own. The JACK backend ignores this. Ctrl+D in the app lists what is there and writes your
-# choice back into this file.
+# Which card the ALSA backend opens: "default", or something like "plughw:1,0" for a card of
+# your own. Prefer plughw over hw: dj-tui asks for 32 bit float, which most USB interfaces do
+# not offer directly, and the plug layer converts. The JACK backend ignores this. Ctrl+D in
+# the app lists what is there and writes your choice back into this file.
 device = "default"
 
 # Sample rate in Hz, used only by backends that pick their own. JACK's server rate always

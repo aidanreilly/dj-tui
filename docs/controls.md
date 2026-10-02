@@ -58,8 +58,8 @@ with the track and comes back the next time you load it.
 | `T` / `Y` / `U` | The same three kills on deck B. |
 | `o` / `O` | Master filter toward low-pass, and toward high-pass with Shift. |
 | `v` | Master filter back to the middle. |
-| `m` | Headphone cue on the focused channel. |
-| `h` / `H` | Headphone mix, from the cue bus toward the master with Shift. |
+| `m` | Headphone cue on the focused channel. Each deck toggles on its own, so cueing both sends both to the headphones. The `CUE` dots in the mixer fill to show which are on. |
+| `h` / `H` | Headphone mix, from the cue bus toward the master with Shift. It starts halfway, so the headphones carry an even blend of the cue and the master until you move it. Five presses of `h` reaches cue only. |
 
 ## Fades
 

@@ -69,6 +69,11 @@ cargo test --workspace
 Run dj-tui directly in a modern terminal emulator such as Ghostty, kitty, foot, WezTerm or a
 recent Alacritty. Terminal multiplexers are not supported.
 
+Give the window at least 110 columns. Narrower than that and the mixer collapses into a bar
+under the decks carrying only the channel faders, the meters, the cue dots and the crossfader.
+The full strip with trim, EQ, filter and the headphone mix needs the width. Forty rows keeps
+both decks and the browser on screen at once.
+
 ## Realtime audio
 
 dj-tui asks for realtime scheduling on any thread it can. To grant it on Fedora and most
