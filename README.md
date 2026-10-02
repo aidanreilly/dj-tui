@@ -6,6 +6,13 @@ Two decks with CDJ-style cueing, hot cues, loops and key lock. A three-band isol
 with a master filter. Tempo and key detection that runs as a track loads, and colour waveforms
 drawn as real pixels where the terminal allows it.
 
+Moving the tempo takes the pitch with it, as a turntable does. `k` locks the key instead,
+holding the pitch where it is while the fader moves, through a WSOLA time stretcher that
+leaves the playhead alone so loops and cues behave the same either way. Keep the pull under
+about 10 %. The fader opens at ±8 % for that reason, and the wider ranges in
+`[deck] tempo_range` are there for when you need the reach and will take the grain artefacts
+that come with it.
+
 Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
 <img width="1433" height="841" alt="image" src="https://github.com/user-attachments/assets/e222814b-a197-4ac1-a4b2-d9729ccd2063" />
