@@ -108,6 +108,17 @@ pub struct Audio {
     pub routing: RoutingMode,
     pub master_ports: Vec<String>,
     pub cue_ports: Vec<String>,
+    /// What the outputs carry: the built-in mixer, or each deck on its own pair.
+    pub output: OutputSetting,
+}
+
+/// What the outputs carry. Mirrors `engine::OutputMode` so the config owns its serde surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputSetting {
+    #[default]
+    Mix,
+    Decks,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -131,6 +142,7 @@ impl Default for Audio {
             routing: RoutingMode::Auto,
             master_ports: Vec::new(),
             cue_ports: Vec::new(),
+            output: OutputSetting::Mix,
         }
     }
 }
@@ -213,6 +225,14 @@ impl Config {
         Ok(c)
     }
 
+    /// What the outputs carry.
+    pub fn output(&self) -> engine::OutputMode {
+        match self.audio.output {
+            OutputSetting::Mix => engine::OutputMode::Mix,
+            OutputSetting::Decks => engine::OutputMode::Decks,
+        }
+    }
+
     /// Output routing for the audio backend.
     pub fn routing(&self) -> Result<backend::Routing, String> {
         let pair = |v: &[String], key: &str| -> Result<[String; 2], String> {
@@ -241,6 +261,11 @@ impl Config {
 
     fn validate(&self) -> Result<(), String> {
         self.routing()?;
+        if self.audio.output == OutputSetting::Decks && self.audio.routing == RoutingMode::Split {
+            return Err("audio.output = \"decks\" cannot use routing = \"split\": split folds a \
+                 master and a cue onto one stereo pair, and deck mode needs two"
+                .into());
+        }
         if !TEMPO_RANGES.contains(&self.deck.tempo_range) {
             return Err(format!(
                 "deck.tempo_range must be one of {TEMPO_RANGES:?}, got {}",

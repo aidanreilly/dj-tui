@@ -304,3 +304,30 @@ fn the_discogs_cache_sits_with_the_rest_of_the_state() {
     );
     assert!(dj_tui::discogs_cache_path(None, None).is_none());
 }
+
+#[test]
+fn output_defaults_to_mix() {
+    let c = Config::from_toml("").unwrap();
+    assert_eq!(c.output(), engine::OutputMode::Mix);
+}
+
+#[test]
+fn output_decks_parses() {
+    let c = Config::from_toml("[audio]\noutput = \"decks\"\n").unwrap();
+    assert_eq!(c.output(), engine::OutputMode::Decks);
+}
+
+#[test]
+fn a_misspelled_output_value_is_an_error() {
+    let err = Config::from_toml("[audio]\noutput = \"deck\"\n")
+        .expect_err("unknown value should not fall back to a default");
+    assert!(err.contains("output"), "{err}");
+}
+
+#[test]
+fn decks_with_split_routing_is_rejected() {
+    let err = Config::from_toml("[audio]\noutput = \"decks\"\nrouting = \"split\"\n")
+        .expect_err("split folds a master and a cue onto one pair");
+    assert!(err.contains("split"), "{err}");
+    assert!(err.contains("decks"), "{err}");
+}

@@ -23,6 +23,12 @@ buffer_frames = 256
 # The name dj-tui registers under, which is what you will see in a patchbay.
 client_name = "dj-tui"
 
+# What the outputs carry. "mix" is dj-tui's own mixer: the master on outputs 1 and 2 and the
+# headphone cue on 3 and 4. "decks" sends deck A to outputs 1 and 2 and deck B to 3 and 4
+# untouched, so a hardware DJ mixer does the crossfading, EQ and cueing. "decks" needs four
+# outputs, and the trim, EQ, fader, crossfader, filter and limiter stop affecting the sound.
+output = "mix"
+
 # Where the master and headphone cue outputs are connected at startup.
 #   "auto"      connect master to the first stereo pair the system offers, cue to the next
 #   "off"       connect nothing and leave the patching to you

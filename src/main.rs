@@ -75,7 +75,11 @@ fn midi_learn() -> ExitCode {
         }
     };
     let (_, processor) = engine::channel(Engine::new(), COMMAND_QUEUE);
-    let mut running = match backend.activate(processor, &backend::Routing::Auto) {
+    let mut running = match backend.activate(
+        processor,
+        &backend::Routing::Auto,
+        engine::OutputMode::Mix,
+    ) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("{e}");
@@ -162,6 +166,7 @@ fn sched_label(sched: Option<backend::realtime::Scheduling>) -> String {
 fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<String>), String> {
     let mut notes = Vec::new();
     let routing = config.routing()?;
+    let output = config.output();
     if config.audio.backend == Backend::Alsa && !no_audio {
         // Straight to the card, for running without a sound server.
         match backend::AlsaBackend::open(
@@ -171,16 +176,17 @@ fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<Strin
         ) {
             Ok(alsa) => {
                 let rate = alsa.sample_rate();
-                if alsa.channels() < 4 {
+                if alsa.channels() < 4 && output == engine::OutputMode::Mix {
                     notes.push(format!(
                         "{} has {} channels, so the headphone cue shares them",
                         config.audio.device,
                         alsa.channels()
                     ));
                 }
-                let (handle, processor) = channel(Engine::with_sample_rate(rate), COMMAND_QUEUE);
+                let (handle, processor) =
+                    channel(Engine::with_output(rate, output), COMMAND_QUEUE);
                 let app = App::new(handle, config, rate);
-                let running = alsa.activate(processor, &routing)?;
+                let running = alsa.activate(processor, &routing, output)?;
                 return Ok((app, Audio::Alsa(running), notes));
             }
             Err(e) => notes.push(format!("{e}; falling back to JACK")),
@@ -201,11 +207,11 @@ fn start_audio(config: &Config, no_audio: bool) -> Result<(App, Audio, Vec<Strin
     let rate = jack
         .as_ref()
         .map_or(config.audio.sample_rate, JackBackend::sample_rate);
-    let (handle, processor) = channel(Engine::with_sample_rate(rate), COMMAND_QUEUE);
+    let (handle, processor) = channel(Engine::with_output(rate, output), COMMAND_QUEUE);
     Ok(match jack {
         Some(jack) => {
             let app = App::new(handle, config, rate);
-            let running = jack.activate(processor, &routing)?;
+            let running = jack.activate(processor, &routing, output)?;
             notes.extend(running.warnings().iter().cloned());
             (app, Audio::Jack(running), notes)
         }
