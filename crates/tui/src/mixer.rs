@@ -6,7 +6,7 @@
 //! anything with a neutral position, the left end for anything that runs up from nothing.
 
 use crate::theme;
-use engine::DeckId;
+use engine::{DeckId, OutputMode};
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
@@ -34,6 +34,8 @@ pub struct MixerView {
     pub crossfader_fade_target: Option<f32>,
     /// Which channel the deck keys act on. The other one is greyed out.
     pub focused: DeckId,
+    /// What the outputs carry. `Decks` replaces the strip with per-deck meters.
+    pub output: OutputMode,
 }
 
 impl Default for MixerView {
@@ -50,8 +52,40 @@ impl Default for MixerView {
             fade_beats: 8.0,
             crossfader_fade_target: None,
             focused: DeckId::A,
+            output: OutputMode::Mix,
         }
     }
+}
+
+/// Deck output mode: two meters and a label. Nothing here claims to do something it cannot,
+/// because the hardware mixer owns the blend and every control in the strip is bypassed.
+fn render_deck_out(f: &mut Frame, area: Rect, m: &MixerView) {
+    let block = Block::bordered().title(" DECK OUT ");
+    let inner = block.inner(area);
+    let meters = || {
+        let mut pk = vec![Span::raw(format!("{:<5}", "PK"))];
+        pk.extend(meter_spans(m.strips[0].meter));
+        pk.push(Span::raw(" "));
+        pk.extend(meter_spans(m.strips[1].meter));
+        pk
+    };
+    let dim = Style::new().fg(theme::colour(theme::DIM_LABEL));
+    let lines = if inner.height >= 6 {
+        vec![
+            Line::from("      A           B"),
+            Line::from(meters()),
+            Line::from(""),
+            Line::from(Span::styled(" out 1/2      out 3/4", dim)),
+            Line::from(""),
+            Line::from(Span::styled(" mixing on hardware", dim)),
+        ]
+    } else {
+        vec![
+            Line::from(Span::styled("  A out 1/2    B out 3/4", dim)),
+            Line::from(meters()),
+        ]
+    };
+    f.render_widget(Paragraph::new(lines).block(block), area);
 }
 
 /// One channel's controls above the fader.
@@ -308,6 +342,10 @@ fn meter_row(label: &str, a: f32, b: f32, focused: DeckId) -> Line<'static> {
 }
 
 pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
+    if m.output == OutputMode::Decks {
+        render_deck_out(f, area, m);
+        return;
+    }
     let block = Block::bordered().title(" MIXER ");
     let inner = block.inner(area);
     let [a, b] = &m.strips;

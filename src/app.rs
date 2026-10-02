@@ -47,6 +47,8 @@ pub struct App {
     meters: [f32; 3],
     waveform_mode: WaveformMode,
     end_warning_secs: u32,
+    /// What the outputs carry, which decides whether the mixer strip is drawn.
+    output: engine::OutputMode,
     started: std::time::Instant,
     /// Where each deck's track came from, and the cues last saved beside it.
     persisted: [Option<Persisted>; 2],
@@ -106,6 +108,7 @@ impl App {
             message: String::new(),
             meters: [0.0; 3],
             end_warning_secs: config.ui.end_warning_secs,
+            output: config.output(),
             started: std::time::Instant::now(),
             persisted: [None, None],
             help: false,
@@ -919,6 +922,7 @@ impl App {
         );
         v.message = self.message.clone();
         v.help = self.help;
+        v.mixer.output = self.output;
         // Highlight against whichever deck is playing; deck A wins when both are.
         let playing = self.playing_key();
         let browsing = self.keymap.mode() == input::Mode::Browser;
