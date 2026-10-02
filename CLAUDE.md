@@ -1,8 +1,11 @@
 # Working on dj-tui
 
-Spec and milestone plan: `docs/spec.md`. M0 through M3 are done, and M4 analyses tempo and key
+User-facing docs live in `docs/`, with the root README carrying a quickstart and links into
+them. Keep both in step when behaviour changes.
+
+M0 through M3 are done, and M4 analyses tempo and key
 on load in `crates/analysis`. M5 brought loops, beat jump and quantize, with cues kept in the
-track sidecar rather than the SQLite store the spec describes. M7 has sync, nudge and key lock,
+track sidecar. M7 has sync, nudge and key lock,
 and M9 has mappings, soft takeover, LED feedback and hotplug through JACK MIDI.
 
 M8 has the browser with search,
