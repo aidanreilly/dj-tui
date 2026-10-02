@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.3
+
+`[audio] output = "decks"` sends deck A to outputs 1 and 2 and deck B to 3 and 4, untouched,
+so a hardware DJ mixer does the crossfading, EQ and cueing. Each deck arrives as the player
+makes it: pitch, key lock, loops and cues apply, and the whole channel strip and master bus
+are bypassed, including the limiter. The mixer panel becomes two output meters, since none of
+its controls reach the audio any more. It needs four outputs and defaults to off, so a config
+without the key runs the path it ran before.
+
+The documentation moved out of the README into `docs/`, which now covers installing, the full
+key reference, the browser, waveforms and configuration. What stays in the README is a
+quickstart of the keys needed to mix two tracks, and links into the rest.
+
+Two things that read as broken audio and are not, now written down: the mixer collapses below
+110 columns and takes the headphone mix with it, and `m` cues each deck separately, so cueing
+both sends both to the headphones. The headphone mix also starts at an even blend of the cue
+bus and the master rather than at the cue.
+
+Four-output soundcards have a section of their own. The ALSA backend needs `plughw:` rather
+than `hw:` on any card that offers no 32 bit float format, which is most USB interfaces, and
+`routing = "auto"` under PipeWire usually finds the built-in card rather than the interface.
+
 ## 0.1.2
 
 The README leads with the built binary now, and says how to verify it. Before this the only
