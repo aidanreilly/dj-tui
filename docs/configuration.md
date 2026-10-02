@@ -5,7 +5,7 @@ set one, and edit it there. Every setting is commented in the example file. The 
 
 | Section | Covers |
 | --- | --- |
-| `[audio]` | Backend (JACK or raw ALSA), card, sample rate, buffer size, and where the master and headphone cue outputs are connected at startup. |
+| `[audio]` | Backend (JACK or raw ALSA), card, sample rate, buffer size, what the outputs carry, and where they are connected at startup. |
 | `[ui]` | Waveform colour mode, the pixel waveform toggle, and how early a deck warns that a track is ending. |
 | `[deck]` | Tempo fader range: 8, 16 or 50 percent. |
 | `[mixer]` | Crossfader curve and the fade length in beats. |
@@ -59,6 +59,31 @@ cue_ports    = ["<node>:playback_RL", "<node>:playback_RR"]
 
 `pw-link -i` lists every port name, so copy them from there. They change if you switch the
 card's PipeWire profile.
+
+### Feeding a hardware mixer
+
+`output = "decks"` sends deck A to outputs 1 and 2 and deck B to outputs 3 and 4, so your own
+DJ mixer does the crossfading, EQ and cueing.
+
+```toml
+[audio]
+output = "decks"
+```
+
+Each deck arrives as the player makes it. Pitch, key lock, loops and cues still apply, and
+dj-tui's trim, EQ, channel fader, crossfader, master filter and limiter are all bypassed,
+because the hardware has its own and two sets in series only cost headroom. Nothing stands
+between a deck and the output, so a hot track can clip the converter the way it would on a
+CDJ. The meters show it coming.
+
+There is no headphone cue bus in this mode, since all four outputs carry deck audio and the
+mixer does the cueing. The mixer panel changes to match: two output meters and the pairs they
+feed, with the keys for the bypassed controls left inert.
+
+This needs four outputs. The ALSA backend refuses to start on a card with fewer, naming the
+channel count. The JACK backend warns and leaves deck B for you to connect by hand, which is
+a reasonable thing to want. It cannot be combined with `routing = "split"`, which exists to
+fold a master and a cue onto a single pair.
 
 ### Example: Focusrite Scarlett 4i4
 

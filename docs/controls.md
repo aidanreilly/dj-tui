@@ -61,6 +61,10 @@ with the track and comes back the next time you load it.
 | `m` | Headphone cue on the focused channel. Each deck toggles on its own, so cueing both sends both to the headphones. The `CUE` dots in the mixer fill to show which are on. |
 | `h` / `H` | Headphone mix, from the cue bus toward the master with Shift. It starts halfway, so the headphones carry an even blend of the cue and the master until you move it. Five presses of `h` reaches cue only. |
 
+With `output = "decks"` the mixer is bypassed, so the trim, EQ, fader, crossfader, filter and
+headphone cue keys stay bound but stop affecting the sound. See
+[configuration](configuration.md#feeding-a-hardware-mixer).
+
 ## Fades
 
 Every automated fade runs over the fade length, shown as `FADE 8b` on the crossfader row.

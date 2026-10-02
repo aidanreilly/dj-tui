@@ -81,7 +81,8 @@ Every key, both keyboard layers and the key map images: [docs/controls.md](docs/
 - [The browser](docs/browser.md): Library folders, tempo and key filtering, typed filters,
   Discogs genre lookup.
 - [Waveforms](docs/waveforms.md): The three colour modes and pixel rendering.
-- [Configuration](docs/configuration.md): The config file, MIDI mappings, track sidecars, logs.
+- [Configuration](docs/configuration.md): The config file, four-output soundcards, feeding a
+  hardware DJ mixer, MIDI mappings, track sidecars, logs.
 
 ## Building from source
 
