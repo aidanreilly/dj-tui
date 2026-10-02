@@ -81,6 +81,16 @@ pub struct Meters {
     pub master: f32,
 }
 
+/// What the two output buffers carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputMode {
+    /// Master bus and headphone cue bus: dj-tui does the mixing.
+    #[default]
+    Mix,
+    /// Deck A and deck B, untouched, for a hardware mixer to blend.
+    Decks,
+}
+
 /// Two decks feeding a DJ mixer with a master bus and a headphone cue bus.
 pub struct Engine {
     decks: [Deck; 2],
@@ -93,6 +103,7 @@ pub struct Engine {
     peaks: Meters,
     filter: DjFilter,
     limiter: crate::dsp::Limiter,
+    output: OutputMode,
 }
 
 impl Default for Engine {
@@ -108,6 +119,11 @@ impl Engine {
     }
 
     pub fn with_sample_rate(sample_rate: u32) -> Self {
+        Self::with_output(sample_rate, OutputMode::Mix)
+    }
+
+    /// An engine whose outputs carry `output`. See [`OutputMode`].
+    pub fn with_output(sample_rate: u32, output: OutputMode) -> Self {
         let fs = sample_rate as f32;
         Self {
             decks: [
@@ -125,6 +141,7 @@ impl Engine {
             ],
             filter: DjFilter::new(fs),
             limiter: crate::dsp::Limiter::new(fs),
+            output,
         }
     }
 
@@ -215,9 +232,33 @@ impl Engine {
         None
     }
 
+    /// Fill the two interleaved stereo output buffers, which must be the same length. What
+    /// they carry depends on the mode: master and cue in `Mix`, deck A and deck B in `Decks`.
+    pub fn process(&mut self, out_a: &mut [f32], out_b: &mut [f32]) {
+        assert_eq!(out_a.len(), out_b.len(), "output buffers must match");
+        match self.output {
+            OutputMode::Mix => self.process_mix(out_a, out_b),
+            OutputMode::Decks => self.process_decks(out_a, out_b),
+        }
+    }
+
+    /// Each deck straight out, with nothing from the channel strip or the master bus. The
+    /// hardware mixer does that work, and a second set in series would only cost headroom.
+    /// Nothing is summed across decks, so this needs no scratch buffer and no block chunking.
+    fn process_decks(&mut self, out_a: &mut [f32], out_b: &mut [f32]) {
+        for ((deck, out), peak) in self
+            .decks
+            .iter_mut()
+            .zip([out_a, out_b])
+            .zip(self.peaks.channels.iter_mut())
+        {
+            deck.render(out);
+            *peak = out.iter().fold(*peak, |m, s| m.max(s.abs()));
+        }
+    }
+
     /// Fill interleaved stereo `master` and `cue` buffers of equal length.
-    pub fn process(&mut self, master: &mut [f32], cue: &mut [f32]) {
-        assert_eq!(master.len(), cue.len(), "master and cue buffers must match");
+    fn process_mix(&mut self, master: &mut [f32], cue: &mut [f32]) {
         let (xa, xb) = crossfader_gains(self.crossfader, self.curve);
         let xf = [xa, xb];
         for (m_block, c_block) in master
