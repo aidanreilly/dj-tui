@@ -19,18 +19,24 @@ Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
 ## Install
 
-Grab a tarball from the [releases page](https://github.com/aidanreilly/dj-tui/releases), or
-build it:
+Every tag publishes an x86_64 Linux tarball on the
+[releases page](https://github.com/aidanreilly/dj-tui/releases). Download the latest, then:
 
 ```sh
-cargo build --release
+tar xzf dj-tui-*-x86_64-linux.tar.gz
+cd dj-tui-*-x86_64-linux
+install -Dm755 dj-tui ~/.local/bin/dj-tui   # or /usr/local/bin with sudo
 ```
 
-Building needs Rust 1.90 or newer and the JACK and ALSA development packages. Run dj-tui
-directly in a modern terminal emulator such as Ghostty, kitty, foot, WezTerm or a recent
-Alacritty. Multiplexers are not supported.
+It needs glibc 2.35 or newer and `libasound2`, which any desktop that plays audio already has.
+JACK is loaded at runtime rather than linked, so the same binary serves whether or not a JACK
+server is running. The tarball carries `config.toml.example` beside the binary.
 
-Full steps, per-distribution packages and realtime scheduling: [docs/install.md](docs/install.md).
+Run dj-tui directly in a modern terminal emulator such as Ghostty, kitty, foot, WezTerm or a
+recent Alacritty. Multiplexers are not supported.
+
+Building from source, checksum verification and realtime scheduling:
+[docs/install.md](docs/install.md).
 
 ## Run
 
@@ -39,11 +45,6 @@ dj-tui ~/Music/one.flac ~/Music/two.mp3   # deck A, deck B
 dj-tui --demo                             # click tracks at 124 and 126 BPM
 dj-tui --midi-learn                       # print what a controller sends
 ```
-
-From an unpacked release tarball the binary sits in that directory, so it is `./dj-tui` until
-you copy it somewhere on your `PATH`, which
-[docs/install.md](docs/install.md#putting-it-on-your-path) covers. Working in a checkout
-instead, put `cargo run --` in front of the arguments, as in `cargo run -- --demo`.
 
 ## Quickstart
 
@@ -71,16 +72,15 @@ Every key, both keyboard layers and the key map images: [docs/controls.md](docs/
 
 ## Documentation
 
-- [Installing](docs/install.md): Binaries, building from source, terminal requirements,
-  realtime audio.
+- [Installing](docs/install.md): The release tarball, building from source, putting the binary
+  on your PATH, terminal requirements, realtime audio.
 - [Controls](docs/controls.md): The full key reference for mix mode and browser mode.
 - [The browser](docs/browser.md): Library folders, tempo and key filtering, typed filters,
   Discogs genre lookup.
 - [Waveforms](docs/waveforms.md): The three colour modes and pixel rendering.
 - [Configuration](docs/configuration.md): The config file, MIDI mappings, track sidecars, logs.
 
-## Building and testing
+## Building from source
 
-```sh
-cargo test --workspace
-```
+Distribution packages, the build itself and `cargo test --workspace` are in
+[docs/install.md](docs/install.md#from-source).
