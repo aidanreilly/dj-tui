@@ -17,6 +17,9 @@ Supports WAV, FLAC, MP3, AAC/M4A, OGG Vorbis and AIFF files.
 
 <img width="1433" height="841" alt="image" src="https://github.com/user-attachments/assets/e222814b-a197-4ac1-a4b2-d9729ccd2063" />
 
+> [!NOTE]
+> This is early alpha software developed with Claude Code. Some features are untested.
+
 ## Install
 
 Every tag publishes an x86_64 Linux tarball on the
