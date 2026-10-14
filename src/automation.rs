@@ -29,6 +29,10 @@ pub enum Curve {
     /// Even in decibels. For channel faders, which take raw amplitude, where a linear ramp
     /// loses 6 dB in the first half of the travel and the rest in a rush at the end.
     Decibel,
+    /// A quarter sine up, a quarter cosine down, so two channel faders crossing each other
+    /// hold their combined power through the middle instead of dipping. For the transitions,
+    /// which ride both faders at once.
+    EqualPower,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -60,6 +64,14 @@ impl Fade {
                 };
                 let at = db(self.from) + (db(self.to) - db(self.from)) * t as f32;
                 10f32.powf(at / 20.0)
+            }
+            Curve::EqualPower => {
+                let q = t as f32 * std::f32::consts::FRAC_PI_2;
+                if self.to >= self.from {
+                    self.from + (self.to - self.from) * q.sin()
+                } else {
+                    self.to + (self.from - self.to) * q.cos()
+                }
             }
         };
         (v, false)

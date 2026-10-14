@@ -201,3 +201,32 @@ fn a_very_short_length_is_held_to_the_floor() {
     let secs = a.secs_for(Some(14_400.0), 1.0, 48_000);
     assert!((secs - MIN_FADE_SECS).abs() < 1e-9, "got {secs}");
 }
+
+#[test]
+fn an_equal_power_pair_keeps_the_sum_of_squares_steady() {
+    let mut a = Automation::new(8.0);
+    a.start(Control::Fader(A), 1.0, 0.0, 1.0, Curve::EqualPower);
+    a.start(Control::Fader(B), 0.0, 1.0, 1.0, Curve::EqualPower);
+    let mut out = Vec::new();
+    for _ in 0..7 {
+        out.clear();
+        a.tick(1.0 / 8.0, &mut out);
+        let power: f32 = out.iter().map(|&(_, v)| v * v).sum();
+        assert!((power - 1.0).abs() < 1e-4, "power {power} at {out:?}");
+    }
+    out.clear();
+    a.tick(1.0 / 8.0, &mut out);
+    assert_eq!(
+        out,
+        vec![(Control::Fader(A), 0.0), (Control::Fader(B), 1.0)]
+    );
+}
+
+#[test]
+fn an_equal_power_fade_scales_to_a_partial_level() {
+    let mut a = Automation::new(8.0);
+    a.start(Control::Fader(B), 0.0, 0.5, 1.0, Curve::EqualPower);
+    let seen = sweep(&mut a, 1.0, 2);
+    assert!((seen[0] - 0.5 * std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-4);
+    assert_eq!(seen[1], 0.5);
+}

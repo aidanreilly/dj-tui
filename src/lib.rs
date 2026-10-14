@@ -10,6 +10,7 @@ pub mod demo;
 pub mod genre;
 pub mod log;
 pub mod session;
+pub mod transition;
 pub mod view;
 
 /// `$XDG_STATE_HOME/dj-tui/discogs.json`, falling back to `~/.local/state`, beside the log
