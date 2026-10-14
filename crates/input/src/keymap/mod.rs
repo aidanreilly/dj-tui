@@ -26,6 +26,9 @@ pub struct KeyEvent {
     pub shift: bool,
     pub ctrl: bool,
     pub release: bool,
+    /// The terminal's auto-repeat of a held key. Most keys treat it as another press; the
+    /// transition keys ignore it, since a held key would otherwise read as a double tap.
+    pub repeat: bool,
 }
 
 impl KeyEvent {
@@ -36,6 +39,7 @@ impl KeyEvent {
             shift: false,
             ctrl: false,
             release: false,
+            repeat: false,
         }
     }
     pub fn release(key: Key) -> Self {
@@ -56,6 +60,12 @@ impl KeyEvent {
     pub fn ctrl(self) -> Self {
         Self { ctrl: true, ..self }
     }
+    pub fn repeat(self) -> Self {
+        Self {
+            repeat: true,
+            ..self
+        }
+    }
 }
 
 /// Which part of the app the keyboard belongs to. A mode nobody can see is a trap, so
@@ -66,6 +76,9 @@ pub enum Mode {
     Mix,
     Browser,
     Devices,
+    /// Mix mode with the number row given over to the nine transitions. Everything else
+    /// keeps its mix meaning, so the layer can stay on through a whole set.
+    Transition,
 }
 
 pub(super) const CUE_KEY: char = 'c';
@@ -149,6 +162,7 @@ impl Keymap {
             Mode::Mix => self.mix(e),
             Mode::Browser => browser::handle(e, self.focused),
             Mode::Devices => devices(e),
+            Mode::Transition => self.transition(e),
         }?;
 
         // The mode changes as a consequence of the action, so there is one place to look.
@@ -157,6 +171,8 @@ impl Keymap {
             Action::BrowserLeave => self.mode = Mode::Mix,
             Action::Devices => self.mode = Mode::Devices,
             Action::DeviceChoose | Action::DeviceClose => self.mode = Mode::Mix,
+            // `TransitionLayer` is a toggle, and a controller button sends it straight to
+            // the app without passing through here, so the app flips the mode for both.
             _ => {}
         }
         Some(action)

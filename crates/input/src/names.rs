@@ -3,6 +3,8 @@
 //! A MIDI mapping is a file, so it needs names for the things a key press produces. Keeping
 //! the parser here means the keyboard and a controller reach the same `Action` set.
 
+use crate::TRANSITION_SLOTS;
+
 use crate::{Action, Band, Dir};
 use engine::DeckId;
 
@@ -97,6 +99,8 @@ pub fn parse_action(text: &str) -> Option<Action> {
         ["browser-lookup"] => Action::BrowserLookup,
         ["analyse-library"] => Action::AnalyseLibrary,
         ["devices"] => Action::Devices,
+        ["transitions"] => Action::TransitionLayer,
+        ["transition", n] => Action::Transition(slot_index(n)?),
         ["help"] => Action::Help,
         ["quit"] => Action::Quit,
         _ => return None,
@@ -107,7 +111,13 @@ pub fn parse_action(text: &str) -> Option<Action> {
 /// Pads are written as they are printed on the hardware, from one.
 fn pad_index(text: &str) -> Option<usize> {
     let n: usize = text.parse().ok()?;
-    (1..=engine::HOT_CUES).contains(&n).then_some(n - 1)
+    (1..=engine::HOT_CUES).contains(&n).then(|| n - 1)
+}
+
+/// Transition slots, numbered from one as the keys are.
+fn slot_index(text: &str) -> Option<usize> {
+    let n: usize = text.parse().ok()?;
+    (1..=TRANSITION_SLOTS).contains(&n).then(|| n - 1)
 }
 
 fn tenth_index(text: &str) -> Option<u8> {

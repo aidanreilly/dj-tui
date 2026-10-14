@@ -18,7 +18,8 @@ pub fn convert_key(e: CtKey) -> Option<KeyEvent> {
         _ => return None,
     };
     let mut ev = match e.kind {
-        KeyEventKind::Press | KeyEventKind::Repeat => KeyEvent::press(key),
+        KeyEventKind::Press => KeyEvent::press(key),
+        KeyEventKind::Repeat => KeyEvent::press(key).repeat(),
         KeyEventKind::Release => KeyEvent::release(key),
     };
     ev.alt = e.modifiers.contains(KeyModifiers::ALT);

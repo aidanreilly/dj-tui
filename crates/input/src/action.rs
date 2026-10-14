@@ -97,6 +97,10 @@ pub enum Action {
     DeviceClose,
     /// Open the audio device chooser.
     Devices,
+    /// Give the number row to the transitions, or take it back.
+    TransitionLayer,
+    /// Arm transition slot 0 to 8. A second tap straight after switches the slot off.
+    Transition(usize),
     CycleWaveformMode,
     Help,
     Quit,

@@ -348,6 +348,7 @@ mod action_names {
         assert_eq!(parse_action("cue-release b"), Some(Action::CueRelease(B)));
         assert_eq!(parse_action("hotcue a 3"), Some(Action::HotCue(A, 2)));
         assert_eq!(parse_action("hotcue a 9"), None, "only eight pads");
+        assert_eq!(parse_action("hotcue a 0"), None, "pads count from one");
         assert_eq!(parse_action("hotcue a"), None, "which pad?");
     }
 
@@ -761,5 +762,86 @@ mod lookup_key {
     #[test]
     fn the_lookup_can_be_mapped_from_midi() {
         assert_eq!(parse_action("browser-lookup"), Some(Action::BrowserLookup));
+    }
+}
+
+mod transition_layer {
+    use super::*;
+    use input::Mode;
+
+    fn in_layer() -> Keymap {
+        let mut km = Keymap::new();
+        km.set_mode(Mode::Transition);
+        km
+    }
+
+    #[test]
+    fn n_asks_for_the_layer_from_mix_mode() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('n')), Some(Action::TransitionLayer));
+    }
+
+    #[test]
+    fn n_asks_to_leave_it_from_inside() {
+        let mut km = in_layer();
+        assert_eq!(press(&mut km, ch('n')), Some(Action::TransitionLayer));
+    }
+
+    #[test]
+    fn the_number_row_fires_transitions_in_the_layer() {
+        let mut km = in_layer();
+        assert_eq!(press(&mut km, ch('1')), Some(Action::Transition(0)));
+        assert_eq!(press(&mut km, ch('9')), Some(Action::Transition(8)));
+    }
+
+    #[test]
+    fn the_number_row_is_still_hot_cues_outside_it() {
+        let mut km = Keymap::new();
+        assert_eq!(press(&mut km, ch('1')), Some(Action::HotCue(A, 0)));
+        assert_eq!(press(&mut km, ch('9')), None, "eight pads, nothing on 9");
+    }
+
+    #[test]
+    fn every_other_mix_key_keeps_working_in_the_layer() {
+        let mut km = in_layer();
+        assert_eq!(press(&mut km, Key::Space), Some(Action::PlayPause(A)));
+        assert_eq!(press(&mut km, ch('t')), Some(Action::EqKill(A, Band::Low)));
+        assert_eq!(
+            press(&mut km, Key::Left),
+            Some(Action::Crossfader(Dir::Down, false))
+        );
+        assert_eq!(press(&mut km, Key::Esc), Some(Action::CancelFades));
+        assert_eq!(press(&mut km, Key::Tab), Some(Action::Focus(B)));
+        assert_eq!(km.mode(), Mode::Transition);
+    }
+
+    #[test]
+    fn a_held_key_repeating_is_not_a_second_tap() {
+        let mut km = in_layer();
+        assert_eq!(press(&mut km, ch('2')), Some(Action::Transition(1)));
+        assert_eq!(km.handle(KeyEvent::press(ch('2')).repeat()), None);
+    }
+
+    #[test]
+    fn the_seek_prefix_still_takes_a_digit_in_the_layer() {
+        let mut km = in_layer();
+        assert_eq!(press(&mut km, ch('g')), None);
+        assert_eq!(press(&mut km, ch('3')), Some(Action::SeekTenth(A, 3)));
+    }
+
+    #[test]
+    fn the_browser_keys_leave_the_layer_for_the_browser() {
+        let mut km = in_layer();
+        assert_eq!(press(&mut km, ch('b')), Some(Action::BrowserEnter));
+        assert_eq!(km.mode(), Mode::Browser);
+    }
+
+    #[test]
+    fn transitions_have_mapping_names() {
+        assert_eq!(parse_action("transition 1"), Some(Action::Transition(0)));
+        assert_eq!(parse_action("transition 9"), Some(Action::Transition(8)));
+        assert_eq!(parse_action("transition 10"), None);
+        assert_eq!(parse_action("transition 0"), None);
+        assert_eq!(parse_action("transitions"), Some(Action::TransitionLayer));
     }
 }

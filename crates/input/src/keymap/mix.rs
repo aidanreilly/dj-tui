@@ -5,6 +5,21 @@ use crate::{Action, Band, Dir};
 use engine::DeckId;
 
 impl Keymap {
+    /// The transition layer: `1`-`9` are the nine transitions and `n` leaves. Everything
+    /// else is mix mode, so the decks and the mixer stay under the hands.
+    pub(super) fn transition(&mut self, e: KeyEvent) -> Option<Action> {
+        if let Key::Char(c @ '1'..='9') = e.key {
+            if !e.alt && !e.ctrl {
+                // A held key repeating would read as a double tap, which disables the slot.
+                if e.repeat {
+                    return None;
+                }
+                return Some(Action::Transition((c as u8 - b'1') as usize));
+            }
+        }
+        self.mix(e)
+    }
+
     pub(super) fn mix(&mut self, e: KeyEvent) -> Option<Action> {
         let target = self.focused;
 
@@ -114,6 +129,7 @@ impl Keymap {
             'V' => FilterSweepCentre,
             '{' => FadeLength(Dir::Down),
             '}' => FadeLength(Dir::Up),
+            'n' => TransitionLayer,
             '/' => Search,
             'b' => BrowserEnter,
             'w' | 'W' => CycleWaveformMode,
