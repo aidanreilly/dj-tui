@@ -36,6 +36,40 @@ pub struct MixerView {
     pub focused: DeckId,
     /// What the outputs carry. `Decks` replaces the strip with per-deck meters.
     pub output: OutputMode,
+    /// Draw the trim and EQ rails in full rather than the one summary row.
+    pub full_eq: bool,
+    /// The transition list under the mixer.
+    pub transitions: TransitionView,
+}
+
+/// How a transition key stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SlotState {
+    #[default]
+    Ready,
+    /// Ready, bent to suit the pair of tracks.
+    Adapted,
+    Unavailable,
+    Disabled,
+    Armed,
+    Running,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SlotView {
+    pub name: String,
+    pub detail: String,
+    pub state: SlotState,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TransitionView {
+    /// The number row belongs to the transitions right now.
+    pub layer: bool,
+    /// One per key, 1 to 9. Empty draws nothing.
+    pub slots: Vec<SlotView>,
+    /// A few short lines on what comes next.
+    pub next: Vec<String>,
 }
 
 impl Default for MixerView {
@@ -53,6 +87,8 @@ impl Default for MixerView {
             crossfader_fade_target: None,
             focused: DeckId::A,
             output: OutputMode::Mix,
+            full_eq: false,
+            transitions: TransitionView::default(),
         }
     }
 }

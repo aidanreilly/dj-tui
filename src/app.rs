@@ -3,8 +3,11 @@
 
 use crate::apply::{apply_many, ControlState, Controls};
 use crate::automation::{Automation, Curve};
-use crate::config::Config;
+use crate::config::{Config, EqRows};
+use crate::transition::run::{Effect, Press, SlotState, Transitions};
+use crate::transition::{Context, DeckInfo};
 use crate::view::{screen_view, DeckMeta};
+use analysis::phrase::Phrases;
 use engine::{Command, DeckId, EngineHandle, Snapshot};
 use input::{Action, KeyEvent, Keymap};
 use loader::sidecar::Cues;
@@ -76,6 +79,13 @@ pub struct App {
     fade_values: Vec<(midi::Control, f32)>,
     /// When the last frame was, for the fade tick's delta.
     last_frame: std::time::Instant,
+    /// The nine transition keys and whatever is armed or running.
+    transitions: Transitions,
+    /// Each deck's bars and sections, worked out when its track loads.
+    phrases: [Phrases; 2],
+    /// What the transitions asked for this frame, reused so the tick allocates nothing.
+    effects: Vec<Effect>,
+    eq_rows: EqRows,
 }
 
 struct Persisted {
@@ -125,6 +135,10 @@ impl App {
             automation: Automation::new(config.mixer.fade_beats),
             fade_values: Vec::with_capacity(8),
             last_frame: std::time::Instant::now(),
+            transitions: Transitions::new(config.transitions.slots()),
+            phrases: Default::default(),
+            effects: Vec::with_capacity(16),
+            eq_rows: config.ui.eq_rows,
             waveform_mode: match config.ui.waveform_mode {
                 crate::config::WaveformMode::ThreeBand => WaveformMode::ThreeBand,
                 crate::config::WaveformMode::Rgb => WaveformMode::Rgb,
@@ -150,8 +164,12 @@ impl App {
     pub fn load_path(&mut self, deck: DeckId, path: PathBuf) {
         // A fade aimed at a track being replaced is aimed at nothing.
         self.automation.cancel_deck(deck);
+        let dropped = self.transitions.cancel_deck(deck);
         self.metas[deck.index()].loading = true;
         self.message = format!("Loading {} on deck {}…", path.display(), deck_letter(deck));
+        if dropped {
+            self.message.push_str(" The transition is off.");
+        }
         self.loader.request(deck, path);
     }
 
@@ -163,6 +181,13 @@ impl App {
         self.state.beat_frames[i] = meta.grid.map(|g| g.beat_secs() * rate);
         self.state.first_beat_frames[i] = meta.grid.map_or(0.0, |g| g.first_beat_secs * rate);
         self.state.loop_in[i] = None;
+        self.automation.cancel_deck(deck);
+        self.transitions.cancel_deck(deck);
+        let secs = track.frames() as f64 / rate;
+        self.phrases[i] = match meta.grid {
+            Some(grid) => analysis::phrase::detect_phrases(&meta.bands, secs, &grid),
+            None => Phrases::default(),
+        };
         self.metas[i] = DeckMeta {
             loading: false,
             ..meta
@@ -174,6 +199,8 @@ impl App {
     pub fn tick(&mut self) {
         let dt = self.last_frame.elapsed().as_secs_f64();
         self.last_frame = std::time::Instant::now();
+        // Transitions first: what they start this frame gets its first step straight away.
+        self.tick_transitions(dt);
         self.tick_fades(dt);
         // The browser's filters measure against whatever is playing, which moves under them
         // as the tempo fader is ridden.
@@ -655,6 +682,7 @@ impl App {
     pub fn set_control(&mut self, control: midi::Control, value: f32) {
         // A hand on the hardware always wins.
         self.automation.cancel(control);
+        self.transitions.release(control);
         if let Some(cmd) =
             crate::apply::set_control(&mut self.state, &self.controls, control, value)
         {
@@ -811,11 +839,31 @@ impl App {
             }
             Action::CancelFades => {
                 // Silent when there is nothing to stop, so Esc is safe to lean on.
-                if self.automation.running() > 0 {
+                let fades = self.automation.running() > 0;
+                let transition = self.transitions.cancel();
+                if fades || transition {
                     self.automation.cancel_all();
-                    self.message = "Fades stopped".into();
+                    self.message = if transition {
+                        "Transition stopped where it stood".into()
+                    } else {
+                        "Fades stopped".into()
+                    };
                 }
             }
+            Action::TransitionLayer => {
+                let on = self.keymap.mode() != input::Mode::Transition;
+                self.keymap.set_mode(if on {
+                    input::Mode::Transition
+                } else {
+                    input::Mode::Mix
+                });
+                self.message = if on {
+                    "Transitions on 1-9. n gives the hot cues back.".into()
+                } else {
+                    "Hot cues back on 1-8".into()
+                };
+            }
+            Action::Transition(slot) => self.press_transition(slot),
             Action::Devices => {
                 // Open on the device in use, so Enter on it changes nothing.
                 let current = self
@@ -828,6 +876,11 @@ impl App {
             _ => {
                 if let Some(control) = manual_control(action) {
                     self.automation.cancel(control);
+                    self.transitions.release(control);
+                }
+                // A kill or an EQ step by hand takes that band off a running transition.
+                if let Action::EqKill(d, b) | Action::Eq(d, b, _) = action {
+                    self.transitions.release(midi::Control::Eq(d, b));
                 }
                 let snap = self.handle.snapshot();
                 // Riding the global tempo moves two decks, so both commands go in the same
@@ -844,6 +897,113 @@ impl App {
             }
         }
         false
+    }
+
+    /// Which layer the keyboard is in.
+    pub fn mode(&self) -> input::Mode {
+        self.keymap.mode()
+    }
+
+    fn press_transition(&mut self, slot: usize) {
+        if slot >= 9 {
+            return;
+        }
+        let snap = self.handle.snapshot();
+        let now = self.started.elapsed().as_secs_f64();
+        let ctx = context(
+            &snap,
+            &self.state,
+            &self.controls,
+            &self.metas,
+            &self.phrases,
+            self.sample_rate,
+        );
+        let name = self.transitions.slots()[slot].kind.name();
+        let n = slot + 1;
+        self.message = match self.transitions.press(slot, now, &ctx) {
+            Press::Armed { summary, .. } => summary,
+            Press::Disarmed => format!("{name} disarmed"),
+            Press::Disabled => {
+                format!("{n} ({name}) is off. A double tap switches it back on.")
+            }
+            Press::Enabled => format!("{n} ({name}) is back on"),
+            Press::Refused(why) => why,
+        };
+    }
+
+    /// Move an armed or running transition on by `dt` seconds and carry out what it asks
+    /// for. Called once a frame, and directly from tests.
+    pub fn tick_transitions(&mut self, dt: f64) {
+        let snap = self.handle.snapshot();
+        let mut effects = std::mem::take(&mut self.effects);
+        effects.clear();
+        let note = {
+            let ctx = context(
+                &snap,
+                &self.state,
+                &self.controls,
+                &self.metas,
+                &self.phrases,
+                self.sample_rate,
+            );
+            self.transitions.tick(dt, &ctx, &mut effects)
+        };
+        for &effect in &effects {
+            self.apply_effect(effect, &snap);
+        }
+        self.effects = effects;
+        if let Some(note) = note {
+            self.message = note;
+        }
+    }
+
+    fn apply_effect(&mut self, effect: Effect, snap: &Snapshot) {
+        match effect {
+            Effect::Fade {
+                control,
+                to,
+                secs,
+                curve,
+            } => {
+                let from = crate::apply::control_value(&self.state, &self.controls, control);
+                self.automation.start(control, from, to, secs, curve);
+            }
+            Effect::Set { control, to } => {
+                self.automation.cancel(control);
+                if let Some(cmd) =
+                    crate::apply::set_control(&mut self.state, &self.controls, control, to)
+                {
+                    self.send(cmd);
+                }
+            }
+            Effect::Start { deck, seek, rate } => {
+                let i = deck.index();
+                if let Some(rate) = rate {
+                    self.state.rates[i] = rate;
+                    self.send(Command::SetRate(deck, rate));
+                }
+                if let Some(frame) = seek {
+                    self.send(Command::Seek(deck, frame));
+                }
+                if !snap.decks[i].playing {
+                    self.send(Command::PlayPause(deck));
+                }
+            }
+            Effect::Stop { deck } => {
+                if snap.decks[deck.index()].playing {
+                    self.send(Command::PlayPause(deck));
+                }
+            }
+            Effect::Loop { deck, span } => self.send(Command::SetLoop(deck, span)),
+            Effect::KeyLock { deck, on } => {
+                self.state.key_lock[deck.index()] = on;
+                self.send(Command::SetKeyLock(deck, on));
+            }
+            Effect::Rate { deck, rate } => {
+                self.state.rates[deck.index()] = rate;
+                self.send(Command::SetRate(deck, rate));
+            }
+        }
     }
 
     /// Advance running fades by `dt` seconds and send what they reached. Called once a frame,
@@ -931,6 +1091,43 @@ impl App {
         if browsing {
             v.status = format!("BROWSER  {}", v.status);
         }
+        let layer = self.keymap.mode() == input::Mode::Transition;
+        if layer {
+            v.status = format!("TRANSITIONS  {}", v.status);
+        }
+        {
+            let snap = self.handle.snapshot();
+            let ctx = context(
+                &snap,
+                &self.state,
+                &self.controls,
+                &self.metas,
+                &self.phrases,
+                self.sample_rate,
+            );
+            v.mixer.transitions = tui::TransitionView {
+                layer,
+                slots: self
+                    .transitions
+                    .lines(&ctx)
+                    .into_iter()
+                    .map(|l| tui::SlotView {
+                        name: l.name,
+                        detail: l.detail,
+                        state: match l.state {
+                            SlotState::Ready => tui::SlotState::Ready,
+                            SlotState::Adapted => tui::SlotState::Adapted,
+                            SlotState::Unavailable => tui::SlotState::Unavailable,
+                            SlotState::Disabled => tui::SlotState::Disabled,
+                            SlotState::Armed => tui::SlotState::Armed,
+                            SlotState::Running => tui::SlotState::Running,
+                        },
+                    })
+                    .collect(),
+                next: self.transitions.next(&ctx),
+            };
+        }
+        v.mixer.full_eq = self.eq_rows == EqRows::Always;
         v.devices = self.device_selected.map(|selected| tui::DeviceView {
             devices: self.devices.clone(),
             selected,
@@ -986,6 +1183,45 @@ impl App {
         if self.handle.send(cmd).is_err() {
             self.message = "Audio engine is not keeping up (command queue full)".into();
         }
+    }
+}
+
+/// What the transition planner sees: both decks as they stand this frame. A free function
+/// over the fields it reads, so it can borrow the phrases while the transitions are borrowed
+/// mutably beside them.
+fn context<'a>(
+    snap: &Snapshot,
+    state: &ControlState,
+    controls: &Controls,
+    metas: &[DeckMeta; 2],
+    phrases: &'a [Phrases; 2],
+    sample_rate: u32,
+) -> Context<'a> {
+    let deck = |i: usize| {
+        let d = &snap.decks[i];
+        DeckInfo {
+            loaded: d.track_frames > 0,
+            playing: d.playing,
+            position: d.position,
+            track_frames: d.track_frames as f64,
+            rate: state.rates[i],
+            key_lock: state.key_lock[i],
+            grid: metas[i].grid,
+            phrases: &phrases[i],
+            cue_point: d.cue_point,
+            hot_cues: d.hot_cues,
+            key: metas[i]
+                .key
+                .as_deref()
+                .and_then(analysis::key::Key::from_camelot),
+            fader: state.faders[i],
+        }
+    };
+    Context {
+        decks: [deck(0), deck(1)],
+        crossfader: state.crossfader,
+        sample_rate,
+        tempo_range: controls.tempo_range,
     }
 }
 

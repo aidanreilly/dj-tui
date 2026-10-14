@@ -19,5 +19,5 @@ pub use deck::{
 pub use graphics::{detect_graphics, multiplexer_detected, Graphics};
 pub use keys::convert_key;
 pub use layout::{screen_layout, ScreenLayout, DECK_HEIGHT};
-pub use mixer::{MixerView, StripView};
+pub use mixer::{MixerView, SlotState, SlotView, StripView, TransitionView};
 pub use screen::{render_screen, DeviceView, ScreenView};

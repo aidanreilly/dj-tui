@@ -751,3 +751,182 @@ mod from_a_controller {
         assert_eq!(view.mixer.faders[0], before, "and the fader did not");
     }
 }
+
+mod transitions {
+    use super::*;
+    use analysis::tempo::BeatGrid;
+    use dj_tui::view::DeckMeta;
+    use input::Mode;
+
+    fn meta(bpm: f64) -> DeckMeta {
+        DeckMeta {
+            title: Some(format!("{bpm} click")),
+            bpm: Some(bpm),
+            grid: Some(BeatGrid {
+                bpm,
+                first_beat_secs: 0.0,
+            }),
+            ..Default::default()
+        }
+    }
+
+    /// Two click tracks with grids, deck A playing.
+    fn two_decks() -> (App, EngineProcessor) {
+        let (mut app, mut p) = setup();
+        app.load_track(
+            DeckId::A,
+            dj_tui::demo::click_track(120.0, 60.0, RATE),
+            meta(120.0),
+        );
+        app.load_track(
+            DeckId::B,
+            dj_tui::demo::click_track(120.0, 60.0, RATE),
+            meta(120.0),
+        );
+        process(&mut p, 16);
+        app.on_key(KeyEvent::press(Key::Space));
+        process(&mut p, 16);
+        (app, p)
+    }
+
+    /// Play `secs` of audio, ticking the transitions the way the frame loop does.
+    fn run(app: &mut App, p: &mut EngineProcessor, secs: f64) {
+        let block = 1024;
+        for _ in 0..(secs * RATE as f64 / block as f64).ceil() as usize {
+            process(p, block);
+            app.tick_transitions(block as f64 / RATE as f64);
+            app.tick_fades(block as f64 / RATE as f64);
+        }
+        process(p, 16);
+    }
+
+    fn press(app: &mut App, c: char) {
+        app.on_key(KeyEvent::press(Key::Char(c)));
+    }
+
+    #[test]
+    fn n_gives_the_number_row_to_the_transitions_and_says_so() {
+        let (mut app, _p) = setup();
+        press(&mut app, 'n');
+        assert_eq!(app.mode(), Mode::Transition);
+        assert!(app.message().contains("1-9"), "{}", app.message());
+        let v = app.view("rate".into());
+        assert!(v.status.starts_with("TRANSITIONS"), "{}", v.status);
+        assert!(v.mixer.transitions.layer);
+        press(&mut app, 'n');
+        assert_eq!(app.mode(), Mode::Mix);
+        assert!(!app.view(String::new()).mixer.transitions.layer);
+    }
+
+    #[test]
+    fn a_jump_cut_lands_on_the_bar_line_and_hands_the_mix_over() {
+        let (mut app, mut p) = two_decks();
+        press(&mut app, 'n');
+        press(&mut app, '4');
+        assert!(
+            app.message().contains("Jump cut armed"),
+            "{}",
+            app.message()
+        );
+        let line = &app.view(String::new()).mixer.transitions.slots[3];
+        assert_eq!(line.state, tui::SlotState::Armed);
+
+        // The cut is four bars in, eight seconds at 120 BPM.
+        run(&mut app, &mut p, 7.5);
+        assert!(!app.snapshot().decks[1].playing, "not yet");
+        run(&mut app, &mut p, 1.0);
+        let snap = app.snapshot();
+        assert!(snap.decks[1].playing, "B came in");
+        assert!(!snap.decks[0].playing, "A stopped");
+        assert_eq!(app.control_value(midi::Control::Fader(DeckId::A)), 0.0);
+        assert_eq!(app.control_value(midi::Control::Fader(DeckId::B)), 1.0);
+        // B started from its first bar, as late as the frame that started it.
+        let b_secs = snap.decks[1].position / RATE as f64;
+        assert!(b_secs < 0.6, "{b_secs}");
+        assert!(app.message().contains("Jump cut done"), "{}", app.message());
+    }
+
+    #[test]
+    fn a_bass_swap_brings_b_in_with_its_lows_held_back_then_swaps_them() {
+        let (mut app, mut p) = two_decks();
+        press(&mut app, 'n');
+        press(&mut app, '1');
+        // Eight bars in is 16 s; the lows swap 32 beats, 16 s, after that.
+        run(&mut app, &mut p, 17.0);
+        let eq = |app: &App, d| app.control_value(midi::Control::Eq(d, input::Band::Low));
+        assert!(app.snapshot().decks[1].playing);
+        assert_eq!(eq(&app, DeckId::B), 0.0, "B's lows are held back");
+        assert_eq!(eq(&app, DeckId::A), 0.5);
+        run(&mut app, &mut p, 16.0);
+        assert_eq!(eq(&app, DeckId::A), 0.0, "A's lows went");
+        assert_eq!(eq(&app, DeckId::B), 0.5, "B's came in");
+        let view = app.view(String::new());
+        assert_eq!(
+            view.mixer.transitions.slots[0].state,
+            tui::SlotState::Running
+        );
+    }
+
+    #[test]
+    fn a_quick_double_tap_switches_a_key_off() {
+        let (mut app, _p) = two_decks();
+        press(&mut app, 'n');
+        press(&mut app, '2');
+        press(&mut app, '2');
+        assert!(app.message().contains("off"), "{}", app.message());
+        let line = &app.view(String::new()).mixer.transitions.slots[1];
+        assert_eq!(line.state, tui::SlotState::Disabled);
+    }
+
+    #[test]
+    fn esc_drops_an_armed_transition() {
+        let (mut app, mut p) = two_decks();
+        press(&mut app, 'n');
+        press(&mut app, '4');
+        app.on_key(KeyEvent::press(Key::Esc));
+        assert!(
+            app.message().contains("Transition stopped"),
+            "{}",
+            app.message()
+        );
+        run(&mut app, &mut p, 9.0);
+        assert!(!app.snapshot().decks[1].playing);
+    }
+
+    #[test]
+    fn a_kill_key_takes_that_band_off_the_plan() {
+        let (mut app, mut p) = two_decks();
+        press(&mut app, 'n');
+        press(&mut app, '1');
+        run(&mut app, &mut p, 17.0);
+        // Kill A's lows by hand, then put them back: the plan must not cut them later.
+        press(&mut app, 't');
+        press(&mut app, 't');
+        run(&mut app, &mut p, 16.0);
+        let a_low = app.control_value(midi::Control::Eq(DeckId::A, input::Band::Low));
+        assert_eq!(a_low, 0.5);
+    }
+
+    #[test]
+    fn loading_a_track_onto_either_deck_drops_the_plan() {
+        let (mut app, mut p) = two_decks();
+        press(&mut app, 'n');
+        press(&mut app, '4');
+        app.load_track(
+            DeckId::B,
+            dj_tui::demo::click_track(120.0, 60.0, RATE),
+            meta(120.0),
+        );
+        run(&mut app, &mut p, 9.0);
+        assert!(!app.snapshot().decks[1].playing);
+    }
+
+    #[test]
+    fn the_view_lists_all_nine_and_what_comes_next() {
+        let (app, _p) = two_decks();
+        let t = app.view(String::new()).mixer.transitions;
+        assert_eq!(t.slots.len(), 9);
+        assert_eq!(t.slots[0].name, "Bass swap");
+        assert!(!t.next.is_empty());
+    }
+}
