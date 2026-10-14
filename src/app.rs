@@ -908,6 +908,14 @@ impl App {
         if slot >= 9 {
             return;
         }
+        // With each deck on its own outputs the faders and EQ never reach the sound, so a
+        // blend would play both tracks at full level.
+        if self.output == engine::OutputMode::Decks {
+            self.message = "Transitions need the built-in mixer, and a hardware mixer is \
+                            doing the mixing (output = \"decks\")"
+                .into();
+            return;
+        }
         let snap = self.handle.snapshot();
         let now = self.started.elapsed().as_secs_f64();
         let ctx = context(

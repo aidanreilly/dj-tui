@@ -922,6 +922,28 @@ mod transitions {
     }
 
     #[test]
+    fn with_a_hardware_mixer_doing_the_mixing_the_keys_refuse() {
+        let config = Config::from_toml("[audio]\noutput = \"decks\"\n").unwrap();
+        let (handle, mut p) = channel(Engine::new(), 64);
+        let mut app = App::new(handle, &config, RATE);
+        for d in [DeckId::A, DeckId::B] {
+            app.load_track(d, dj_tui::demo::click_track(120.0, 60.0, RATE), meta(120.0));
+        }
+        process(&mut p, 16);
+        app.on_key(KeyEvent::press(Key::Space));
+        process(&mut p, 16);
+        press(&mut app, 'n');
+        press(&mut app, '1');
+        assert!(
+            app.message().contains("hardware mixer"),
+            "{}",
+            app.message()
+        );
+        run(&mut app, &mut p, 17.0);
+        assert!(!app.snapshot().decks[1].playing);
+    }
+
+    #[test]
     fn the_view_lists_all_nine_and_what_comes_next() {
         let (app, _p) = two_decks();
         let t = app.view(String::new()).mixer.transitions;

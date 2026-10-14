@@ -1,6 +1,7 @@
 # Controls
 
-The keyboard has two layers. Mix mode is where you start.
+The keyboard has two layers. Mix mode is where you start. The transition layer on `n` is mix
+mode with the number row changed.
 
 ![The dj-tui mix mode key map on a UK keyboard](../images/keyboard.svg)
 
@@ -78,6 +79,19 @@ Every automated fade runs over the fade length, shown as `FADE 8b` on the crossf
 | `V` | Master filter sweeps back to the middle. |
 | `{` / `}` | Halve and double the fade length. |
 | `Esc` | Stop every running fade where it stands. |
+
+## Transitions
+
+`n` turns the transition layer on and off. In it, `1`–`9` are nine automatic mixes into the
+other deck, and every other key does what it does in mix mode. See
+[transitions](transitions.md).
+
+| Key | What it does |
+| --- | --- |
+| `n` | Transition layer on and off. `TRANSITIONS` leads the status line while it is on. |
+| `1`–`9` | Arm that transition. Again later disarms it. |
+| `1`–`9` twice, quickly | Switch that key off, or back on. |
+| `Esc` | Stop the transition where it stands, along with any fades. |
 
 ## Browser
 

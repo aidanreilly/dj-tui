@@ -6,29 +6,38 @@
 <rect x="92.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="98.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">1</text>
 <text x="123.0" y="68.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hot cue 1</text>
+<text x="123.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: swap</text>
 <rect x="160.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="166.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">2</text>
 <text x="191.0" y="68.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hot cue 2</text>
+<text x="191.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: long</text>
 <rect x="228.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="234.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">3</text>
 <text x="259.0" y="68.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hot cue 3</text>
+<text x="259.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: filter</text>
 <rect x="296.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="302.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">4</text>
 <text x="327.0" y="68.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hot cue 4</text>
+<text x="327.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: cut</text>
 <rect x="364.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="370.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">5</text>
 <text x="395.0" y="68.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hot cue 5</text>
+<text x="395.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: drop</text>
 <rect x="432.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="438.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">6</text>
 <text x="463.0" y="68.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hot cue 6</text>
+<text x="463.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: loop</text>
 <rect x="500.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="506.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">7</text>
 <text x="531.0" y="68.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hot cue 7</text>
+<text x="531.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: bridge</text>
 <rect x="568.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="574.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">8</text>
 <text x="599.0" y="68.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hot cue 8</text>
-<rect x="636.0" y="32.0" width="62.0" height="62" rx="7" fill="#e3e3e8" stroke="#c9c9d2" stroke-width="1"/>
-<text x="642.0" y="48.0" font-size="12" font-weight="600" fill="#8a8a95" opacity="0.95">9</text>
+<text x="599.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: brake</text>
+<rect x="636.0" y="32.0" width="62.0" height="62" rx="7" fill="#2f6f4f" stroke="#c9c9d2" stroke-width="1"/>
+<text x="642.0" y="48.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">9</text>
+<text x="667.0" y="82.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">n: auto</text>
 <rect x="704.0" y="32.0" width="62.0" height="62" rx="7" fill="#e3e3e8" stroke="#c9c9d2" stroke-width="1"/>
 <text x="710.0" y="48.0" font-size="12" font-weight="600" fill="#8a8a95" opacity="0.95">0</text>
 <rect x="772.0" y="32.0" width="62.0" height="62" rx="7" fill="#8a5a1f" stroke="#c9c9d2" stroke-width="1"/>
@@ -140,8 +149,10 @@
 <rect x="449.0" y="236.0" width="62.0" height="62" rx="7" fill="#27567f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="455.0" y="252.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">B</text>
 <text x="480.0" y="272.0" font-size="9.8" text-anchor="middle" fill="#ffffff">browser</text>
-<rect x="517.0" y="236.0" width="62.0" height="62" rx="7" fill="#e3e3e8" stroke="#c9c9d2" stroke-width="1"/>
-<text x="523.0" y="252.0" font-size="12" font-weight="600" fill="#8a8a95" opacity="0.95">N</text>
+<rect x="517.0" y="236.0" width="62.0" height="62" rx="7" fill="#8a5a1f" stroke="#c9c9d2" stroke-width="1"/>
+<text x="523.0" y="252.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">N</text>
+<text x="548.0" y="272.0" font-size="9.8" text-anchor="middle" fill="#ffffff">transitions</text>
+<text x="548.0" y="286.0" font-size="9" text-anchor="middle" fill="#ffffff" opacity="0.72">1-9 mix</text>
 <rect x="585.0" y="236.0" width="62.0" height="62" rx="7" fill="#8a5a1f" stroke="#c9c9d2" stroke-width="1"/>
 <text x="591.0" y="252.0" font-size="12" font-weight="600" fill="#ffffff" opacity="0.95">M</text>
 <text x="616.0" y="272.0" font-size="9.8" text-anchor="middle" fill="#ffffff">hp cue</text>

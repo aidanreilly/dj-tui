@@ -498,7 +498,7 @@ fn the_help_overlay_lists_the_keys_over_the_screen() {
     view.help = true;
     let shown = text(&view);
     assert!(shown.contains("HELP"), "{shown}");
-    for label in ["Space", "Tab", "hot cue", "loop", "Ctrl+Q"] {
+    for label in ["Space", "Tab", "hot cue", "loop", "n then 1-9", "Ctrl+Q"] {
         assert!(shown.contains(label), "missing {label}\n{shown}");
     }
 }

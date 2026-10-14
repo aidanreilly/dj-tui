@@ -59,6 +59,7 @@ Enough to mix two tracks. `?` shows the key list while running.
 | `Space` | Play or pause. |
 | `c` | Cue. Hold to preview from the cue point, release to snap back. |
 | `1`–`8` | Hot cue: jump to it, or set it where the pad is empty. |
+| `n` | Transition layer: `1`–`9` become nine automatic mixes into the other deck. `n` again gives the hot cues back. |
 | `s` | Sync. First press matches the other deck's tempo, second lines the beats up. |
 | `,` / `.` | Pitch down and up. `<` / `>` nudge the playhead instead. |
 | `k` | Key lock. |
@@ -80,6 +81,8 @@ Every key, both keyboard layers and the key map images: [docs/controls.md](docs/
 - [Controls](docs/controls.md): The full key reference for mix mode and browser mode.
 - [The browser](docs/browser.md): Library folders, tempo and key filtering, typed filters,
   Discogs genre lookup.
+- [Transitions](docs/transitions.md): The nine automatic mixes on the `n` layer, how they
+  choose where to start, and what bends them.
 - [Waveforms](docs/waveforms.md): The three colour modes and pixel rendering.
 - [Configuration](docs/configuration.md): The config file, four-output soundcards, feeding a
   hardware DJ mixer, MIDI mappings, track sidecars, logs.

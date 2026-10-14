@@ -6,11 +6,12 @@ set one, and edit it there. Every setting is commented in the example file. The 
 | Section | Covers |
 | --- | --- |
 | `[audio]` | Backend (JACK or raw ALSA), card, sample rate, buffer size, what the outputs carry, and where they are connected at startup. |
-| `[ui]` | Waveform colour mode, the pixel waveform toggle, and how early a deck warns that a track is ending. |
+| `[ui]` | Waveform colour mode, the pixel waveform toggle, how early a deck warns that a track is ending, and whether the EQ shows as one row or full rails. |
 | `[deck]` | Tempo fader range: 8, 16 or 50 percent. |
 | `[mixer]` | Crossfader curve and the fade length in beats. |
 | `[midi]` | Whether controllers are looked for, which mappings load, and soft takeover. |
 | `[library]` | Folders the browser lists, and the Discogs lookup. See [the browser](browser.md). |
+| `[transitions]` | What each of the nine transition keys does, and how long the blends run. See [transitions](transitions.md). |
 
 `Ctrl+D` opens the audio device screen, and the card you pick there is written back into the
 config file.
@@ -124,6 +125,21 @@ amixer -c 1 cget numid=24
 
 `sudo alsactl store 1` keeps the routing across a reboot. Then the ALSA config above works as
 written, with `plughw:1,0` for a card that reports as card 1.
+
+## Transition keys
+
+`slots` lists what `1` to `9` do in the transition layer, in order. Each entry is a kind, and
+for the blends a length in bars from 1 to 64. Keys past the end of the list keep the kind they
+come with.
+
+```toml
+[transitions]
+slots = ["bass-swap 8", "long-blend 64", "jump-cut", "drop-swap", "auto"]
+```
+
+The kinds are `bass-swap`, `long-blend`, `filter-blend`, `jump-cut`, `drop-swap`, `loop-out`,
+`tempo-bridge`, `brake` and `auto`. Cuts have no length. A mapping file can reach them too, as
+`transition 1` to `transition 9`, and `transitions` toggles the layer.
 
 ## MIDI controllers
 

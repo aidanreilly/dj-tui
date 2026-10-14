@@ -185,11 +185,13 @@ leaves the person's comments and ordering alone.
 ## Input layer
 
 `crates/input` decides what every key means, including which mode the keyboard is in:
-`Mode::Mix`, `Mode::Browser` and `Mode::Devices` in `keymap/mod.rs`, with a table per mode in
-`keymap/mix.rs` and `keymap/browser.rs`. `App::on_key` is a dispatcher and holds no modal
+`Mode::Mix`, `Mode::Browser`, `Mode::Devices` and `Mode::Transition` in `keymap/mod.rs`, with
+a table per mode in `keymap/mix.rs` and `keymap/browser.rs`. `App::on_key` is a dispatcher and holds no modal
 state of its own. Browser mode owns the whole keyboard so letters type a search, which is what
 frees the arrow keys for the faders, and its own commands sit on `Alt` plus a letter. `Esc`
 leaves in one press and the filter stays on, drawn under the list.
+
+`n` is the transition layer: see Transitions below.
 
 Backtick, which sent the next key to the other deck, is removed. `Tab` is the only way to
 reach the other deck. It saved one press per transition and was the keymap's only hidden
@@ -251,6 +253,45 @@ A fade dies on `Esc`, on any manual move of the same control from key or knob
 when another fade claims the control. At most one fade per control. The master filter's fade
 is the one exception to the track-load clause: it belongs to no deck, so `cancel_deck` leaves
 it running.
+
+## Transitions
+
+`n` toggles `Mode::Transition`, which is mix mode with `1`-`9` sending `Action::Transition`.
+The keymap does not flip the mode for `TransitionLayer`: it is a toggle, and a controller
+sends it straight to `App::on_action`, so the app flips it for both. `KeyEvent::repeat` marks
+the terminal's auto-repeat, which the layer drops so a held key cannot read as a double tap.
+
+Three parts, each tested with numbers:
+
+- `analysis::phrase` reads bars and sections from the overview's band envelope: the low band
+  per bar tells kick from no kick, four bars at a time, and a gap under eight bars is a fill.
+  The grid does not know which beat starts the bar, so the bar line is the beat the low band
+  changes on most, scored with squared differences (summed plainly, the four beats round one
+  step tie). `App::load_track` runs it, so nothing new goes in the sidecar.
+- `transition::plan` is pure: `Context` in, `Plan` out. A plan is steps timed in beats from a
+  downbeat on the outgoing deck, negative ones running ahead of it. Kinds bend to the pair:
+  a tempo gap makes a blend a cut, a key clash swaps the mids at once, no grid makes a fade
+  by the clock, a short runway shortens it. Volume rides the crossfader when it is parked on
+  the outgoing side and the channel faders otherwise, with `Curve::EqualPower` so two faders
+  crossing hold their power. Every plan ends with the old deck stopped and both EQs flat.
+- `transition::run::Transitions` arms, double-taps and plays a plan. Until the start the
+  clock is the outgoing playhead; from the start, or from a brake beginning, it is the frame
+  delta, because a loop wrapping or a deck slowing would stall it. A start landing late seeks
+  the incoming deck that much further in. It hands back `Effect`s and the app carries them
+  out through `set_control`, `Automation` and plain commands, so `ControlState` stays the
+  owner of every value. A manual move of a control (`manual_control`, `set_control`, a kill
+  or EQ step) releases that control from the plan; Esc and a load onto either deck drop it.
+  With `output = "decks"` the keys refuse, since the faders and EQ never reach the sound.
+
+Not done, and worth doing: steps run at the UI frame rate, so a cut can be up to a frame late
+and a swap on a downbeat can click. A frame-stamped command in the engine and per-sample gain
+ramps in the mixer would fix both. The planned start is shown as a countdown in the list, not
+yet as a marker on the waveform. There is no per-channel filter, so the filter blend is EQ.
+
+The mixer folds trim and EQ into one row unless `[ui] eq_rows = "always"`: `flat` until a
+band moves, then each letter lit by `EQ_CUT`, `EQ_BOOST` or `EQ_KILL`. The transition list sits
+under the master meter; the narrow bar grew a fifth row for the armed key. The `?` list is at
+42 rows, which is all a 44-row terminal shows: merge before adding.
 
 ## Browser
 

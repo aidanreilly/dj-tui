@@ -3,7 +3,8 @@
 
 Two layers, because the keyboard has two: images/keyboard.svg is mix mode and
 images/keyboard-browser.svg is browser mode, where letters type into the filter and every
-command sits on Alt. The bindings here are the ones in crates/input/src/keymap/mix.rs and
+command sits on Alt. The transition layer on N is mix mode with the number row changed, so it
+shares the mix map: the lower label on 1 to 9 is what the key does there. The bindings here are the ones in crates/input/src/keymap/mix.rs and
 crates/input/src/keymap/browser.rs. When a binding moves, change it in both places and run
 this again:
 
@@ -31,15 +32,15 @@ GROUPS = {
 MIX_ROWS = [
     [
         ("`", 1, None, "", ""),
-        ("1", 1, "transport", "hot cue 1", ""),
-        ("2", 1, "transport", "hot cue 2", ""),
-        ("3", 1, "transport", "hot cue 3", ""),
-        ("4", 1, "transport", "hot cue 4", ""),
-        ("5", 1, "transport", "hot cue 5", ""),
-        ("6", 1, "transport", "hot cue 6", ""),
-        ("7", 1, "transport", "hot cue 7", ""),
-        ("8", 1, "transport", "hot cue 8", ""),
-        ("9", 1, None, "", ""),
+        ("1", 1, "transport", "hot cue 1", "n: swap"),
+        ("2", 1, "transport", "hot cue 2", "n: long"),
+        ("3", 1, "transport", "hot cue 3", "n: filter"),
+        ("4", 1, "transport", "hot cue 4", "n: cut"),
+        ("5", 1, "transport", "hot cue 5", "n: drop"),
+        ("6", 1, "transport", "hot cue 6", "n: loop"),
+        ("7", 1, "transport", "hot cue 7", "n: bridge"),
+        ("8", 1, "transport", "hot cue 8", "n: brake"),
+        ("9", 1, "transport", "", "n: auto"),
         ("0", 1, None, "", ""),
         ("-", 1, "mixer", "tempo dn", "both decks"),
         ("=", 1, "mixer", "tempo up", "both decks"),
@@ -83,7 +84,7 @@ MIX_ROWS = [
         ("C", 1, "transport", "cue (hold)", ""),
         ("V", 1, "mixer", "master mid", "V slowly"),
         ("B", 1, "browser", "browser", ""),
-        ("N", 1, None, "", ""),
+        ("N", 1, "mixer", "transitions", "1-9 mix"),
         ("M", 1, "mixer", "hp cue", ""),
         (",", 1, "mixer", "pitch dn", "< nudge bk"),
         (".", 1, "mixer", "pitch up", "> nudge fw"),
