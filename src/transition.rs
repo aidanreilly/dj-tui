@@ -24,6 +24,8 @@ use analysis::tempo::BeatGrid;
 use engine::{DeckId, HOT_CUES};
 use input::{Band, Control};
 
+pub mod run;
+
 /// EQ positions in the 0-to-1 `Control` space: 0.5 is flat and 0 is the floor, 26 dB down.
 pub const EQ_FLAT: f32 = 0.5;
 pub const EQ_CUT: f32 = 0.0;
