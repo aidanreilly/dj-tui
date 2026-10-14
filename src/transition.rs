@@ -254,7 +254,7 @@ pub struct Plan {
     pub notes: Vec<String>,
     /// What marks the start: "cue 3", "breakdown", "phrase".
     pub out_label: String,
-    /// What marks the way in: "cue 1", "drop", "first bar".
+    /// What marks the way in: "cue 1", "drop", "bar 1".
     pub in_label: String,
 }
 
@@ -659,7 +659,7 @@ impl<'c, 'a> Planner<'c, 'a> {
             self.in_label = "cue".into();
         } else if let Some(g) = id.grid {
             self.in_from = Some(id.phrases.bar_secs(&g, 0) * sr);
-            self.in_label = "first bar".into();
+            self.in_label = "bar 1".into();
         } else {
             self.in_from = Some(0.0);
             self.in_label = "start".into();

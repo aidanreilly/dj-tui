@@ -182,7 +182,7 @@ fn without_a_hot_cue_the_main_cue_then_the_first_bar_is_the_way_in() {
     };
     let plan2 = ok(Kind::BassSwap, &ctx(playing_at(&p, 10.5), deck(&late)));
     assert_eq!(plan2.in_from, Some(BEAT), "bar 1 is on the second beat");
-    assert_eq!(plan2.in_label, "first bar");
+    assert_eq!(plan2.in_label, "bar 1");
 }
 
 #[test]
