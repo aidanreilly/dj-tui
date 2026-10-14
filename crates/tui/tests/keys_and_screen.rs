@@ -64,14 +64,16 @@ fn auto_repeat_arrives_as_a_press_so_holding_a_key_keeps_stepping() {
     // Terminals that report event types send Repeat while a key is held. Dropping it meant
     // holding an arrow moved the fader exactly one step on the terminals dj-tui recommends.
     let e = convert_key(ct(KeyCode::Down, KeyModifiers::NONE, KeyEventKind::Repeat));
-    assert_eq!(e, Some(KeyEvent::press(Key::Down)));
+    // Still a press, marked as a repeat so the transition keys can tell it from a double tap.
+    assert_eq!(e, Some(KeyEvent::press(Key::Down).repeat()));
+    assert!(e.is_some_and(|e| !e.release));
     // Cue is held rather than stepped, and the keymap is what keeps it from retriggering.
     let c = convert_key(ct(
         KeyCode::Char('c'),
         KeyModifiers::NONE,
         KeyEventKind::Repeat,
     ));
-    assert_eq!(c, Some(KeyEvent::press(Key::Char('c'))));
+    assert_eq!(c, Some(KeyEvent::press(Key::Char('c')).repeat()));
 }
 
 #[test]
@@ -214,7 +216,11 @@ fn mixer_text(m: MixerView, w: u16, h: u16) -> String {
 
 #[test]
 fn mixer_strip_shows_trim_eq_meters_and_the_master_filter() {
-    let text = mixer_text(MixerView::default(), 120, 44);
+    let full = MixerView {
+        full_eq: true,
+        ..Default::default()
+    };
+    let text = mixer_text(full, 120, 44);
     for label in ["TRIM", "HI", "MID", "LOW", "FLT", "PK", "VOL", "CUE"] {
         assert!(text.contains(label), "missing {label}\n{text}");
     }
@@ -310,7 +316,10 @@ fn colour_of(buf: &Buffer, label: &str, glyphs: &[char]) -> ratatui::style::Colo
 fn a_killed_band_is_muted_rather_than_shouted() {
     // KILL is the state of a band, not a value being read off the row, so it recedes with
     // the rail instead of being the brightest thing in the strip.
-    let mut m = MixerView::default();
+    let mut m = MixerView {
+        full_eq: true,
+        ..Default::default()
+    };
     m.strips[0].kills = [false, false, true];
     let buf = mixer_buffer(m, 120, 44);
     let [r, g, b] = tui::theme::BASE01;
@@ -392,7 +401,11 @@ fn the_longest_fade_length_still_fits_the_panel() {
 
 #[test]
 fn killed_bands_say_kill() {
-    let mut m = MixerView::default();
+    // On the full rails. The folded row lights the band's letter instead.
+    let mut m = MixerView {
+        full_eq: true,
+        ..Default::default()
+    };
     m.strips[1].kills = [false, false, true];
     let text = mixer_text(m, 120, 44);
     assert!(text.contains("KILL"), "{text}");

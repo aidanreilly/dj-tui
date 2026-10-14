@@ -12,8 +12,33 @@ use std::f32::consts::TAU;
 use std::io::Write;
 use tui::pixel::{loop_columns, playhead_x, Palette, Wave, WaveformBitmaps, WaveformMode};
 use tui::{
-    render_screen, screen_layout, waveform_area, DeckView, MixerView, ScreenView, StripView,
+    render_screen, screen_layout, waveform_area, DeckView, MixerView, ScreenView, SlotState,
+    SlotView, StripView, TransitionView,
 };
+
+/// The transition layer mid-set: a bass swap armed, one key switched off, one bent to fit.
+fn transition_list() -> TransitionView {
+    let slot = |name: &str, detail: &str, state| SlotView {
+        name: name.into(),
+        detail: detail.into(),
+        state,
+    };
+    TransitionView {
+        layer: true,
+        slots: vec![
+            slot("Bass swap", "▸ 3 bars", SlotState::Armed),
+            slot("Long blend", "32 bars", SlotState::Ready),
+            slot("Filter blend", "16 bars", SlotState::Ready),
+            slot("Jump cut", "cut", SlotState::Ready),
+            slot("Drop swap", "cut", SlotState::Adapted),
+            slot("Loop out", "8 bars", SlotState::Ready),
+            slot("Tempo bridge", "off", SlotState::Disabled),
+            slot("Brake", "cut", SlotState::Ready),
+            slot("Auto", "▹long 32", SlotState::Ready),
+        ],
+        next: vec!["A→B Bass swap".into(), "out breakdown · in cue 1".into()],
+    }
+}
 
 const FS: u32 = 48_000;
 const COLS: u16 = 120;
@@ -167,6 +192,8 @@ fn main() {
                 crossfader_fade_target: None,
                 focused: DeckId::A,
                 output: engine::OutputMode::Mix,
+                full_eq: false,
+                transitions: transition_list(),
             },
             status: "JACK dj-tui @ 48000 Hz / 256 frames, xruns 0  |  hold-cue on  |  pixel waveforms  |  ? help".into(),
             message: format!("Waveform: {}", match mode { WaveformMode::ThreeBand => "3-Band", WaveformMode::Rgb => "RGB", WaveformMode::Blue => "Blue" }),

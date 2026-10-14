@@ -88,7 +88,8 @@ fn the_compact_bar_names_the_mode() {
 #[test]
 fn mix_mode_still_draws_the_full_strip() {
     let out = render(OutputMode::Mix, 120, 44);
-    for row in ["TRIM", "FLT", "MSTR", "MIX"] {
+    // The trim and EQ rails fold into one EQ row unless they are asked for in full.
+    for row in ["EQ ", "FLT", "MSTR", "MIX"] {
         assert!(out.contains(row), "{row} missing from the mix strip: {out}");
     }
     assert!(!out.contains("DECK OUT"), "{out}");

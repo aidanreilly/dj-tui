@@ -61,6 +61,15 @@ pub const METER_HOT: [u8; 3] = YELLOW;
 pub const METER_CLIP: [u8; 3] = RED;
 /// A track whose key would mix with what is playing.
 pub const KEY_MATCH: [u8; 3] = GREEN;
+/// The folded EQ row: a band pulled down, pushed up, or killed. A flat band is `BASE01`.
+pub const EQ_CUT: [u8; 3] = YELLOW;
+pub const EQ_BOOST: [u8; 3] = CYAN;
+pub const EQ_KILL: [u8; 3] = RED;
+/// Transition keys: the one waiting for its downbeat, the one playing out, and one the
+/// planner bent to suit the pair. A key with nothing to do, or switched off, is `BASE01`.
+pub const SLOT_ARMED: [u8; 3] = ORANGE;
+pub const SLOT_RUNNING: [u8; 3] = GREEN;
+pub const SLOT_ADAPTED: [u8; 3] = YELLOW;
 
 /// Turn one of the constants above into a ratatui colour.
 pub const fn colour(c: [u8; 3]) -> Color {

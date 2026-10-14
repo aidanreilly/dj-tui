@@ -390,47 +390,53 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
     let inner = block.inner(area);
     let [a, b] = &m.strips;
     let lines = if inner.height >= 12 {
-        vec![
-            {
-                let (sa, sb) = column_styles(m.focused);
-                let mark = |d: DeckId, letter: &str| {
-                    if m.focused == d {
-                        format!("{:^w$}", format!("▸{letter}"), w = BAR)
-                    } else {
-                        format!("{letter:^w$}", w = BAR)
-                    }
-                };
-                Line::from(vec![
-                    Span::raw(format!("{:<5}", "")),
-                    Span::styled(mark(DeckId::A, "A"), sa.add_modifier(Modifier::BOLD)),
-                    Span::raw(" "),
-                    Span::styled(mark(DeckId::B, "B"), sb.add_modifier(Modifier::BOLD)),
-                ])
-            },
-            row(
-                "TRIM",
-                centre_bar(a.trim_db / TRIM_RANGE_DB, BAR),
-                centre_bar(b.trim_db / TRIM_RANGE_DB, BAR),
-                m.focused,
-            ),
-            row(
-                "HI",
-                eq_bar(a.eq_db[2], a.kills[2], BAR),
-                eq_bar(b.eq_db[2], b.kills[2], BAR),
-                m.focused,
-            ),
-            row(
-                "MID",
-                eq_bar(a.eq_db[1], a.kills[1], BAR),
-                eq_bar(b.eq_db[1], b.kills[1], BAR),
-                m.focused,
-            ),
-            row(
-                "LOW",
-                eq_bar(a.eq_db[0], a.kills[0], BAR),
-                eq_bar(b.eq_db[0], b.kills[0], BAR),
-                m.focused,
-            ),
+        let mut lines = vec![{
+            let (sa, sb) = column_styles(m.focused);
+            let mark = |d: DeckId, letter: &str| {
+                if m.focused == d {
+                    format!("{:^w$}", format!("▸{letter}"), w = BAR)
+                } else {
+                    format!("{letter:^w$}", w = BAR)
+                }
+            };
+            Line::from(vec![
+                Span::raw(format!("{:<5}", "")),
+                Span::styled(mark(DeckId::A, "A"), sa.add_modifier(Modifier::BOLD)),
+                Span::raw(" "),
+                Span::styled(mark(DeckId::B, "B"), sb.add_modifier(Modifier::BOLD)),
+            ])
+        }];
+        if m.full_eq {
+            lines.extend([
+                row(
+                    "TRIM",
+                    centre_bar(a.trim_db / TRIM_RANGE_DB, BAR),
+                    centre_bar(b.trim_db / TRIM_RANGE_DB, BAR),
+                    m.focused,
+                ),
+                row(
+                    "HI",
+                    eq_bar(a.eq_db[2], a.kills[2], BAR),
+                    eq_bar(b.eq_db[2], b.kills[2], BAR),
+                    m.focused,
+                ),
+                row(
+                    "MID",
+                    eq_bar(a.eq_db[1], a.kills[1], BAR),
+                    eq_bar(b.eq_db[1], b.kills[1], BAR),
+                    m.focused,
+                ),
+                row(
+                    "LOW",
+                    eq_bar(a.eq_db[0], a.kills[0], BAR),
+                    eq_bar(b.eq_db[0], b.kills[0], BAR),
+                    m.focused,
+                ),
+            ]);
+        } else {
+            lines.push(eq_summary_row(a, b, m.focused));
+        }
+        lines.extend([
             master_row("FLT", centre_bar(m.filter, MASTER_WIDTH)),
             Line::from(""),
             meter_row("PK", a.meter, b.meter, m.focused),
@@ -469,7 +475,10 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
                 spans.extend(meter_spans(m.master_meter));
                 Line::from(spans)
             },
-        ]
+        ]);
+        let room = (inner.height as usize).saturating_sub(lines.len());
+        transition_lines(&mut lines, &m.transitions, room, inner.width as usize);
+        lines
     } else {
         // The label column is the width the tall mixer uses, so a channel's fader and its
         // meter start in the same place and read as the one channel.
@@ -487,7 +496,177 @@ pub(crate) fn render_mixer(f: &mut Frame, area: Rect, m: &MixerView) {
             dot(m.headphone_cue[1]),
             crossfader_bar(m.crossfader, m.crossfader_fade_target)
         )));
-        vec![Line::from(vol), Line::from(pk)]
+        let mut lines = vec![Line::from(vol), Line::from(pk)];
+        if let Some(line) = transition_bar_line(&m.transitions) {
+            lines.push(line);
+        }
+        lines
     };
     f.render_widget(Paragraph::new(lines).block(block), area);
+}
+
+/// One channel's cell in the folded EQ row: `flat` while nothing has moved, otherwise the
+/// three band letters lit by what happened to each, and the trim when it is off zero.
+fn eq_cell(s: &StripView, style: Style) -> Vec<Span<'static>> {
+    let muted = style.fg(theme::colour(theme::BASE01));
+    let moved = s.kills.iter().any(|&k| k)
+        || s.eq_db.iter().any(|d| d.abs() >= 0.5)
+        || s.trim_db.abs() >= 0.5;
+    if !moved {
+        return vec![Span::styled(format!("{:^w$}", "flat", w = BAR), muted)];
+    }
+    // The strip's arrays run low, mid, high.
+    let mut spans: Vec<Span<'static>> = [(0, 'L'), (1, 'M'), (2, 'H')]
+        .into_iter()
+        .map(|(band, letter)| {
+            let db = s.eq_db[band];
+            let colour = if s.kills[band] {
+                theme::EQ_KILL
+            } else if db <= -0.5 {
+                theme::EQ_CUT
+            } else if db >= 0.5 {
+                theme::EQ_BOOST
+            } else {
+                theme::BASE01
+            };
+            Span::styled(letter.to_string(), style.fg(theme::colour(colour)))
+        })
+        .collect();
+    let trim = if s.trim_db.abs() >= 0.5 {
+        format!(" {:>+3}", s.trim_db.round() as i32)
+    } else {
+        "    ".into()
+    };
+    spans.push(Span::styled(trim, style));
+    spans
+}
+
+fn eq_summary_row(a: &StripView, b: &StripView, focused: DeckId) -> Line<'static> {
+    let (sa, sb) = column_styles(focused);
+    let mut spans = vec![Span::raw(format!("{:<5}", "EQ"))];
+    spans.extend(eq_cell(a, sa));
+    spans.push(Span::raw(" "));
+    spans.extend(eq_cell(b, sb));
+    Line::from(spans)
+}
+
+/// Width of a transition row's name column, which fits the longest kind's name.
+const SLOT_NAME: usize = 12;
+/// Width of its detail column: a length, a countdown, or what Auto picked.
+const SLOT_DETAIL: usize = 8;
+
+fn slot_style(state: SlotState, live: bool) -> Style {
+    let base = if live {
+        Style::new()
+    } else {
+        // Outside the layer the keys do something else, so the list sits back.
+        Style::new().add_modifier(Modifier::DIM)
+    };
+    match state {
+        SlotState::Ready => base,
+        SlotState::Adapted => base,
+        SlotState::Unavailable => base.fg(theme::colour(theme::BASE01)),
+        SlotState::Disabled => base
+            .fg(theme::colour(theme::BASE01))
+            .add_modifier(Modifier::CROSSED_OUT),
+        SlotState::Armed => Style::new()
+            .fg(theme::colour(theme::SLOT_ARMED))
+            .add_modifier(Modifier::BOLD),
+        SlotState::Running => Style::new()
+            .fg(theme::colour(theme::SLOT_RUNNING))
+            .add_modifier(Modifier::BOLD),
+    }
+}
+
+fn slot_line(n: usize, slot: &SlotView, live: bool) -> Line<'static> {
+    let style = slot_style(slot.state, live);
+    let detail_style = match slot.state {
+        SlotState::Ready => style.fg(theme::colour(theme::BASE01)),
+        SlotState::Adapted => style.fg(theme::colour(theme::SLOT_ADAPTED)),
+        SlotState::Disabled => style.remove_modifier(Modifier::CROSSED_OUT),
+        _ => style,
+    };
+    let name: String = slot.name.chars().take(SLOT_NAME).collect();
+    let detail: String = slot.detail.chars().take(SLOT_DETAIL).collect();
+    Line::from(vec![
+        Span::styled(
+            format!("{n} "),
+            style
+                .add_modifier(Modifier::BOLD)
+                .remove_modifier(Modifier::CROSSED_OUT),
+        ),
+        Span::styled(format!("{name:<SLOT_NAME$}"), style),
+        Span::raw(" "),
+        Span::styled(format!("{detail:>SLOT_DETAIL$}"), detail_style),
+    ])
+}
+
+/// The transition list: a header, one row per key, and what comes next in whatever room is
+/// left. Rows that do not fit are left off from the bottom, `next` first.
+fn transition_lines(lines: &mut Vec<Line<'static>>, t: &TransitionView, room: usize, width: usize) {
+    if t.slots.is_empty() || room < 2 {
+        return;
+    }
+    let header = if t.layer {
+        Line::from(Span::styled(
+            format!("{:<w$}", "TRANSITIONS  1-9 live", w = width),
+            Style::new()
+                .fg(theme::colour(theme::SLOT_ARMED))
+                .add_modifier(Modifier::BOLD),
+        ))
+    } else {
+        Line::from(Span::styled(
+            "TRANSITIONS  n for keys",
+            Style::new().fg(theme::colour(theme::BASE01)),
+        ))
+    };
+    let mut room = room;
+    // A blank line ahead of the header when there is space for it and the whole list.
+    if room > t.slots.len() + 1 {
+        lines.push(Line::from(""));
+        room -= 1;
+    }
+    lines.push(header);
+    room -= 1;
+    for (i, slot) in t.slots.iter().enumerate().take(room) {
+        lines.push(slot_line(i + 1, slot, t.layer));
+    }
+    room = room.saturating_sub(t.slots.len());
+    for (i, text) in t.next.iter().take(room).enumerate() {
+        let text: String = text.chars().take(width).collect();
+        let style = if i == 0 {
+            Style::new().add_modifier(Modifier::BOLD)
+        } else {
+            Style::new().fg(theme::colour(theme::BASE01))
+        };
+        lines.push(Line::from(Span::styled(text, style)));
+    }
+}
+
+/// The narrow bar has one line to spare: the key that is armed or running, or how to get
+/// at them.
+fn transition_bar_line(t: &TransitionView) -> Option<Line<'static>> {
+    if t.slots.is_empty() {
+        return None;
+    }
+    let live = t
+        .slots
+        .iter()
+        .enumerate()
+        .find(|(_, s)| matches!(s.state, SlotState::Armed | SlotState::Running));
+    Some(match live {
+        Some((i, slot)) => {
+            let mut line = slot_line(i + 1, slot, true);
+            line.spans.insert(0, Span::raw(format!("{:<5}", "XFM")));
+            line
+        }
+        None => Line::from(Span::styled(
+            if t.layer {
+                "XFM  1-9 live"
+            } else {
+                "XFM  n for transition keys"
+            },
+            Style::new().fg(theme::colour(theme::BASE01)),
+        )),
+    })
 }

@@ -5,7 +5,7 @@ pub const DECK_HEIGHT: u16 = 13;
 pub const PHASE_HEIGHT: u16 = 1;
 pub const MIXER_WIDTH: u16 = 26;
 /// Height of the collapsed horizontal mixer used on narrow terminals.
-pub const MIXER_BAR_HEIGHT: u16 = 4;
+pub const MIXER_BAR_HEIGHT: u16 = 5;
 /// Below this width the mixer strip collapses into a bar under the decks.
 pub const WIDE_MIN_WIDTH: u16 = 110;
 

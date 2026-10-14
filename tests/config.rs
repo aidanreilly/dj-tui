@@ -394,10 +394,7 @@ mod transitions {
 
     #[test]
     fn there_are_only_nine_keys() {
-        let ten = format!(
-            "[transitions]\nslots = [{}]\n",
-            vec!["\"auto\""; 10].join(", ")
-        );
+        let ten = format!("[transitions]\nslots = [{}]\n", ["\"auto\""; 10].join(", "));
         let err = Config::from_toml(&ten).unwrap_err();
         assert!(err.contains("nine"), "{err}");
     }
