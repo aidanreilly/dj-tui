@@ -59,6 +59,12 @@ end_warning_secs = 30
 # else. "off" forces the block characters.
 graphics = "auto"
 
+# The mixer's trim and EQ rails. "auto" folds them into one EQ row that stays blank while
+# every band is flat and lights a letter when one is cut, boosted or killed, since the
+# transitions drive the EQ for you. "always" draws the full rails, for a controller with
+# EQ knobs.
+eq_rows = "auto"
+
 [deck]
 
 # Tempo fader range in percent, either side of the track's own tempo: 8, 16 or 50.
@@ -91,6 +97,15 @@ mappings = []
 # knobs are somewhere else cannot jump a fader on the first touch. Turning this off trusts
 # the controller's positions from the start.
 soft_takeover = true
+
+[transitions]
+
+# What 1 to 9 do in the transition layer, which n turns on. One entry per key, in order: a
+# kind, and for the blends a length in bars from 1 to 64. Keys past the end of the list keep
+# the kind they come with, which is this list:
+# slots = ["bass-swap 16", "long-blend 32", "filter-blend 16", "jump-cut", "drop-swap",
+#          "loop-out 8", "tempo-bridge 8", "brake", "auto"]
+slots = []
 
 [library]
 

@@ -246,7 +246,15 @@ fn the_example_config_lists_every_key_at_its_default() {
     // key by the time it was noticed.
     let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/config.rs"))
         .expect("src/config.rs is where the sections are declared");
-    for section in ["Audio", "Ui", "Deck", "Mixer", "Midi", "Library"] {
+    for section in [
+        "Audio",
+        "Ui",
+        "Deck",
+        "Mixer",
+        "Midi",
+        "Library",
+        "Transitions",
+    ] {
         let decl = format!("pub struct {section} {{");
         let at = source
             .find(&decl)
@@ -273,6 +281,7 @@ fn the_example_config_lists_every_key_at_its_default() {
         "[mixer]",
         "[midi]",
         "[library]",
+        "[transitions]",
     ] {
         assert!(
             text.contains(section),
@@ -330,4 +339,73 @@ fn decks_with_split_routing_is_rejected() {
         .expect_err("split folds a master and a cue onto one pair");
     assert!(err.contains("split"), "{err}");
     assert!(err.contains("decks"), "{err}");
+}
+
+mod transitions {
+    use dj_tui::config::{Config, EqRows};
+    use dj_tui::transition::{default_slots, Kind, Slot};
+
+    #[test]
+    fn the_nine_keys_come_set_up() {
+        assert_eq!(Config::default().transitions.slots(), default_slots());
+    }
+
+    #[test]
+    fn a_slot_takes_a_kind_and_an_optional_length_in_bars() {
+        let c = Config::from_toml(
+            "[transitions]\nslots = [\"long-blend 64\", \"jump-cut\", \"auto\"]\n",
+        )
+        .unwrap();
+        let slots = c.transitions.slots();
+        assert_eq!(
+            slots[0],
+            Slot {
+                kind: Kind::LongBlend,
+                bars: Some(64)
+            }
+        );
+        assert_eq!(slots[1], Slot::new(Kind::JumpCut));
+        assert_eq!(slots[2], Slot::new(Kind::Auto));
+        // Keys the list does not reach keep what they had.
+        assert_eq!(slots[3], default_slots()[3]);
+    }
+
+    #[test]
+    fn an_unknown_kind_names_the_ones_there_are() {
+        let err = Config::from_toml("[transitions]\nslots = [\"spinback\"]\n").unwrap_err();
+        assert!(
+            err.contains("spinback") && err.contains("bass-swap"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_cut_has_no_length_to_set() {
+        let err = Config::from_toml("[transitions]\nslots = [\"jump-cut 8\"]\n").unwrap_err();
+        assert!(err.contains("jump-cut"), "{err}");
+    }
+
+    #[test]
+    fn lengths_stay_within_what_a_track_can_hold() {
+        assert!(Config::from_toml("[transitions]\nslots = [\"bass-swap 0\"]\n").is_err());
+        assert!(Config::from_toml("[transitions]\nslots = [\"bass-swap 65\"]\n").is_err());
+        assert!(Config::from_toml("[transitions]\nslots = [\"bass-swap 1\"]\n").is_ok());
+    }
+
+    #[test]
+    fn there_are_only_nine_keys() {
+        let ten = format!(
+            "[transitions]\nslots = [{}]\n",
+            vec!["\"auto\""; 10].join(", ")
+        );
+        let err = Config::from_toml(&ten).unwrap_err();
+        assert!(err.contains("nine"), "{err}");
+    }
+
+    #[test]
+    fn the_eq_rows_hide_unless_asked_for() {
+        assert_eq!(Config::default().ui.eq_rows, EqRows::Auto);
+        let c = Config::from_toml("[ui]\neq_rows = \"always\"\n").unwrap();
+        assert_eq!(c.ui.eq_rows, EqRows::Always);
+    }
 }

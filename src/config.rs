@@ -45,6 +45,80 @@ pub struct Config {
     pub mixer: Mixer,
     pub midi: Midi,
     pub library: Library,
+    pub transitions: Transitions,
+}
+
+/// The nine transition keys. Each entry is a kind, optionally followed by a length in bars:
+/// `"bass-swap"`, `"long-blend 64"`. Keys past the end of the list keep their own kind.
+#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Transitions {
+    pub slots: Vec<String>,
+}
+
+/// The longest a transition can be set to, in bars.
+pub const MAX_TRANSITION_BARS: u32 = 64;
+
+impl Transitions {
+    /// The slots, with the configured ones over the defaults. Only valid after `validate`.
+    pub fn slots(&self) -> [crate::transition::Slot; 9] {
+        let mut slots = crate::transition::default_slots();
+        for (slot, text) in slots.iter_mut().zip(&self.slots) {
+            if let Ok(parsed) = parse_slot(text) {
+                *slot = parsed;
+            }
+        }
+        slots
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.slots.len() > 9 {
+            return Err(format!(
+                "transitions.slots has {} entries, but there are only nine keys",
+                self.slots.len()
+            ));
+        }
+        for text in &self.slots {
+            parse_slot(text)?;
+        }
+        Ok(())
+    }
+}
+
+fn parse_slot(text: &str) -> Result<crate::transition::Slot, String> {
+    use crate::transition::{Kind, Slot};
+    let mut words = text.split_whitespace();
+    let name = words.next().unwrap_or("");
+    let Some(kind) = Kind::parse(name) else {
+        let known: Vec<&str> = Kind::ALL.iter().map(|k| k.config_name()).collect();
+        return Err(format!(
+            "transitions.slots: \"{name}\" is not a transition. These are: {}",
+            known.join(", ")
+        ));
+    };
+    let bars = match words.next() {
+        None => None,
+        Some(_) if kind.default_bars() == 0 => {
+            return Err(format!(
+                "transitions.slots: {name} is a cut, so it has no length to set"
+            ))
+        }
+        Some(n) => match n.parse::<u32>() {
+            Ok(b) if (1..=MAX_TRANSITION_BARS).contains(&b) => Some(b),
+            _ => {
+                return Err(format!(
+                    "transitions.slots: the length of {name} is in bars, from 1 to \
+                     {MAX_TRANSITION_BARS}, got {n}"
+                ))
+            }
+        },
+    };
+    if words.next().is_some() {
+        return Err(format!(
+            "transitions.slots: \"{text}\" should be a kind and at most a length"
+        ));
+    }
+    Ok(Slot { kind, bars })
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Deserialize)]
@@ -154,6 +228,17 @@ pub struct Ui {
     pub end_warning_secs: u32,
     /// Pixel waveforms through the kitty graphics protocol when the terminal supports it.
     pub graphics: Graphics,
+    /// The mixer's per-channel trim and EQ rails. `auto` folds them into one summary row,
+    /// since the transitions drive the EQ; `always` draws them in full, for EQ knobs.
+    pub eq_rows: EqRows,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EqRows {
+    #[default]
+    Auto,
+    Always,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -170,6 +255,7 @@ impl Default for Ui {
             waveform_mode: WaveformMode::ThreeBand,
             end_warning_secs: 30,
             graphics: Graphics::Auto,
+            eq_rows: EqRows::Auto,
         }
     }
 }
@@ -261,6 +347,7 @@ impl Config {
 
     fn validate(&self) -> Result<(), String> {
         self.routing()?;
+        self.transitions.validate()?;
         if self.audio.output == OutputSetting::Decks && self.audio.routing == RoutingMode::Split {
             return Err(
                 "audio.output = \"decks\" cannot use routing = \"split\": split folds a \
