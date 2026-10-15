@@ -138,7 +138,7 @@ slots = ["bass-swap 8", "long-blend 64", "jump-cut", "drop-swap", "auto"]
 ```
 
 The kinds are `bass-swap`, `long-blend`, `filter-blend`, `jump-cut`, `drop-swap`, `loop-out`,
-`tempo-bridge`, `brake` and `auto`. Cuts have no length. A mapping file can reach them too, as
+`tempo-bridge`, `brake` and `auto`. `jump-cut`, `drop-swap`, `brake` and `auto` take no length. A mapping file can reach them too, as
 `transition 1` to `transition 9`, and `transitions` toggles the layer.
 
 ## MIDI controllers

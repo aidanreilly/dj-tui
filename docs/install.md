@@ -70,7 +70,7 @@ Run dj-tui directly in a modern terminal emulator such as Ghostty, kitty, foot, 
 recent Alacritty. Terminal multiplexers are not supported.
 
 Give the window at least 110 columns. Narrower than that and the mixer collapses into a bar
-under the decks carrying only the channel faders, the meters, the cue dots and the crossfader.
+under the decks carrying only the channel faders, the meters, the cue dots, the crossfader and a line for the armed transition.
 The full strip with trim, EQ, filter and the headphone mix needs the width. Forty rows keeps
 both decks and the browser on screen at once.
 

@@ -59,10 +59,10 @@ end_warning_secs = 30
 # else. "off" forces the block characters.
 graphics = "auto"
 
-# The mixer's trim and EQ rails. "auto" folds them into one EQ row that stays blank while
-# every band is flat and lights a letter when one is cut, boosted or killed, since the
-# transitions drive the EQ for you. "always" draws the full rails, for a controller with
-# EQ knobs.
+# The mixer's trim and EQ rails. "auto" folds them into one EQ row that reads "flat" while
+# the trim and every band are at zero and lights a letter when a band is cut, boosted or
+# killed, since the transitions drive the EQ for you. "always" draws the full rails, for a
+# controller with EQ knobs.
 eq_rows = "auto"
 
 [deck]

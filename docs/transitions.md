@@ -9,6 +9,8 @@ band while a transition runs.
 The list under the mixer shows what each key would do right now, and it updates as the decks
 move. `TRANSITIONS` leads the status line while the layer is on.
 
+With `output = "decks"` the keys refuse and say why: a hardware mixer is doing the mixing, so the faders and EQ a transition moves never reach the sound, and a blend would play both tracks at full level.
+
 ## The keys
 
 | Key | Kind | What it does |
@@ -18,8 +20,8 @@ move. `TRANSITIONS` leads the status line while the layer is on.
 | `3` | Filter blend | 16 bars. The next track arrives as highs alone and opens up, while the old one closes down to its lows. Done with the EQ, since the mixer has one filter on the master rather than one per channel. |
 | `4` | Jump cut | A clean cut on the next four-bar line. |
 | `5` | Drop swap | Waits for the old track's breakdown to end and cuts straight into the next track's drop. |
-| `6` | Loop out | Loops the old track's last four bars and blends over the loop. For when the track is running out. |
-| `7` | Tempo bridge | For two tracks further apart than the tempo fader reaches. Rides the old track's tempo across over eight bars, with key lock on, then blends. |
+| `6` | Loop out | 8 bars. Loops four bars of the old track and blends over the loop. For when the track is running out. |
+| `7` | Tempo bridge | 8 bars. For two tracks further apart than the tempo fader reaches. Rides the old track's tempo across over eight bars, with key lock on, then blends for the length of the slot. |
 | `8` | Brake | Winds the old track down like a turntable stopping and drops the next one on the downbeat. |
 | `9` | Auto | Picks one of the eight to suit the pair: see below. |
 
