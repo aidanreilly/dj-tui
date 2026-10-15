@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.4
+
+`n` turns the number row into nine automatic transitions from the playing deck into the other one: bass swap, long blend, filter blend, jump cut, drop swap, loop out, tempo bridge, brake, and Auto, which picks one to suit the pair. Each works out where to start from your hot cues, the track's sections and its phrase lines, brings the next track to tempo, and rides the EQ and faders across. A tempo gap, a key clash, a missing beat grid or a short runway bends the plan, and the list under the mixer shows what each key would do right now. One tap arms a transition for its downbeat, and moving any control it drives hands that control back to you. `[transitions] slots` in the config file changes what each key does and how long the blends run. See [transitions](docs/transitions.md).
+
+Bars and sections now come from the low band of the overview waveform when a track loads, so intros, breakdowns, drops and outros are known without anything new in the sidecar.
+
+The mixer folds trim and EQ into one row that reads `flat` until a band moves, then lights each band's letter for a cut, a boost or a kill. `[ui] eq_rows = "always"` brings the full rails back for a controller with EQ knobs.
+
+With `output = "decks"` the transition keys refuse, since a hardware mixer does the mixing and a blend would play both tracks at full level.
+
 ## 0.1.3
 
 `[audio] output = "decks"` sends deck A to outputs 1 and 2 and deck B to 3 and 4, untouched,
